@@ -1,0 +1,7 @@
+node_modules/
+unpacked1/
+unpacked2/
+files/
+*.md
+build-guide.md
+tech-spec.md
