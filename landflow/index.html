@@ -315,7 +315,7 @@ textarea.form-input{resize:vertical;min-height:80px}
     <input class="auth-input" id="authPass" type="password" placeholder="••••••••" autocomplete="current-password">
     <button class="auth-btn" onclick="signIn()">Sign In</button>
     <div class="auth-err" id="authErr"></div>
-    <div style="margin-top:20px;font-size:11px;color:var(--text3)">First time? <span style="color:var(--gold);cursor:pointer" onclick="signUp()">Create account</span></div>
+    <div style="margin-top:20px;font-size:11px;color:var(--text3)">Internal use only — Elk Creek Group USA LLC</div>
   </div>
 </div>
 
@@ -367,6 +367,12 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="nav-label">Documents</div>
       <div class="nav-item" onclick="nav('vault',this)" data-title="Doc Vault">
         <span class="nav-icon">🗄</span>Document Vault
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Account</div>
+      <div class="nav-item" onclick="openModal('passwordModal');closeDrawer()">
+        <span class="nav-icon">🔑</span>Change Password
       </div>
     </div>
     <div class="drawer-stats">
@@ -663,6 +669,27 @@ textarea.form-input{resize:vertical;min-height:80px}
   </div>
 </div>
 
+<!-- PASSWORD MODAL -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-head">
+      <div class="modal-title">Change Password</div>
+      <button class="modal-close" onclick="closeModal('passwordModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="form-group"><label class="form-label">New Password</label><input class="form-input" id="pw-new" type="password" placeholder="Min 6 characters"></div>
+        <div class="form-group"><label class="form-label">Confirm Password</label><input class="form-input" id="pw-confirm" type="password" placeholder="Re-enter password"></div>
+        <div id="pwErr" style="font-size:12px;min-height:18px"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('passwordModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="changePassword()">🔑 Update Password</button>
+    </div>
+  </div>
+</div>
+
 <!-- DETAIL PANEL -->
 <div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
 <div class="detail-panel" id="detailPanel">
@@ -794,18 +821,29 @@ async function signIn() {
 }
 
 async function signUp() {
-  const email = document.getElementById('authEmail').value.trim();
-  const pass = document.getElementById('authPass').value;
-  document.getElementById('authErr').textContent = '';
-  if (!email || !pass) { document.getElementById('authErr').textContent = 'Email and password required'; return; }
-  if (pass.length < 6) { document.getElementById('authErr').textContent = 'Password must be at least 6 characters'; return; }
-  const { error } = await sb.auth.signUp({ email, password: pass });
-  if (error) document.getElementById('authErr').textContent = error.message;
-  else document.getElementById('authErr').style.color = 'var(--green)', document.getElementById('authErr').textContent = 'Check your email to confirm your account!';
+  document.getElementById('authErr').textContent = 'Sign-up is disabled. Contact administrator.';
 }
 
 async function signOut() {
   await sb.auth.signOut();
+}
+
+async function changePassword() {
+  const pw = document.getElementById('pw-new').value;
+  const pw2 = document.getElementById('pw-confirm').value;
+  const errEl = document.getElementById('pwErr');
+  errEl.style.color = 'var(--red)';
+  errEl.textContent = '';
+  if (!pw || !pw2) { errEl.textContent = 'Both fields required'; return; }
+  if (pw.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
+  if (pw !== pw2) { errEl.textContent = 'Passwords do not match'; return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if (error) { errEl.textContent = error.message; return; }
+  errEl.style.color = 'var(--green)';
+  errEl.textContent = 'Password updated!';
+  document.getElementById('pw-new').value = '';
+  document.getElementById('pw-confirm').value = '';
+  setTimeout(() => closeModal('passwordModal'), 1500);
 }
 
 // ============================================================
