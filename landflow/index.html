@@ -618,8 +618,16 @@ textarea.form-input{resize:vertical;min-height:80px}
             <div><div class="pv-label">Interest</div><div class="pv-val" id="pay-interest-split">—</div></div>
           </div>
         </div>
-        <div class="form-group"><label class="form-label">Date *</label><input class="form-input" id="pay-date" type="date"></div>
-        <div class="form-group"><label class="form-label">Amount *</label><input class="form-input" id="pay-amount" type="number" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label class="form-label">Date *</label><input class="form-input" id="pay-date" type="date" onchange="populatePaymentDefaults()"></div>
+        <div class="form-group"><label class="form-label">Principal *</label><input class="form-input" id="pay-principal-input" type="number" placeholder="0.00" step="0.01" oninput="updatePayTotal()"></div>
+        <div class="form-group"><label class="form-label">Interest *</label><input class="form-input" id="pay-interest-input" type="number" placeholder="0.00" step="0.01" oninput="updatePayTotal()"></div>
+        <div class="form-group" id="pay-latefee-group" style="display:none"><label class="form-label" style="color:var(--red)">Late Fee</label><input class="form-input" id="pay-latefee-input" type="number" placeholder="0.00" step="0.01" oninput="updatePayTotal()"></div>
+        <div class="form-group form-full" id="payTotalRow" style="display:none;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:var(--text2)">Total Payment</span>
+            <span style="font-size:18px;font-weight:700;color:var(--gold)" id="pay-total-display">$0.00</span>
+          </div>
+        </div>
         <div class="form-group"><label class="form-label">Payment Method</label>
           <select class="form-input" id="pay-method">
             <option value="">— Select —</option><option value="Zelle">Zelle</option><option value="Wire">Wire Transfer</option><option value="Check">Check</option><option value="Credit Card">Credit Card</option><option value="Cash">Cash</option><option value="Other">Other</option>
@@ -1018,19 +1026,27 @@ function calcRealBalance(loanId) {
   history.push({ date: loan.orig_date, description: 'Funds Advanced', interest: 0, principal: principal, balance: balance, amount: 0 });
   for (const pmt of loanPmts) {
     const amt = parseFloat(pmt.amount) || 0;
-    // Check for late fees that should be applied first
-    const loanLateFees = (typeof lateFees !== 'undefined' ? lateFees : []).filter(f => f.loan_id === loanId && !f.paid);
-    let remainingAmt = amt;
-    let lateFeePaid = 0;
-    // Pay off outstanding late fees first
-    for (const lf of loanLateFees) {
-      if (remainingAmt >= lf.amount) { remainingAmt -= lf.amount; lateFeePaid += lf.amount; lf.paid = true; }
+    let pmtInterest, pmtPrincipal, lateFeePaid;
+    // Use stored split if available (user-entered), otherwise compute
+    if (pmt.principal_portion > 0 || pmt.interest_portion > 0) {
+      pmtPrincipal = parseFloat(pmt.principal_portion) || 0;
+      pmtInterest = parseFloat(pmt.interest_portion) || 0;
+      lateFeePaid = parseFloat(pmt.late_fee_portion) || 0;
+    } else {
+      const loanLateFees = (typeof lateFees !== 'undefined' ? lateFees : []).filter(f => f.loan_id === loanId && !f.paid);
+      let remainingAmt = amt;
+      lateFeePaid = 0;
+      for (const lf of loanLateFees) {
+        if (remainingAmt >= lf.amount) { remainingAmt -= lf.amount; lateFeePaid += lf.amount; lf.paid = true; }
+      }
+      const split = computePaymentSplit(balance, mr, remainingAmt);
+      pmtInterest = split.interest;
+      pmtPrincipal = split.principal;
     }
-    const split = computePaymentSplit(balance, mr, remainingAmt);
-    balance = split.newBalance;
+    balance = Math.max(0, Math.round((balance - pmtPrincipal) * 100) / 100);
     history.push({
       date: pmt.date, description: 'Payment' + (pmt.method ? ' (' + pmt.method + ')' : '') + (pmt.ref ? ' Ref#' + pmt.ref : ''),
-      interest: split.interest, principal: split.principal, balance: balance, amount: amt, lateFee: lateFeePaid, id: pmt.id
+      interest: pmtInterest, principal: pmtPrincipal, balance: balance, amount: amt, lateFee: lateFeePaid, id: pmt.id
     });
   }
   return { balance, history, totalPayments: loanPmts.length };
@@ -1475,51 +1491,90 @@ function populatePaymentDefaults() {
   const id = document.getElementById('pay-loan').value;
   const l = loans.find(x => x.id === id);
   const box = document.getElementById('payPreviewBox');
-  if (!l) { box.style.display = 'none'; return; }
+  if (!l) { box.style.display = 'none'; document.getElementById('payTotalRow').style.display = 'none'; return; }
   box.style.display = '';
+  document.getElementById('payTotalRow').style.display = '';
   const realBal = calcRealBalance(l.id);
   const bal = realBal.balance;
   const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
   const mr = parseFloat(l.rate)/100/12;
-  const int = bal * mr;
-  const prin = Math.min(pmt - int, bal);
+  const int = Math.round(bal * mr * 100) / 100;
+  const prin = Math.round(Math.min(pmt - int, bal) * 100) / 100;
   document.getElementById('pay-expected').textContent = fmtD(pmt);
   document.getElementById('pay-principal-split').textContent = fmtD(prin);
   document.getElementById('pay-interest-split').textContent = fmtD(int);
   document.getElementById('pay-balance-preview').textContent = fmtD(bal);
-  document.getElementById('pay-amount').value = Math.min(pmt, bal + int).toFixed(2);
+  document.getElementById('pay-principal-input').value = prin.toFixed(2);
+  document.getElementById('pay-interest-input').value = int.toFixed(2);
+  // Check if payment is late (past grace period)
+  const s = APP.settings || {};
+  const graceDays = s.grace_period_days || 15;
+  const lateFeeAmt = parseFloat(s.late_fee_amount) || 25;
+  const dueDay = l.payment_due_day || 1;
+  const payDate = document.getElementById('pay-date').value ? new Date(document.getElementById('pay-date').value + 'T12:00:00') : new Date();
+  const dueDate = new Date(payDate.getFullYear(), payDate.getMonth(), dueDay);
+  if (payDate < dueDate) dueDate.setMonth(dueDate.getMonth() - 1);
+  const graceDate = new Date(dueDate); graceDate.setDate(graceDate.getDate() + graceDays);
+  const lfGroup = document.getElementById('pay-latefee-group');
+  const unpaidLateFees = (typeof lateFees !== 'undefined' ? lateFees : []).filter(f => f.loan_id === id && !f.paid);
+  if (payDate > graceDate || unpaidLateFees.length > 0) {
+    lfGroup.style.display = '';
+    const totalLF = unpaidLateFees.reduce((s, f) => s + parseFloat(f.amount || 0), 0) + (payDate > graceDate ? lateFeeAmt : 0);
+    document.getElementById('pay-latefee-input').value = totalLF.toFixed(2);
+  } else {
+    lfGroup.style.display = 'none';
+    document.getElementById('pay-latefee-input').value = '';
+  }
+  updatePayTotal();
+}
+
+function updatePayTotal() {
+  const prin = parseFloat(document.getElementById('pay-principal-input').value) || 0;
+  const int = parseFloat(document.getElementById('pay-interest-input').value) || 0;
+  const lf = parseFloat(document.getElementById('pay-latefee-input').value) || 0;
+  const total = prin + int + lf;
+  document.getElementById('pay-total-display').textContent = fmtD(total);
 }
 
 async function savePayment() {
   const loanId = document.getElementById('pay-loan').value;
   const date = document.getElementById('pay-date').value;
-  const amount = parseFloat(document.getElementById('pay-amount').value);
+  const principalAmt = parseFloat(document.getElementById('pay-principal-input').value) || 0;
+  const interestAmt = parseFloat(document.getElementById('pay-interest-input').value) || 0;
+  const lateFeeAmt = parseFloat(document.getElementById('pay-latefee-input').value) || 0;
+  const amount = Math.round((principalAmt + interestAmt + lateFeeAmt) * 100) / 100;
   if (!loanId) return showToast('⚠️ Select a loan', 'error');
   if (!date) return showToast('⚠️ Enter payment date', 'error');
-  if (!amount || isNaN(amount)) return showToast('⚠️ Enter payment amount', 'error');
-  // Compute interest/principal split based on current real balance
+  if (amount <= 0) return showToast('⚠️ Enter payment amounts', 'error');
   const loan = loans.find(l => l.id === loanId);
   const realBal = calcRealBalance(loanId);
-  const mr = parseFloat(loan?.rate || 0) / 100 / 12;
-  const split = computePaymentSplit(realBal.balance, mr, amount);
+  const newBalance = Math.round((realBal.balance - principalAmt) * 100) / 100;
   const data = {
     loan_id: loanId, date, amount,
     type: document.getElementById('pay-type').value,
     method: document.getElementById('pay-method').value,
     ref: document.getElementById('pay-ref').value,
     notes: document.getElementById('pay-notes').value,
-    interest_portion: split.interest,
-    principal_portion: split.principal,
-    running_balance: split.newBalance,
+    interest_portion: interestAmt,
+    principal_portion: principalAmt,
+    late_fee_portion: lateFeeAmt,
+    running_balance: Math.max(0, newBalance),
   };
   showToast('Saving…');
   const saved = await dbSavePayment(data);
   payments.unshift(saved);
+  // Record late fee if applicable
+  if (lateFeeAmt > 0) {
+    const lf = await dbSaveLateFee({ loan_id: loanId, amount: lateFeeAmt, assessed_date: date, paid: true });
+    if (lf) lateFees.push(lf);
+  }
   if (loan && loan.status === 'late') { loan.status = 'current'; await dbSaveLoan({ status: 'current' }, loanId); }
   renderLoans(); updateStats(); renderPaymentLedger();
   closeModal('paymentModal');
   showToast('✅ Payment of ' + fmtD(amount) + ' recorded!', 'success');
-  document.getElementById('pay-amount').value = '';
+  document.getElementById('pay-principal-input').value = '';
+  document.getElementById('pay-interest-input').value = '';
+  document.getElementById('pay-latefee-input').value = '';
   document.getElementById('pay-ref').value = '';
   document.getElementById('pay-notes').value = '';
   document.getElementById('pay-method').value = '';
