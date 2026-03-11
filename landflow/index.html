@@ -49,7 +49,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .topnav-logo{font-family:'DM Serif Display',serif;font-size:20px;color:var(--gold2);letter-spacing:-0.5px}
 .topnav-right{display:flex;align-items:center;gap:8px}
 .burger{background:none;border:none;color:var(--text2);cursor:pointer;padding:8px;font-size:20px;line-height:1}
-.logout-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:6px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;border:1px solid var(--border)}
+.logout-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:11px;padding:6px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;border:1px solid var(--text3)}
 .topnav-title{font-size:13px;color:var(--text2);font-weight:600;position:absolute;left:50%;transform:translateX(-50%)}
 
 /* ── SIDEBAR DRAWER ── */
@@ -508,6 +508,13 @@ textarea.form-input{resize:vertical;min-height:80px}
     </div>
     <div class="modal-body">
       <input type="hidden" id="f-edit-id">
+      <div class="form-section">🏷️ Seller Info</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Seller Full Name</label><input class="form-input" id="f-seller" placeholder="John Smith"></div>
+        <div class="form-group"><label class="form-label">Seller Phone</label><input class="form-input" id="f-seller-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group form-full"><label class="form-label">Seller Address</label><input class="form-input" id="f-seller-address" placeholder="123 Main St, Atlanta GA 30301"></div>
+        <div class="form-group"><label class="form-label">Price Paid to Seller</label><input class="form-input" id="f-price-paid" type="number" placeholder="8000"></div>
+      </div>
       <div class="form-section">👤 Buyer Info</div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Buyer Full Name *</label><input class="form-input" id="f-borrower" placeholder="John & Jane Smith"></div>
@@ -515,13 +522,6 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="form-group"><label class="form-label">Buyer Email</label><input class="form-input" id="f-email" type="email" placeholder="buyer@email.com"></div>
         <div class="form-group form-full"><label class="form-label">Buyer Address</label><input class="form-input" id="f-buyer-address" placeholder="123 Main St, Atlanta GA 30301"></div>
         <div class="form-group"><label class="form-label">SSN / EIN (last 4)</label><input class="form-input" id="f-ssn" placeholder="••••" maxlength="4"></div>
-      </div>
-      <div class="form-section">🏷️ Seller Info</div>
-      <div class="form-grid">
-        <div class="form-group"><label class="form-label">Seller Full Name</label><input class="form-input" id="f-seller" placeholder="John Smith"></div>
-        <div class="form-group"><label class="form-label">Seller Phone</label><input class="form-input" id="f-seller-phone" type="tel" placeholder="(555) 000-0000"></div>
-        <div class="form-group form-full"><label class="form-label">Seller Address</label><input class="form-input" id="f-seller-address" placeholder="123 Main St, Atlanta GA 30301"></div>
-        <div class="form-group"><label class="form-label">Price Paid to Seller</label><input class="form-input" id="f-price-paid" type="number" placeholder="8000"></div>
       </div>
       <div class="form-section">📍 Property Info</div>
       <div class="form-grid">
