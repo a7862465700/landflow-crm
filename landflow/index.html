@@ -6,6 +6,8 @@
 <title>LandFlow CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 :root {
   --bg:#0a0c10; --s1:#111318; --s2:#181b22; --s3:#1e2230;
@@ -50,6 +52,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .topnav-right{display:flex;align-items:center;gap:8px}
 .burger{background:none;border:none;color:var(--text2);cursor:pointer;padding:8px;font-size:20px;line-height:1}
 .logout-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:11px;padding:6px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;border:1px solid var(--text3)}
+.settings-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:6px 8px;border-radius:6px}
+.settings-btn:hover{color:var(--gold)}
 .topnav-title{font-size:13px;color:var(--text2);font-weight:600;position:absolute;left:50%;transform:translateX(-50%)}
 
 /* ── SIDEBAR DRAWER ── */
@@ -382,6 +386,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="desktop-title" id="desktopTitle">Portfolio</div>
       <div class="topbar-right">
         <button class="btn btn-gold btn-sm" onclick="openLoanModal()">＋ New Loan</button>
+        <button class="settings-btn" onclick="openSettingsModal()" title="Company Settings">⚙</button>
         <button class="logout-btn" onclick="signOut()">Sign Out</button>
       </div>
     </div>
@@ -548,6 +553,12 @@ textarea.form-input{resize:vertical;min-height:80px}
         </div>
         <div class="form-group"><label class="form-label">Origination Date *</label><input class="form-input" id="f-origdate" type="date" oninput="updatePreview()"></div>
         <div class="form-group"><label class="form-label">First Payment Date</label><input class="form-input" id="f-firstpay" type="date"></div>
+        <div class="form-group"><label class="form-label">Payment Due Day</label>
+          <select class="form-input" id="f-dueday">
+            <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
+            <option value="6">6th</option><option value="7">7th</option><option value="8">8th</option><option value="9">9th</option><option value="10">10th</option>
+          </select>
+        </div>
         <div class="form-group"><label class="form-label">Status</label>
           <select class="form-input" id="f-status">
             <option value="current">Current</option><option value="late">Late</option><option value="default">Default</option>
@@ -600,14 +611,20 @@ textarea.form-input{resize:vertical;min-height:80px}
           <select class="form-input" id="pay-loan" onchange="populatePaymentDefaults()"></select>
         </div>
         <div id="payPreviewBox" style="display:none;grid-column:1/-1;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px">
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-            <div><div class="pv-label">Expected</div><div class="pv-val" id="pay-expected">—</div></div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            <div><div class="pv-label">Current Balance</div><div class="pv-val gold" id="pay-balance-preview">—</div></div>
+            <div><div class="pv-label">Expected Pmt</div><div class="pv-val" id="pay-expected">—</div></div>
             <div><div class="pv-label">Principal</div><div class="pv-val" id="pay-principal-split">—</div></div>
             <div><div class="pv-label">Interest</div><div class="pv-val" id="pay-interest-split">—</div></div>
           </div>
         </div>
         <div class="form-group"><label class="form-label">Date *</label><input class="form-input" id="pay-date" type="date"></div>
         <div class="form-group"><label class="form-label">Amount *</label><input class="form-input" id="pay-amount" type="number" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label class="form-label">Payment Method</label>
+          <select class="form-input" id="pay-method">
+            <option value="">— Select —</option><option value="Zelle">Zelle</option><option value="Wire">Wire Transfer</option><option value="Check">Check</option><option value="Credit Card">Credit Card</option><option value="Cash">Cash</option><option value="Other">Other</option>
+          </select>
+        </div>
         <div class="form-group"><label class="form-label">Type</label>
           <select class="form-input" id="pay-type">
             <option value="regular">Regular</option><option value="late">Late</option><option value="partial">Partial</option><option value="extra">Extra Principal</option>
@@ -673,6 +690,60 @@ textarea.form-input{resize:vertical;min-height:80px}
   </div>
 </div>
 
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <div class="modal-title">⚙ Company Settings</div>
+      <button class="modal-close" onclick="closeModal('settingsModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full"><label class="form-label">Company Name</label><input class="form-input" id="set-company" placeholder="Elk Creek Group USA LLC"></div>
+        <div class="form-group form-full"><label class="form-label">Company Address</label><input class="form-input" id="set-address" placeholder="123 Main St, Suite 100, Denver CO 80202"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="set-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="set-email" type="email" placeholder="info@company.com"></div>
+        <div class="form-group form-full">
+          <label class="form-label">Company Logo</label>
+          <div style="display:flex;align-items:center;gap:12px">
+            <img id="set-logo-preview" src="" style="max-height:48px;max-width:160px;display:none;border-radius:4px;border:1px solid var(--border)">
+            <input type="file" id="set-logo-file" accept="image/*" onchange="previewLogo(this)" style="font-size:12px;color:var(--text2)">
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Default Due Day (1st–10th)</label>
+          <select class="form-input" id="set-dueday">
+            <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
+            <option value="6">6th</option><option value="7">7th</option><option value="8">8th</option><option value="9">9th</option><option value="10">10th</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Late Fee Amount ($)</label><input class="form-input" id="set-latefee" type="number" value="25" step="1"></div>
+        <div class="form-group"><label class="form-label">Grace Period (days)</label><input class="form-input" id="set-grace" type="number" value="15" step="1"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('settingsModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATEMENT PREVIEW (full-screen overlay) -->
+<div class="modal-overlay" id="statementModal" style="z-index:600">
+  <div class="modal" style="max-width:800px;max-height:90vh;overflow-y:auto">
+    <div class="modal-head">
+      <div class="modal-title" id="stmtTitle">Statement</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost btn-sm" onclick="downloadStatementPDF()">📥 PDF</button>
+        <button class="btn btn-ghost btn-sm" onclick="emailStatement()">📧 Email</button>
+        <button class="modal-close" onclick="closeModal('statementModal')">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div id="stmtContent" style="background:#fff;color:#222;padding:32px;font-family:Georgia,serif;font-size:13px"></div>
+    </div>
+  </div>
+</div>
+
 <!-- DETAIL PANEL -->
 <div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
 <div class="detail-panel" id="detailPanel">
@@ -686,6 +757,8 @@ textarea.form-input{resize:vertical;min-height:80px}
       <button class="btn btn-ghost btn-sm" onclick="editLoan()">✏️ Edit</button>
       <button class="btn btn-green btn-sm" onclick="quickPayment()">💳 Pay</button>
       <button class="btn btn-gold btn-sm" onclick="quickInvoice()">🧾 Invoice</button>
+      <button class="btn btn-ghost btn-sm" onclick="generateMonthlyStatement(currentLoanId)">📄 Statement</button>
+      <button class="btn btn-ghost btn-sm" onclick="generateAccountStatement(currentLoanId)">📋 Full History</button>
       <button class="btn btn-danger btn-sm" onclick="deleteLoan()">🗑</button>
     </div>
     <div class="dp-stats">
@@ -759,8 +832,9 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ============================================================
 // STATE
 // ============================================================
-let loans = [], payments = [], investors = [], invoices = [], vaultFiles = [];
+let loans = [], payments = [], investors = [], invoices = [], vaultFiles = [], lateFees = [];
 let currentLoanId = null, editingLoanId = null, toastTimer, currentUser = null;
+let APP = { settings: null };
 
 // ============================================================
 // AUTH
@@ -824,18 +898,22 @@ async function signOut() {
 async function loadAllData() {
   if (!currentUser) return;
   const uid = currentUser.id;
-  const [l, p, inv, ivs, vf] = await Promise.all([
+  const [l, p, inv, ivs, vf, us, lf] = await Promise.all([
     sb.from('loans').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     sb.from('payments').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('investors').select('*').eq('user_id', uid),
     sb.from('invoices').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     sb.from('vault_files').select('*').eq('user_id', uid),
+    sb.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
+    sb.from('late_fees').select('*').eq('user_id', uid),
   ]);
   loans = l.data || [];
   payments = p.data || [];
   investors = inv.data || [];
   invoices = ivs.data || [];
   vaultFiles = vf.data || [];
+  APP.settings = us.data || null;
+  lateFees = lf.data || [];
 }
 
 async function dbSaveLoan(data, id) {
@@ -890,11 +968,77 @@ async function dbUpdateVaultFile(id, updates) {
   await sb.from('vault_files').update(updates).eq('id', id).eq('user_id', currentUser.id);
 }
 
+async function dbSaveSettings(data) {
+  const row = { ...data, user_id: currentUser.id, updated_at: new Date().toISOString() };
+  if (APP.settings?.id) {
+    const { data: d } = await sb.from('user_settings').update(row).eq('id', APP.settings.id).select().single();
+    return d;
+  } else {
+    const { data: d } = await sb.from('user_settings').insert(row).select().single();
+    return d;
+  }
+}
+
+async function dbSaveLateFee(data) {
+  const { data: d } = await sb.from('late_fees').insert({ ...data, user_id: currentUser.id }).select().single();
+  return d;
+}
+
 // ============================================================
-// MATH
+// MATH — Core Balance Engine
 // ============================================================
 function calcPayment(p,r,t){if(!p||!r||!t)return 0;const mr=r/100/12,n=t*12;if(mr===0)return p/n;return p*(mr*Math.pow(1+mr,n))/(Math.pow(1+mr,n)-1);}
-function calcBalance(p,r,t,paid){if(!p||!r||!t)return p||0;const mr=r/100/12,n=t*12,pmt=calcPayment(p,r,t);if(mr===0)return p-pmt*paid;let bal=p;for(let i=0;i<Math.min(paid,n);i++){const int=bal*mr;bal-=(pmt-int);if(bal<0)bal=0;}return bal;}
+
+// Compute interest/principal split for a single payment
+function computePaymentSplit(currentBalance, monthlyRate, paymentAmount) {
+  const interest = currentBalance * monthlyRate;
+  let principal, lateFee = 0, newBalance;
+  if (paymentAmount >= interest) {
+    principal = paymentAmount - interest;
+    newBalance = Math.max(0, currentBalance - principal);
+  } else {
+    // Payment doesn't cover interest — all goes to interest, balance grows
+    principal = 0;
+    newBalance = currentBalance - paymentAmount + interest; // underpayment
+  }
+  return { interest: Math.round(interest*100)/100, principal: Math.round(principal*100)/100, newBalance: Math.round(newBalance*100)/100 };
+}
+
+// Calculate real balance based on actual payments recorded
+function calcRealBalance(loanId) {
+  const loan = loans.find(l => l.id === loanId);
+  if (!loan) return { balance: 0, history: [] };
+  const principal = parseFloat(loan.loan_amount) || 0;
+  const rate = parseFloat(loan.rate) || 0;
+  const mr = rate / 100 / 12;
+  const loanPmts = payments.filter(p => p.loan_id === loanId).slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+  let balance = principal;
+  const history = [];
+  // First entry: funds advanced
+  history.push({ date: loan.orig_date, description: 'Funds Advanced', interest: 0, principal: principal, balance: balance, amount: 0 });
+  for (const pmt of loanPmts) {
+    const amt = parseFloat(pmt.amount) || 0;
+    // Check for late fees that should be applied first
+    const loanLateFees = (typeof lateFees !== 'undefined' ? lateFees : []).filter(f => f.loan_id === loanId && !f.paid);
+    let remainingAmt = amt;
+    let lateFeePaid = 0;
+    // Pay off outstanding late fees first
+    for (const lf of loanLateFees) {
+      if (remainingAmt >= lf.amount) { remainingAmt -= lf.amount; lateFeePaid += lf.amount; lf.paid = true; }
+    }
+    const split = computePaymentSplit(balance, mr, remainingAmt);
+    balance = split.newBalance;
+    history.push({
+      date: pmt.date, description: 'Payment' + (pmt.method ? ' (' + pmt.method + ')' : '') + (pmt.ref ? ' Ref#' + pmt.ref : ''),
+      interest: split.interest, principal: split.principal, balance: balance, amount: amt, lateFee: lateFeePaid, id: pmt.id
+    });
+  }
+  return { balance, history, totalPayments: loanPmts.length };
+}
+
+// Legacy wrapper — keeps old code working during transition
+function calcBalance(p,r,t,paid){if(!p||!r||!t)return p||0;const mr=r/100/12,pmt=calcPayment(p,r,t);let bal=p;for(let i=0;i<Math.min(paid,t*12);i++){const int=bal*mr;bal-=(pmt-int);if(bal<0)bal=0;}return bal;}
+
 function genSchedule(p,r,t,startDate,limit){const mr=r/100/12,n=t*12,pmt=calcPayment(p,r,t);let bal=p;const rows=[],start=startDate?new Date(startDate):new Date();const max=limit||n;for(let i=0;i<max&&bal>0.01;i++){const int=bal*mr,prin=pmt-int;bal=Math.max(0,bal-prin);const d=new Date(start);d.setMonth(d.getMonth()+i+1);rows.push({num:i+1,date:d.toLocaleDateString('en-US',{month:'short',year:'numeric'}),payment:pmt,principal:prin,interest:int,balance:bal});}return rows;}
 function paysMade(origDate){if(!origDate)return 0;const start=new Date(origDate),now=new Date();return Math.max(0,(now.getFullYear()-start.getFullYear())*12+now.getMonth()-start.getMonth());}
 function matDate(orig,years){if(!orig||!years)return'—';const d=new Date(orig);d.setFullYear(d.getFullYear()+parseInt(years));return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
@@ -902,6 +1046,22 @@ function balloonDate(orig,bYears){if(!orig||!bYears)return null;const d=new Date
 const fmt=n=>'$'+Math.round(n||0).toLocaleString();
 const fmtD=n=>'$'+(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 const fmtDate=d=>d?new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+
+// Late fee check: returns true if payment is late (past grace period)
+function isPaymentLate(dueDate, graceDays) {
+  if (!dueDate) return false;
+  const due = new Date(dueDate);
+  const grace = new Date(due);
+  grace.setDate(grace.getDate() + (graceDays || 15));
+  return new Date() > grace;
+}
+
+function getGraceDate(dueDate, graceDays) {
+  if (!dueDate) return null;
+  const d = new Date(dueDate);
+  d.setDate(d.getDate() + (graceDays || 15));
+  return d;
+}
 
 // ============================================================
 // NAV
@@ -990,8 +1150,8 @@ function renderLoans() {
   }
   grid.innerHTML = filtered.map(l => {
     const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
-    const paid = paysMade(l.orig_date);
-    const bal = calcBalance(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), paid);
+    const realBal = calcRealBalance(l.id);
+    const bal = realBal.balance;
     const loanPmts = payments.filter(p => p.loan_id === l.id);
     return `<div class="loan-card" onclick="openDetail('${l.id}')">
       <div class="lc-head">
@@ -1044,6 +1204,7 @@ function openLoanModal(editId) {
     document.getElementById('f-origdate').value = l.orig_date||'';
     document.getElementById('f-firstpay').value = l.first_pay_date||'';
     document.getElementById('f-status').value = l.status||'current';
+    document.getElementById('f-dueday').value = l.payment_due_day||'1';
     document.getElementById('f-investor').value = l.investor||'';
     document.getElementById('f-inv-contact').value = l.inv_contact||'';
     document.getElementById('f-inv-date').value = l.inv_date||'';
@@ -1072,6 +1233,7 @@ function clearLoanForm() {
   document.getElementById('f-term').value = '30';
   document.getElementById('f-balloon').value = '';
   document.getElementById('f-status').value = 'current';
+  document.getElementById('f-dueday').value = (APP.settings?.default_due_day || 1).toString();
 }
 
 function autoCalcLoan() {
@@ -1126,6 +1288,7 @@ async function saveLoan() {
     term: parseInt(document.getElementById('f-term').value),
     balloon: document.getElementById('f-balloon').value,
     first_pay_date: document.getElementById('f-firstpay').value,
+    payment_due_day: parseInt(document.getElementById('f-dueday').value) || 1,
     status: document.getElementById('f-status').value,
     investor: document.getElementById('f-investor').value.trim(),
     inv_contact: document.getElementById('f-inv-contact').value.trim(),
@@ -1175,8 +1338,9 @@ function openDetail(id) {
   const l = loans.find(x => x.id === id);
   if (!l) return;
   const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
-  const paid = paysMade(l.orig_date);
-  const bal = calcBalance(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), paid);
+  const realBal = calcRealBalance(l.id);
+  const bal = realBal.balance;
+  const paid = realBal.totalPayments || 0;
   document.getElementById('dp-id').textContent = (l.id?.slice(0,8).toUpperCase()||'') + (l.parcel ? ' · Parcel ' + l.parcel : '') + ' · ' + fmtDate(l.orig_date);
   document.getElementById('dp-name').textContent = l.borrower || 'Unnamed';
   document.getElementById('dp-addr').textContent = '📍 ' + (l.address||'—') + (l.county ? ' · ' + l.county + ' County' : '');
@@ -1193,6 +1357,7 @@ function openDetail(id) {
     ['Origination', fmtDate(l.orig_date), 'mono'],
     ['Maturity', matDate(l.orig_date, l.term), 'mono'],
     ['Payments Made', paid + ' of ' + (l.term*12), 'green'],
+    ['Due Day', ordinal(l.payment_due_day || 1) + ' of month', ''],
     ['Buyer Phone', l.phone||'—', ''],
     ['Buyer Email', l.email||'—', ''],
     ['Buyer Address', l.buyer_address||'—', ''],
@@ -1263,12 +1428,13 @@ function renderDpPayments(l) {
         <div class="pay-left">
           <div class="pay-dot" style="background:${color}"></div>
           <div>
-            <div class="pay-date">${fmtDate(p.date)} ${p.ref?'· Ref #'+p.ref:''}</div>
-            <div class="pay-note">${p.type}${p.notes?' · '+p.notes:''}</div>
+            <div class="pay-date">${fmtDate(p.date)} ${p.method?'· '+p.method:''} ${p.ref?'· Ref #'+p.ref:''}</div>
+            <div class="pay-note">${p.type}${p.interest_portion?' · Int: '+fmtD(p.interest_portion)+' / Prin: '+fmtD(p.principal_portion):''}${p.notes?' · '+p.notes:''}</div>
           </div>
         </div>
         <div style="text-align:right">
           <div class="pay-amt" style="color:${color}">${fmtD(p.amount)}</div>
+          ${p.running_balance ? `<div style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace">Bal: ${fmtD(p.running_balance)}</div>` : ''}
           <button onclick="deletePayment('${p.id}')" style="font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer;margin-top:2px">🗑 remove</button>
         </div>
       </div>`;
@@ -1311,15 +1477,17 @@ function populatePaymentDefaults() {
   const box = document.getElementById('payPreviewBox');
   if (!l) { box.style.display = 'none'; return; }
   box.style.display = '';
-  const paid = paysMade(l.orig_date);
-  const bal = calcBalance(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), paid);
+  const realBal = calcRealBalance(l.id);
+  const bal = realBal.balance;
   const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
-  const int = bal * (parseFloat(l.rate)/100/12);
-  const prin = pmt - int;
+  const mr = parseFloat(l.rate)/100/12;
+  const int = bal * mr;
+  const prin = Math.min(pmt - int, bal);
   document.getElementById('pay-expected').textContent = fmtD(pmt);
   document.getElementById('pay-principal-split').textContent = fmtD(prin);
   document.getElementById('pay-interest-split').textContent = fmtD(int);
-  document.getElementById('pay-amount').value = pmt.toFixed(2);
+  document.getElementById('pay-balance-preview').textContent = fmtD(bal);
+  document.getElementById('pay-amount').value = Math.min(pmt, bal + int).toFixed(2);
 }
 
 async function savePayment() {
@@ -1329,16 +1497,24 @@ async function savePayment() {
   if (!loanId) return showToast('⚠️ Select a loan', 'error');
   if (!date) return showToast('⚠️ Enter payment date', 'error');
   if (!amount || isNaN(amount)) return showToast('⚠️ Enter payment amount', 'error');
+  // Compute interest/principal split based on current real balance
+  const loan = loans.find(l => l.id === loanId);
+  const realBal = calcRealBalance(loanId);
+  const mr = parseFloat(loan?.rate || 0) / 100 / 12;
+  const split = computePaymentSplit(realBal.balance, mr, amount);
   const data = {
     loan_id: loanId, date, amount,
     type: document.getElementById('pay-type').value,
+    method: document.getElementById('pay-method').value,
     ref: document.getElementById('pay-ref').value,
     notes: document.getElementById('pay-notes').value,
+    interest_portion: split.interest,
+    principal_portion: split.principal,
+    running_balance: split.newBalance,
   };
   showToast('Saving…');
   const saved = await dbSavePayment(data);
   payments.unshift(saved);
-  const loan = loans.find(l => l.id === loanId);
   if (loan && loan.status === 'late') { loan.status = 'current'; await dbSaveLoan({ status: 'current' }, loanId); }
   renderLoans(); updateStats(); renderPaymentLedger();
   closeModal('paymentModal');
@@ -1346,6 +1522,7 @@ async function savePayment() {
   document.getElementById('pay-amount').value = '';
   document.getElementById('pay-ref').value = '';
   document.getElementById('pay-notes').value = '';
+  document.getElementById('pay-method').value = '';
   if (currentLoanId === loanId) { const l = loans.find(x => x.id === loanId); if (l) renderDpPayments(l); }
 }
 
@@ -1418,10 +1595,12 @@ function populateInvoiceDefaults() {
   const id = document.getElementById('inv-loan').value;
   const l = loans.find(x => x.id === id);
   if (!l) return;
+  const s = APP.settings || {};
   const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
   document.getElementById('inv-amount').value = pmt.toFixed(2);
   if (l.email) document.getElementById('inv-email').value = l.email;
-  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+1);
+  const dueDay = l.payment_due_day || s.default_due_day || 1;
+  const d = new Date(); d.setMonth(d.getMonth()+1); d.setDate(dueDay);
   document.getElementById('inv-due').value = d.toISOString().split('T')[0];
 }
 
@@ -1489,6 +1668,7 @@ function renderInvoices() {
       <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
         ${isPending?`<button class="btn btn-ghost btn-sm" onclick="sendInvoice('${inv.id}')">📧 Send Email</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="viewInvoice('${inv.id}')">👁 View</button>
+        ${l?`<button class="btn btn-ghost btn-sm" onclick="generateAccountStatement('${l.id}')">📋 History</button>`:''}
         <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${inv.id}')">🗑</button>
       </div>
     </div>`;
@@ -1499,9 +1679,10 @@ function viewInvoice(id) {
   const inv = invoices.find(x => x.id === id);
   if (!inv) return;
   const l = loans.find(x => x.id === inv.loan_id);
+  // Use the monthly statement view instead if loan exists
+  if (l) { generateMonthlyStatement(l.id); return; }
   const w = window.open('', '_blank');
-  const paid = l ? paysMade(l.orig_date) : 0;
-  const bal = l ? calcBalance(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), paid) : 0;
+  const bal = 0;
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice</title><style>
     body{font-family:Georgia,serif;max-width:680px;margin:40px auto;padding:20px;color:#222}
     .header{border-bottom:3px solid #c9933a;padding-bottom:16px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start}
@@ -1542,8 +1723,13 @@ function viewInvoice(id) {
 async function sendInvoice(id) {
   const inv = invoices.find(x => x.id === id);
   if (!inv) return;
-  const subject = encodeURIComponent(`Payment Due — ${inv.period||''} — ${fmtD(inv.amount)}`);
-  const body = encodeURIComponent(`Dear ${inv.borrower},\n\nYour payment of ${fmtD(inv.amount)} is due on ${fmtDate(inv.due_date)}.\n\nProperty: Parcel ${loans.find(l=>l.id===inv.loan_id)?.parcel||inv.loan_id?.slice(0,8).toUpperCase()}\nPeriod: ${inv.period||''}\n${inv.notes?'\n'+inv.notes+'\n':''}\nThank you,\nLandFlow CRM`);
+  const s = APP.settings || {};
+  const l = loans.find(x => x.id === inv.loan_id);
+  const acctNum = inv.loan_id?.slice(0,8).toUpperCase() || '';
+  const graceDays = s.grace_period_days || 15;
+  const graceDate = new Date(inv.due_date); graceDate.setDate(graceDate.getDate() + graceDays);
+  const subject = encodeURIComponent(`Payment Statement — Account ${acctNum} — ${inv.period||''}`);
+  const body = encodeURIComponent(`Dear ${inv.borrower},\n\nYour payment of ${fmtD(inv.amount)} is due on ${fmtDate(inv.due_date)}.\n\nAccount #: ${acctNum}\nProperty: ${l?.address||'—'} ${l?.parcel?'| Parcel '+l.parcel:''}\nPeriod: ${inv.period||''}\n\nA late charge of $${(s.late_fee_amount||25).toFixed(2)} will be assessed if payment is not received by ${graceDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}.\n\nPayment Methods: Zelle, Wire, Check, or Credit Card\n${s.company_phone ? 'Questions? Call ' + s.company_phone : ''}\n${inv.notes?'\n'+inv.notes+'\n':''}\nThank you,\n${s.company_name || 'LandFlow CRM'}`);
   window.open(`mailto:${inv.email}?subject=${subject}&body=${body}`);
   await sb.from('invoices').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id);
   const idx = invoices.findIndex(i => i.id === id);
@@ -1621,8 +1807,8 @@ function renderBuyers() {
     const pmts = payments.filter(p => p.loan_id === l.id);
     const totalPaid = pmts.reduce((s,p) => s + parseFloat(p.amount||0), 0);
     const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
-    const paid = paysMade(l.orig_date);
-    const bal = calcBalance(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), paid);
+    const realBal = calcRealBalance(l.id);
+    const bal = realBal.balance;
     return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer" onclick="openDetail('${l.id}')">
       <div style="font-weight:700;font-size:14px;margin-bottom:2px">👤 ${l.borrower||'Unnamed'}</div>
       ${getBadge(l)}
@@ -1827,6 +2013,346 @@ function renderFileVault(loanId) {
     html += `</div>`;
   });
   el.innerHTML = html;
+}
+
+// ============================================================
+// UTILITY — ordinal suffix
+// ============================================================
+function ordinal(n) {
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v-20)%10] || s[v] || s[0]);
+}
+
+// ============================================================
+// COMPANY SETTINGS
+// ============================================================
+function openSettingsModal() {
+  const s = APP.settings || {};
+  document.getElementById('set-company').value = s.company_name || '';
+  document.getElementById('set-address').value = s.company_address || '';
+  document.getElementById('set-phone').value = s.company_phone || '';
+  document.getElementById('set-email').value = s.company_email || '';
+  document.getElementById('set-dueday').value = s.default_due_day || '1';
+  document.getElementById('set-latefee').value = s.late_fee_amount || '25';
+  document.getElementById('set-grace').value = s.grace_period_days || '15';
+  const preview = document.getElementById('set-logo-preview');
+  if (s.logo_url) { preview.src = s.logo_url; preview.style.display = ''; } else { preview.style.display = 'none'; }
+  openModal('settingsModal');
+}
+
+function previewLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = document.getElementById('set-logo-preview');
+    img.src = reader.result; img.style.display = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveSettings() {
+  const logoFile = document.getElementById('set-logo-file').files[0];
+  let logoUrl = APP.settings?.logo_url || '';
+  if (logoFile) {
+    logoUrl = await new Promise((res, rej) => {
+      const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(logoFile);
+    });
+  }
+  const data = {
+    company_name: document.getElementById('set-company').value.trim(),
+    company_address: document.getElementById('set-address').value.trim(),
+    company_phone: document.getElementById('set-phone').value.trim(),
+    company_email: document.getElementById('set-email').value.trim(),
+    logo_url: logoUrl,
+    default_due_day: parseInt(document.getElementById('set-dueday').value) || 1,
+    late_fee_amount: parseFloat(document.getElementById('set-latefee').value) || 25,
+    grace_period_days: parseInt(document.getElementById('set-grace').value) || 15,
+  };
+  showToast('Saving…');
+  APP.settings = await dbSaveSettings(data);
+  closeModal('settingsModal');
+  showToast('✅ Settings saved!', 'success');
+}
+
+// ============================================================
+// STATEMENT — Company Header HTML (reused by both statement types)
+// ============================================================
+function stmtHeader() {
+  const s = APP.settings || {};
+  const logo = s.logo_url ? `<img src="${s.logo_url}" style="max-height:60px;max-width:180px">` : '';
+  return `<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #c9933a;padding-bottom:14px;margin-bottom:20px">
+    <div>${logo}</div>
+    <div style="text-align:right">
+      <div style="font-size:18px;font-weight:bold;color:#c9933a">${s.company_name || 'LandFlow CRM'}</div>
+      ${s.company_address ? `<div style="font-size:11px;color:#666">${s.company_address}</div>` : ''}
+      ${s.company_phone ? `<div style="font-size:11px;color:#666">${s.company_phone}</div>` : ''}
+      ${s.company_email ? `<div style="font-size:11px;color:#666">${s.company_email}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// MONTHLY PAYMENT STATEMENT (Mortgage Office format)
+// ============================================================
+function generateMonthlyStatement(loanId) {
+  const l = loans.find(x => x.id === loanId);
+  if (!l) return showToast('Loan not found', 'error');
+  const s = APP.settings || {};
+  const realBal = calcRealBalance(loanId);
+  const bal = realBal.balance;
+  const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
+  const mr = parseFloat(l.rate) / 100 / 12;
+  const interestDue = bal * mr;
+  const principalDue = pmt - interestDue;
+  const dueDay = l.payment_due_day || s.default_due_day || 1;
+  const now = new Date();
+  const dueDate = new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
+  const graceDays = s.grace_period_days || 15;
+  const graceDate = new Date(dueDate); graceDate.setDate(graceDate.getDate() + graceDays);
+  const lateFee = s.late_fee_amount || 25;
+  const acctNum = l.id?.slice(0,8).toUpperCase() || '';
+  // Recent payments (last 3)
+  const recentPmts = payments.filter(p => p.loan_id === loanId).slice(0, 3);
+
+  const html = `${stmtHeader()}
+    <div style="display:flex;justify-content:space-between;margin-bottom:20px">
+      <div style="flex:1">
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px">Statement Date</div>
+        <div style="font-weight:bold">${now.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:8px">Account Number</div>
+        <div style="font-weight:bold;font-family:monospace">${acctNum}</div>
+      </div>
+      <div style="flex:1;text-align:right">
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px">Borrower</div>
+        <div style="font-weight:bold">${l.borrower || '—'}</div>
+        ${l.buyer_address ? `<div style="font-size:12px;color:#555">${l.buyer_address}</div>` : ''}
+      </div>
+    </div>
+    <div style="background:#fdf7ef;border:2px solid #c9933a;border-radius:8px;padding:16px;margin-bottom:20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
+        <div>
+          <div style="font-size:11px;color:#888;text-transform:uppercase">Payment Due Date</div>
+          <div style="font-size:16px;font-weight:bold">${dueDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#888;text-transform:uppercase">Monthly Payment</div>
+          <div style="font-size:16px;font-weight:bold">${fmtD(pmt)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#888;text-transform:uppercase">Late Charge After</div>
+          <div style="font-size:16px;font-weight:bold;color:#c55">${graceDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:12px;padding-top:12px;border-top:1px solid #e8c88a">
+        <div style="font-size:11px;color:#888;text-transform:uppercase">Amount Due</div>
+        <div style="font-size:28px;font-weight:bold;color:#c9933a">${fmtD(pmt)}</div>
+      </div>
+    </div>
+    <div style="margin-bottom:20px">
+      <div style="font-weight:bold;margin-bottom:8px;border-bottom:1px solid #ddd;padding-bottom:4px">Payment Breakdown</div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Principal</span><span style="font-family:monospace">${fmtD(principalDue)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Interest</span><span style="font-family:monospace">${fmtD(interestDue)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:bold;border-top:1px solid #ddd;margin-top:4px;padding-top:6px"><span>Total Due</span><span style="font-family:monospace">${fmtD(pmt)}</span></div>
+    </div>
+    ${recentPmts.length ? `<div style="margin-bottom:20px">
+      <div style="font-weight:bold;margin-bottom:8px;border-bottom:1px solid #ddd;padding-bottom:4px">Account Activity</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f5f5f5"><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #ddd">Date</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #ddd">Description</th><th style="padding:6px 8px;text-align:right;border-bottom:1px solid #ddd">Amount</th></tr></thead>
+        <tbody>${recentPmts.map(p => `<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">${fmtDate(p.date)}</td><td style="padding:4px 8px;border-bottom:1px solid #eee">Payment${p.method ? ' - ' + p.method : ''}${p.ref ? ' Ref#' + p.ref : ''}</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid #eee">${fmtD(p.amount)}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>` : ''}
+    <div style="background:#f9f9f9;border-radius:6px;padding:12px;margin-bottom:20px;font-size:11px;color:#666">
+      <strong>Important Notices:</strong><br>
+      A late charge of $${lateFee.toFixed(2)} will be assessed if payment is not received by ${graceDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}.<br>
+      Current principal balance: ${fmtD(bal)}<br>
+      Interest rate: ${l.rate}% | Property: ${l.address || '—'}
+    </div>
+    <div style="border-top:2px dashed #ccc;padding-top:16px;margin-top:20px">
+      <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✂ Payment Remittance — Detach and return with payment</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px">
+        <div><strong>Account #:</strong> ${acctNum}</div>
+        <div><strong>Due Date:</strong> ${dueDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+        <div><strong>Amount Due:</strong> ${fmtD(pmt)}</div>
+      </div>
+      <div style="margin-top:8px;font-size:12px"><strong>Amount Enclosed: $</strong> ______________</div>
+      ${s.company_name ? `<div style="margin-top:12px;font-size:11px;color:#666">Make payable to: <strong>${s.company_name}</strong></div>` : ''}
+      ${s.company_address ? `<div style="font-size:11px;color:#666">Mail to: ${s.company_address}</div>` : ''}
+    </div>`;
+
+  document.getElementById('stmtTitle').textContent = 'Payment Statement — ' + (l.borrower || '') + ' — ' + now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  document.getElementById('stmtContent').innerHTML = html;
+  window._currentStmtLoanId = loanId;
+  window._currentStmtType = 'monthly';
+  openModal('statementModal');
+}
+
+// ============================================================
+// BORROWER STATEMENT OF ACCOUNT (full history from inception)
+// ============================================================
+function generateAccountStatement(loanId) {
+  const l = loans.find(x => x.id === loanId);
+  if (!l) return showToast('Loan not found', 'error');
+  const s = APP.settings || {};
+  const realBal = calcRealBalance(loanId);
+  const history = realBal.history;
+  const acctNum = l.id?.slice(0,8).toUpperCase() || '';
+  const now = new Date();
+
+  // Calculate totals
+  let totalInterest = 0, totalPrincipal = 0, totalPaid = 0;
+  history.forEach((h, i) => {
+    if (i === 0) return; // skip Funds Advanced
+    totalInterest += h.interest || 0;
+    totalPrincipal += h.principal || 0;
+    totalPaid += h.amount || 0;
+  });
+
+  const html = `${stmtHeader()}
+    <div style="text-align:center;font-size:16px;font-weight:bold;margin-bottom:16px;color:#c9933a">BORROWER STATEMENT OF ACCOUNT</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div style="font-size:11px;color:#888;text-transform:uppercase">Borrower</div>
+        <div style="font-weight:bold">${l.borrower || '—'}</div>
+        ${l.buyer_address ? `<div style="font-size:12px;color:#555">${l.buyer_address}</div>` : ''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:#888;text-transform:uppercase">Account #</div>
+        <div style="font-weight:bold;font-family:monospace">${acctNum}</div>
+        <div style="font-size:11px;color:#888;text-transform:uppercase;margin-top:6px">Statement Date</div>
+        <div style="font-weight:bold">${now.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+      </div>
+    </div>
+    <div style="background:#f9f9f9;border-radius:6px;padding:12px;margin-bottom:16px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px">
+      <div><div style="color:#888;font-size:10px;text-transform:uppercase">Original Amount</div><div style="font-weight:bold">${fmt(l.loan_amount)}</div></div>
+      <div><div style="color:#888;font-size:10px;text-transform:uppercase">Interest Rate</div><div style="font-weight:bold">${l.rate}%</div></div>
+      <div><div style="color:#888;font-size:10px;text-transform:uppercase">Term</div><div style="font-weight:bold">${l.term} years</div></div>
+      <div><div style="color:#888;font-size:10px;text-transform:uppercase">Origination</div><div style="font-weight:bold">${fmtDate(l.orig_date)}</div></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
+      <thead>
+        <tr style="background:#2d2d2d;color:#fff">
+          <th style="padding:8px;text-align:left">Date</th>
+          <th style="padding:8px;text-align:left">Description</th>
+          <th style="padding:8px;text-align:right">Interest</th>
+          <th style="padding:8px;text-align:right">Principal</th>
+          <th style="padding:8px;text-align:right">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${history.map((h, i) => {
+          const isFirst = i === 0;
+          const bg = i % 2 === 0 ? '#fff' : '#f9f9f9';
+          return `<tr style="background:${bg}">
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;font-family:monospace;font-size:11px">${fmtDate(h.date)}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee">${isFirst ? 'Funds Advanced' : h.description || 'Payment'}</td>
+            <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-family:monospace">${isFirst ? '—' : fmtD(h.interest)}</td>
+            <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-family:monospace">${isFirst ? fmtD(h.balance) : fmtD(h.principal)}</td>
+            <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-family:monospace;font-weight:bold">${fmtD(h.balance)}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;background:#fdf7ef;border:2px solid #c9933a;border-radius:8px;padding:16px;text-align:center">
+      <div>
+        <div style="font-size:10px;color:#888;text-transform:uppercase">Total Interest Paid</div>
+        <div style="font-size:18px;font-weight:bold;color:#c55">${fmtD(totalInterest)}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:#888;text-transform:uppercase">Total Principal Paid</div>
+        <div style="font-size:18px;font-weight:bold;color:#2ecc8a">${fmtD(totalPrincipal)}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:#888;text-transform:uppercase">Current Balance</div>
+        <div style="font-size:18px;font-weight:bold;color:#c9933a">${fmtD(realBal.balance)}</div>
+      </div>
+    </div>
+    <div style="text-align:center;font-size:10px;color:#999;margin-top:16px">
+      Property: ${l.address || '—'} ${l.parcel ? '| Parcel: ' + l.parcel : ''} ${l.county ? '| ' + l.county + ' County' : ''}
+    </div>`;
+
+  document.getElementById('stmtTitle').textContent = 'Statement of Account — ' + (l.borrower || '') ;
+  document.getElementById('stmtContent').innerHTML = html;
+  window._currentStmtLoanId = loanId;
+  window._currentStmtType = 'account';
+  openModal('statementModal');
+}
+
+// ============================================================
+// PDF GENERATION
+// ============================================================
+async function downloadStatementPDF() {
+  const el = document.getElementById('stmtContent');
+  if (!el || !el.innerHTML) return showToast('No statement to export', 'error');
+  showToast('Generating PDF…');
+  try {
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'letter');
+    const pageWidth = 215.9; // letter width mm
+    const pageHeight = 279.4; // letter height mm
+    const margin = 10;
+    const imgWidth = pageWidth - margin * 2;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let yPos = margin;
+    // If content fits on one page
+    if (imgHeight <= pageHeight - margin * 2) {
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', margin, yPos, imgWidth, imgHeight);
+    } else {
+      // Multi-page
+      const pageContentHeight = pageHeight - margin * 2;
+      const totalPages = Math.ceil(imgHeight / pageContentHeight);
+      for (let i = 0; i < totalPages; i++) {
+        if (i > 0) pdf.addPage();
+        const sourceY = (i * pageContentHeight * canvas.width) / imgWidth;
+        const sourceH = Math.min((pageContentHeight * canvas.width) / imgWidth, canvas.height - sourceY);
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = sourceH;
+        const ctx = tempCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceH, 0, 0, canvas.width, sourceH);
+        const destH = (sourceH * imgWidth) / canvas.width;
+        pdf.addImage(tempCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, imgWidth, destH);
+      }
+    }
+    const loan = loans.find(x => x.id === window._currentStmtLoanId);
+    const type = window._currentStmtType === 'account' ? 'Statement_of_Account' : 'Payment_Statement';
+    const name = (loan?.borrower || 'Statement').replace(/\s+/g, '_');
+    const month = new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}).replace(' ','_');
+    pdf.save(`${type}_${name}_${month}.pdf`);
+    showToast('✅ PDF downloaded!', 'success');
+  } catch (e) {
+    console.error('PDF error:', e);
+    showToast('PDF generation failed', 'error');
+  }
+}
+
+// ============================================================
+// EMAIL STATEMENT
+// ============================================================
+function emailStatement() {
+  const loan = loans.find(x => x.id === window._currentStmtLoanId);
+  if (!loan || !loan.email) return showToast('No borrower email on file', 'error');
+  const s = APP.settings || {};
+  const realBal = calcRealBalance(loan.id);
+  const pmt = calcPayment(parseFloat(loan.loan_amount), parseFloat(loan.rate), parseInt(loan.term));
+  const dueDay = loan.payment_due_day || s.default_due_day || 1;
+  const now = new Date();
+  const dueDate = new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
+  const acctNum = loan.id?.slice(0,8).toUpperCase() || '';
+  const isMonthly = window._currentStmtType === 'monthly';
+  const subject = encodeURIComponent(
+    isMonthly
+      ? `Payment Statement — Account ${acctNum} — ${now.toLocaleDateString('en-US',{month:'long',year:'numeric'})}`
+      : `Statement of Account — Account ${acctNum}`
+  );
+  const body = encodeURIComponent(
+    isMonthly
+      ? `Dear ${loan.borrower},\n\nPlease find your monthly payment statement details below:\n\nAccount #: ${acctNum}\nPayment Due: ${dueDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}\nAmount Due: ${fmtD(pmt)}\nCurrent Balance: ${fmtD(realBal.balance)}\n\nPayment Methods: Zelle, Wire, Check, or Credit Card\n${s.company_phone ? 'Questions? Call ' + s.company_phone : ''}\n\nPlease download the attached PDF for full statement details.\n\nThank you,\n${s.company_name || 'LandFlow CRM'}`
+      : `Dear ${loan.borrower},\n\nAttached is your complete Statement of Account for Account #${acctNum}.\n\nOriginal Loan: ${fmt(loan.loan_amount)}\nCurrent Balance: ${fmtD(realBal.balance)}\nTotal Payments: ${realBal.totalPayments}\n\nPlease download the PDF for the full transaction history.\n\nThank you,\n${s.company_name || 'LandFlow CRM'}`
+  );
+  window.open(`mailto:${loan.email}?subject=${subject}&body=${body}`);
+  showToast('📧 Email client opened!', 'success');
 }
 
 // ============================================================
