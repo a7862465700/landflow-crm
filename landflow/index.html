@@ -511,7 +511,10 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="form-section">👤 Buyer / Seller</div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Buyer Full Name *</label><input class="form-input" id="f-borrower" placeholder="John & Jane Smith"></div>
-        <div class="form-group"><label class="form-label">Seller Full Name</label><input class="form-input" id="f-seller" placeholder="Panda Group LLC"></div>
+        <div class="form-group"><label class="form-label">Seller Full Name</label><input class="form-input" id="f-seller" placeholder="John Smith"></div>
+        <div class="form-group"><label class="form-label">Seller Phone</label><input class="form-input" id="f-seller-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group form-full"><label class="form-label">Seller Address</label><input class="form-input" id="f-seller-address" placeholder="123 Main St, Atlanta GA 30301"></div>
+        <div class="form-group"><label class="form-label">Price Paid to Seller</label><input class="form-input" id="f-price-paid" type="number" placeholder="8000"></div>
         <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="f-phone" type="tel" placeholder="(555) 000-0000"></div>
         <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="f-email" type="email" placeholder="buyer@email.com"></div>
         <div class="form-group"><label class="form-label">SSN / EIN (last 4)</label><input class="form-input" id="f-ssn" placeholder="••••" maxlength="4"></div>
@@ -831,67 +834,53 @@ async function loadAllData() {
 async function dbSaveLoan(data, id) {
   const row = { ...data, user_id: currentUser.id };
   if (id) {
-    const { data: d, error } = await sb.from('loans').update(row).eq('id', id).eq('user_id', currentUser.id).select().single();
-    if (error) { showToast('⚠️ Save failed: ' + error.message, 'error'); return null; }
+    const { data: d } = await sb.from('loans').update(row).eq('id', id).eq('user_id', currentUser.id).select().single();
     return d;
   } else {
-    const { data: d, error } = await sb.from('loans').insert(row).select().single();
-    if (error) { showToast('⚠️ Save failed: ' + error.message, 'error'); return null; }
+    const { data: d } = await sb.from('loans').insert(row).select().single();
     return d;
   }
 }
 
 async function dbDeleteLoan(id) {
-  const { error } = await sb.from('loans').delete().eq('id', id).eq('user_id', currentUser.id);
-  if (error) { showToast('⚠️ Delete failed: ' + error.message, 'error'); return false; }
-  return true;
+  await sb.from('loans').delete().eq('id', id).eq('user_id', currentUser.id);
+  await sb.from('payments').delete().eq('loan_id', id).eq('user_id', currentUser.id);
 }
 
 async function dbSavePayment(data) {
-  const { data: d, error } = await sb.from('payments').insert({ ...data, user_id: currentUser.id }).select().single();
-  if (error) { showToast('⚠️ Save failed: ' + error.message, 'error'); return null; }
+  const { data: d } = await sb.from('payments').insert({ ...data, user_id: currentUser.id }).select().single();
   return d;
 }
 
 async function dbDeletePayment(id) {
-  const { error } = await sb.from('payments').delete().eq('id', id).eq('user_id', currentUser.id);
-  if (error) { showToast('⚠️ Delete failed: ' + error.message, 'error'); return false; }
-  return true;
+  await sb.from('payments').delete().eq('id', id).eq('user_id', currentUser.id);
 }
 
 async function dbSaveInvestor(data) {
-  const { data: d, error } = await sb.from('investors').insert({ ...data, user_id: currentUser.id }).select().single();
-  if (error) { showToast('⚠️ Save failed: ' + error.message, 'error'); return null; }
+  const { data: d } = await sb.from('investors').insert({ ...data, user_id: currentUser.id }).select().single();
   return d;
 }
 
 async function dbSaveInvoice(data) {
-  const { data: d, error } = await sb.from('invoices').insert({ ...data, user_id: currentUser.id }).select().single();
-  if (error) { showToast('⚠️ Save failed: ' + error.message, 'error'); return null; }
+  const { data: d } = await sb.from('invoices').insert({ ...data, user_id: currentUser.id }).select().single();
   return d;
 }
 
 async function dbDeleteInvoice(id) {
-  const { error } = await sb.from('invoices').delete().eq('id', id).eq('user_id', currentUser.id);
-  if (error) { showToast('⚠️ Delete failed: ' + error.message, 'error'); return false; }
-  return true;
+  await sb.from('invoices').delete().eq('id', id).eq('user_id', currentUser.id);
 }
 
 async function dbSaveVaultFile(data) {
-  const { data: d, error } = await sb.from('vault_files').insert({ ...data, user_id: currentUser.id }).select().single();
-  if (error) { showToast('⚠️ Upload failed: ' + error.message, 'error'); return null; }
+  const { data: d } = await sb.from('vault_files').insert({ ...data, user_id: currentUser.id }).select().single();
   return d;
 }
 
 async function dbDeleteVaultFile(id) {
-  const { error } = await sb.from('vault_files').delete().eq('id', id).eq('user_id', currentUser.id);
-  if (error) { showToast('⚠️ Delete failed: ' + error.message, 'error'); return false; }
-  return true;
+  await sb.from('vault_files').delete().eq('id', id).eq('user_id', currentUser.id);
 }
 
 async function dbUpdateVaultFile(id, updates) {
-  const { error } = await sb.from('vault_files').update(updates).eq('id', id).eq('user_id', currentUser.id);
-  if (error) { showToast('⚠️ Update failed: ' + error.message, 'error'); }
+  await sb.from('vault_files').update(updates).eq('id', id).eq('user_id', currentUser.id);
 }
 
 // ============================================================
@@ -1028,6 +1017,9 @@ function openLoanModal(editId) {
     if (!l) return;
     document.getElementById('f-borrower').value = l.borrower||'';
     document.getElementById('f-seller').value = l.seller||'';
+    document.getElementById('f-seller-phone').value = l.seller_phone||'';
+    document.getElementById('f-seller-address').value = l.seller_address||'';
+    document.getElementById('f-price-paid').value = l.price_paid||'';
     document.getElementById('f-phone').value = l.phone||'';
     document.getElementById('f-email').value = l.email||'';
     document.getElementById('f-ssn').value = l.ssn||'';
@@ -1065,7 +1057,7 @@ function openLoanModal(editId) {
 }
 
 function clearLoanForm() {
-  ['f-borrower','f-seller','f-phone','f-email','f-ssn','f-county','f-parcel','f-address','f-legaldesc',
+  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-phone','f-email','f-ssn','f-county','f-parcel','f-address','f-legaldesc',
    'f-saleprice','f-down','f-loanamt','f-rate','f-origdate','f-firstpay','f-investor','f-inv-contact',
    'f-inv-date','f-inv-price','f-nb-name','f-nb-business','f-nb-phone','f-nb-email','f-nb-address','f-notes']
   .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
@@ -1110,6 +1102,9 @@ async function saveLoan() {
   const data = {
     borrower, loan_amount: loanAmount, rate, orig_date: origDate,
     seller: document.getElementById('f-seller').value.trim(),
+    seller_phone: document.getElementById('f-seller-phone').value.trim(),
+    seller_address: document.getElementById('f-seller-address').value.trim(),
+    price_paid: parseFloat(document.getElementById('f-price-paid').value)||0,
     phone: document.getElementById('f-phone').value,
     email: document.getElementById('f-email').value,
     ssn: document.getElementById('f-ssn').value,
@@ -1121,12 +1116,12 @@ async function saveLoan() {
     down_payment: parseFloat(document.getElementById('f-down').value)||0,
     term: parseInt(document.getElementById('f-term').value),
     balloon: document.getElementById('f-balloon').value,
-    first_pay_date: document.getElementById('f-firstpay').value || null,
+    first_pay_date: document.getElementById('f-firstpay').value,
     status: document.getElementById('f-status').value,
     investor: document.getElementById('f-investor').value.trim(),
     inv_contact: document.getElementById('f-inv-contact').value.trim(),
-    inv_date: document.getElementById('f-inv-date').value || null,
-    inv_price: parseFloat(document.getElementById('f-inv-price').value) || null,
+    inv_date: document.getElementById('f-inv-date').value,
+    inv_price: parseFloat(document.getElementById('f-inv-price').value)||0,
     nb_name: document.getElementById('f-nb-name').value.trim(),
     nb_business: document.getElementById('f-nb-business').value.trim(),
     nb_phone: document.getElementById('f-nb-phone').value.trim(),
@@ -1136,7 +1131,6 @@ async function saveLoan() {
   };
   showToast('Saving…');
   const saved = await dbSaveLoan(data, editingLoanId);
-  if (!saved) return;
   if (editingLoanId) {
     const idx = loans.findIndex(l => l.id === editingLoanId);
     if (idx >= 0) loans[idx] = saved;
@@ -1191,6 +1185,9 @@ function openDetail(id) {
     ['Maturity', matDate(l.orig_date, l.term), 'mono'],
     ['Payments Made', paid + ' of ' + (l.term*12), 'green'],
     ['Seller', l.seller||'—', ''],
+    ['Seller Phone', l.seller_phone||'—', ''],
+    ['Seller Address', l.seller_address||'—', ''],
+    ['Price Paid', l.price_paid ? fmt(l.price_paid) : '—', 'mono'],
     ['County', l.county||'—', ''],
   ].map(([lb,val,cls]) => `<div class="dp-field"><div class="dp-field-label">${lb}</div><div class="dp-field-val ${cls}">${val}</div></div>`).join('');
   const pct = Math.min(100, (paid/(l.term*12))*100);
@@ -1328,7 +1325,6 @@ async function savePayment() {
   };
   showToast('Saving…');
   const saved = await dbSavePayment(data);
-  if (!saved) return;
   payments.unshift(saved);
   const loan = loans.find(l => l.id === loanId);
   if (loan && loan.status === 'late') { loan.status = 'current'; await dbSaveLoan({ status: 'current' }, loanId); }
@@ -1436,7 +1432,6 @@ async function saveInvoice() {
   };
   showToast('Saving…');
   const saved = await dbSaveInvoice(data);
-  if (!saved) return;
   invoices.unshift(saved);
   closeModal('invoiceModal');
   renderInvoices();
@@ -1538,7 +1533,7 @@ async function sendInvoice(id) {
   const subject = encodeURIComponent(`Payment Due — ${inv.period||''} — ${fmtD(inv.amount)}`);
   const body = encodeURIComponent(`Dear ${inv.borrower},\n\nYour payment of ${fmtD(inv.amount)} is due on ${fmtDate(inv.due_date)}.\n\nProperty: Parcel ${loans.find(l=>l.id===inv.loan_id)?.parcel||inv.loan_id?.slice(0,8).toUpperCase()}\nPeriod: ${inv.period||''}\n${inv.notes?'\n'+inv.notes+'\n':''}\nThank you,\nLandFlow CRM`);
   window.open(`mailto:${inv.email}?subject=${subject}&body=${body}`);
-  await sb.from('invoices').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id).eq('user_id', currentUser.id);
+  await sb.from('invoices').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id);
   const idx = invoices.findIndex(i => i.id === id);
   if (idx >= 0) { invoices[idx].status = 'sent'; invoices[idx].sent_at = new Date().toISOString(); }
   renderInvoices();
@@ -1567,7 +1562,6 @@ async function saveInvestor() {
     notes: document.getElementById('inv2-notes').value,
   };
   const saved = await dbSaveInvestor(data);
-  if (!saved) return;
   investors.push(saved);
   renderInvestors(); closeModal('investorModal');
   showToast('✅ Investor saved!', 'success');
@@ -1737,7 +1731,6 @@ async function vaultUpload(loanId, catId) {
       };
       showToast('Uploading…');
       const saved = await dbSaveVaultFile(data);
-      if (!saved) continue;
       vaultFiles.push(saved);
       added++;
     }
