@@ -619,9 +619,11 @@ textarea.form-input{resize:vertical;min-height:80px}
           </div>
         </div>
         <div class="form-group"><label class="form-label">Date *</label><input class="form-input" id="pay-date" type="date" onchange="populatePaymentDefaults()"></div>
-        <div class="form-group"><label class="form-label">Principal *</label><input class="form-input" id="pay-principal-input" type="number" placeholder="0.00" step="0.01" oninput="updatePayTotal()"></div>
-        <div class="form-group"><label class="form-label">Interest *</label><input class="form-input" id="pay-interest-input" type="number" placeholder="0.00" step="0.01" oninput="updatePayTotal()"></div>
-        <div class="form-group" id="pay-latefee-group" style="display:none"><label class="form-label" style="color:var(--red)">Late Fee</label><input class="form-input" id="pay-latefee-input" type="number" placeholder="0.00" step="0.01" oninput="updatePayTotal()"></div>
+        <div class="form-full" id="payAmountRow" style="display:grid;gap:8px;grid-template-columns:1fr 1fr" >
+          <div class="form-group" style="margin:0"><label class="form-label">Principal *</label><input class="form-input" id="pay-principal-input" type="number" placeholder="0.00" step="0.01" oninput="updatePayTotal()"></div>
+          <div class="form-group" style="margin:0"><label class="form-label">Interest *</label><input class="form-input" id="pay-interest-input" type="number" placeholder="0.00" step="0.01" oninput="updatePayTotal()"></div>
+          <div class="form-group" id="pay-latefee-group" style="display:none;margin:0"><label class="form-label" style="color:var(--red)">Late Fee</label><input class="form-input" id="pay-latefee-input" type="number" placeholder="0.00" step="0.01" oninput="updatePayTotal()"></div>
+        </div>
         <div class="form-group form-full" id="payTotalRow" style="display:none;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:13px;color:var(--text2)">Total Payment</span>
@@ -1516,13 +1518,16 @@ function populatePaymentDefaults() {
   if (payDate < dueDate) dueDate.setMonth(dueDate.getMonth() - 1);
   const graceDate = new Date(dueDate); graceDate.setDate(graceDate.getDate() + graceDays);
   const lfGroup = document.getElementById('pay-latefee-group');
+  const amtRow = document.getElementById('payAmountRow');
   const unpaidLateFees = (typeof lateFees !== 'undefined' ? lateFees : []).filter(f => f.loan_id === id && !f.paid);
   if (payDate > graceDate || unpaidLateFees.length > 0) {
     lfGroup.style.display = '';
+    amtRow.style.gridTemplateColumns = '1fr 1fr 1fr';
     const totalLF = unpaidLateFees.reduce((s, f) => s + parseFloat(f.amount || 0), 0) + (payDate > graceDate ? lateFeeAmt : 0);
     document.getElementById('pay-latefee-input').value = totalLF.toFixed(2);
   } else {
     lfGroup.style.display = 'none';
+    amtRow.style.gridTemplateColumns = '1fr 1fr';
     document.getElementById('pay-latefee-input').value = '';
   }
   updatePayTotal();
