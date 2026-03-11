@@ -1523,7 +1523,7 @@ async function savePayment() {
   document.getElementById('pay-ref').value = '';
   document.getElementById('pay-notes').value = '';
   document.getElementById('pay-method').value = '';
-  if (currentLoanId === loanId) { const l = loans.find(x => x.id === loanId); if (l) renderDpPayments(l); }
+  if (currentLoanId === loanId) { openDetail(loanId); }
 }
 
 async function deletePayment(id) {
@@ -1531,7 +1531,7 @@ async function deletePayment(id) {
   await dbDeletePayment(id);
   payments = payments.filter(p => p.id !== id);
   renderPaymentLedger();
-  if (currentLoanId) { const l = loans.find(x => x.id === currentLoanId); if (l) renderDpPayments(l); }
+  if (currentLoanId) { openDetail(currentLoanId); }
   showToast('Payment deleted');
 }
 
