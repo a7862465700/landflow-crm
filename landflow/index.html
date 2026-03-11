@@ -2172,6 +2172,9 @@ function generateMonthlyStatement(loanId) {
   const graceDate = new Date(dueDate); graceDate.setDate(graceDate.getDate() + graceDays);
   const lateFee = s.late_fee_amount || 25;
   const acctNum = l.id?.slice(0,8).toUpperCase() || '';
+  // Outstanding late fees for this loan
+  const outstandingLF = (typeof lateFees !== 'undefined' ? lateFees : []).filter(f => f.loan_id === loanId && !f.paid).reduce((s, f) => s + parseFloat(f.amount || 0), 0);
+  const totalDue = pmt + outstandingLF;
   // Recent payments (last 3)
   const recentPmts = payments.filter(p => p.loan_id === loanId).slice(0, 3);
 
@@ -2205,21 +2208,27 @@ function generateMonthlyStatement(loanId) {
         </div>
       </div>
       <div style="text-align:center;margin-top:12px;padding-top:12px;border-top:1px solid #e8c88a">
-        <div style="font-size:11px;color:#888;text-transform:uppercase">Amount Due</div>
-        <div style="font-size:28px;font-weight:bold;color:#c9933a">${fmtD(pmt)}</div>
+        <div style="font-size:11px;color:#888;text-transform:uppercase">Amount Due${outstandingLF > 0 ? ' (includes late fee)' : ''}</div>
+        <div style="font-size:28px;font-weight:bold;color:#c9933a">${fmtD(totalDue)}</div>
       </div>
     </div>
     <div style="margin-bottom:20px">
       <div style="font-weight:bold;margin-bottom:8px;border-bottom:1px solid #ddd;padding-bottom:4px">Payment Breakdown</div>
       <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Principal</span><span style="font-family:monospace">${fmtD(principalDue)}</span></div>
       <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Interest</span><span style="font-family:monospace">${fmtD(interestDue)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:bold;border-top:1px solid #ddd;margin-top:4px;padding-top:6px"><span>Total Due</span><span style="font-family:monospace">${fmtD(pmt)}</span></div>
+      ${outstandingLF > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;color:#c55"><span>Late Fee</span><span style="font-family:monospace">${fmtD(outstandingLF)}</span></div>` : ''}
+      <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:bold;border-top:1px solid #ddd;margin-top:4px;padding-top:6px"><span>Total Due</span><span style="font-family:monospace">${fmtD(totalDue)}</span></div>
     </div>
     ${recentPmts.length ? `<div style="margin-bottom:20px">
       <div style="font-weight:bold;margin-bottom:8px;border-bottom:1px solid #ddd;padding-bottom:4px">Account Activity</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:#f5f5f5"><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #ddd">Date</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #ddd">Description</th><th style="padding:6px 8px;text-align:right;border-bottom:1px solid #ddd">Amount</th></tr></thead>
-        <tbody>${recentPmts.map(p => `<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">${fmtDate(p.date)}</td><td style="padding:4px 8px;border-bottom:1px solid #eee">Payment${p.method ? ' - ' + p.method : ''}${p.ref ? ' Ref#' + p.ref : ''}</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid #eee">${fmtD(p.amount)}</td></tr>`).join('')}</tbody>
+        <thead><tr style="background:#f5f5f5"><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #ddd">Date</th><th style="padding:6px 8px;text-align:left;border-bottom:1px solid #ddd">Description</th><th style="padding:6px 8px;text-align:right;border-bottom:1px solid #ddd">Principal</th><th style="padding:6px 8px;text-align:right;border-bottom:1px solid #ddd">Interest</th><th style="padding:6px 8px;text-align:right;border-bottom:1px solid #ddd;color:#c55">Late Fee</th><th style="padding:6px 8px;text-align:right;border-bottom:1px solid #ddd;font-weight:bold">Total Paid</th></tr></thead>
+        <tbody>${recentPmts.map(p => {
+          const pPrin = parseFloat(p.principal_portion) || 0;
+          const pInt = parseFloat(p.interest_portion) || 0;
+          const pLF = parseFloat(p.late_fee_portion) || 0;
+          return `<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">${fmtDate(p.date)}</td><td style="padding:4px 8px;border-bottom:1px solid #eee">Payment${p.method ? ' - ' + p.method : ''}${p.ref ? ' Ref#' + p.ref : ''}</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid #eee">${fmtD(pPrin)}</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid #eee">${fmtD(pInt)}</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid #eee;color:#c55">${pLF > 0 ? fmtD(pLF) : '—'}</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid #eee;font-weight:bold">${fmtD(p.amount)}</td></tr>`;
+        }).join('')}</tbody>
       </table>
     </div>` : ''}
     <div style="background:#f9f9f9;border-radius:6px;padding:12px;margin-bottom:20px;font-size:11px;color:#666">
@@ -2233,7 +2242,7 @@ function generateMonthlyStatement(loanId) {
       <div style="display:flex;justify-content:space-between;font-size:12px">
         <div><strong>Account #:</strong> ${acctNum}</div>
         <div><strong>Due Date:</strong> ${dueDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
-        <div><strong>Amount Due:</strong> ${fmtD(pmt)}</div>
+        <div><strong>Amount Due:</strong> ${fmtD(totalDue)}</div>
       </div>
       <div style="margin-top:8px;font-size:12px"><strong>Amount Enclosed: $</strong> ______________</div>
       ${s.company_name ? `<div style="margin-top:12px;font-size:11px;color:#666">Make payable to: <strong>${s.company_name}</strong></div>` : ''}
