@@ -508,16 +508,23 @@ textarea.form-input{resize:vertical;min-height:80px}
     </div>
     <div class="modal-body">
       <input type="hidden" id="f-edit-id">
-      <div class="form-section">👤 Buyer / Seller</div>
+      <div class="form-section">👤 Buyer Info</div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Buyer Full Name *</label><input class="form-input" id="f-borrower" placeholder="John & Jane Smith"></div>
+        <div class="form-group"><label class="form-label">Buyer Phone</label><input class="form-input" id="f-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label class="form-label">Buyer Email</label><input class="form-input" id="f-email" type="email" placeholder="buyer@email.com"></div>
+        <div class="form-group form-full"><label class="form-label">Buyer Address</label><input class="form-input" id="f-buyer-address" placeholder="123 Main St, Atlanta GA 30301"></div>
+        <div class="form-group"><label class="form-label">SSN / EIN (last 4)</label><input class="form-input" id="f-ssn" placeholder="••••" maxlength="4"></div>
+      </div>
+      <div class="form-section">🏷️ Seller Info</div>
+      <div class="form-grid">
         <div class="form-group"><label class="form-label">Seller Full Name</label><input class="form-input" id="f-seller" placeholder="John Smith"></div>
         <div class="form-group"><label class="form-label">Seller Phone</label><input class="form-input" id="f-seller-phone" type="tel" placeholder="(555) 000-0000"></div>
         <div class="form-group form-full"><label class="form-label">Seller Address</label><input class="form-input" id="f-seller-address" placeholder="123 Main St, Atlanta GA 30301"></div>
         <div class="form-group"><label class="form-label">Price Paid to Seller</label><input class="form-input" id="f-price-paid" type="number" placeholder="8000"></div>
-        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="f-phone" type="tel" placeholder="(555) 000-0000"></div>
-        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="f-email" type="email" placeholder="buyer@email.com"></div>
-        <div class="form-group"><label class="form-label">SSN / EIN (last 4)</label><input class="form-input" id="f-ssn" placeholder="••••" maxlength="4"></div>
+      </div>
+      <div class="form-section">📍 Property Info</div>
+      <div class="form-grid">
         <div class="form-group"><label class="form-label">County</label><input class="form-input" id="f-county" placeholder="Hancock"></div>
         <div class="form-group"><label class="form-label">Parcel #</label><input class="form-input" id="f-parcel" placeholder="013B048"></div>
         <div class="form-group form-full"><label class="form-label">Property Address</label><input class="form-input" id="f-address" placeholder="123 Main St, Atlanta GA 30301"></div>
@@ -1020,6 +1027,7 @@ function openLoanModal(editId) {
     document.getElementById('f-seller-phone').value = l.seller_phone||'';
     document.getElementById('f-seller-address').value = l.seller_address||'';
     document.getElementById('f-price-paid').value = l.price_paid||'';
+    document.getElementById('f-buyer-address').value = l.buyer_address||'';
     document.getElementById('f-phone').value = l.phone||'';
     document.getElementById('f-email').value = l.email||'';
     document.getElementById('f-ssn').value = l.ssn||'';
@@ -1057,7 +1065,7 @@ function openLoanModal(editId) {
 }
 
 function clearLoanForm() {
-  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-phone','f-email','f-ssn','f-county','f-parcel','f-address','f-legaldesc',
+  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-address','f-phone','f-email','f-ssn','f-county','f-parcel','f-address','f-legaldesc',
    'f-saleprice','f-down','f-loanamt','f-rate','f-origdate','f-firstpay','f-investor','f-inv-contact',
    'f-inv-date','f-inv-price','f-nb-name','f-nb-business','f-nb-phone','f-nb-email','f-nb-address','f-notes']
   .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
@@ -1105,6 +1113,7 @@ async function saveLoan() {
     seller_phone: document.getElementById('f-seller-phone').value.trim(),
     seller_address: document.getElementById('f-seller-address').value.trim(),
     price_paid: parseFloat(document.getElementById('f-price-paid').value)||0,
+    buyer_address: document.getElementById('f-buyer-address').value.trim(),
     phone: document.getElementById('f-phone').value,
     email: document.getElementById('f-email').value,
     ssn: document.getElementById('f-ssn').value,
@@ -1184,6 +1193,9 @@ function openDetail(id) {
     ['Origination', fmtDate(l.orig_date), 'mono'],
     ['Maturity', matDate(l.orig_date, l.term), 'mono'],
     ['Payments Made', paid + ' of ' + (l.term*12), 'green'],
+    ['Buyer Phone', l.phone||'—', ''],
+    ['Buyer Email', l.email||'—', ''],
+    ['Buyer Address', l.buyer_address||'—', ''],
     ['Seller', l.seller||'—', ''],
     ['Seller Phone', l.seller_phone||'—', ''],
     ['Seller Address', l.seller_address||'—', ''],
