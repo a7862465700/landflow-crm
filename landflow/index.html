@@ -864,7 +864,46 @@ textarea.form-input{resize:vertical;min-height:80px}
       </div>
     </div>
     <div class="te-fmt-bar">
-      <span style="font-size:12px;color:var(--text2)">Click where you want a merge field, then click a field from the palette on the right. Your document formatting is preserved exactly as-is.</span>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('undo')" title="Undo">↩</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('redo')" title="Redo">↪</button>
+      <div class="te-fmt-sep"></div>
+      <select class="te-fmt-select" id="te-font-family" onchange="teExec('fontName',this.value);this.blur()" title="Font">
+        <option value="">Font</option>
+        <option value="Arial">Arial</option>
+        <option value="Calibri">Calibri</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Verdana">Verdana</option>
+        <option value="Garamond">Garamond</option>
+      </select>
+      <select class="te-fmt-select" id="te-font-size" onchange="teExecFontSize(this.value);this.blur()" title="Font Size">
+        <option value="">Size</option>
+        <option value="1">8</option>
+        <option value="2">10</option>
+        <option value="3">12</option>
+        <option value="4">14</option>
+        <option value="5">18</option>
+        <option value="6">24</option>
+        <option value="7">36</option>
+      </select>
+      <div class="te-fmt-sep"></div>
+      <button class="te-fmt-btn" data-cmd="bold" onmousedown="event.preventDefault();teExec('bold')" title="Bold"><b>B</b></button>
+      <button class="te-fmt-btn" data-cmd="italic" onmousedown="event.preventDefault();teExec('italic')" title="Italic"><i>I</i></button>
+      <button class="te-fmt-btn" data-cmd="underline" onmousedown="event.preventDefault();teExec('underline')" title="Underline"><u>U</u></button>
+      <button class="te-fmt-btn" data-cmd="strikeThrough" onmousedown="event.preventDefault();teExec('strikeThrough')" title="Strikethrough"><s>S</s></button>
+      <div class="te-fmt-sep"></div>
+      <label class="te-fmt-btn" title="Text Color" style="position:relative;cursor:pointer">
+        A<span id="te-color-indicator" style="display:block;height:3px;background:#000;margin-top:-2px;border-radius:1px"></span>
+        <input type="color" id="te-text-color" value="#000000" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" onchange="teExec('foreColor',this.value);document.getElementById('te-color-indicator').style.background=this.value">
+      </label>
+      <div class="te-fmt-sep"></div>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('justifyLeft')" title="Align Left">⇤</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('justifyCenter')" title="Center">⇔</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('justifyRight')" title="Align Right">⇥</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('justifyFull')" title="Justify">☰</button>
+      <div class="te-fmt-sep"></div>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teRemoveLine()" title="Remove Line">✕ Line</button>
     </div>
     <div class="te-body">
       <div class="te-editor-pane">
@@ -2894,8 +2933,159 @@ document.addEventListener('selectionchange', function() {
   const editor = document.getElementById('te-editor');
   if (editor && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
     _teLastRange = sel.getRangeAt(0).cloneRange();
+    teUpdateToolbarState();
   }
 });
+
+// ── FORMATTING TOOLBAR ──
+function teExec(command, value) {
+  document.execCommand(command, false, value || null);
+  teUpdateToolbarState();
+}
+function teExecFontSize(sizeValue) {
+  if (!sizeValue) return;
+  document.execCommand('fontSize', false, sizeValue);
+  teUpdateToolbarState();
+}
+function teRemoveLine() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  let node = sel.getRangeAt(0).startContainer;
+  while (node && node.tagName !== 'P' && !node.classList?.contains('docx')) {
+    node = node.parentElement;
+  }
+  if (node && node.tagName === 'P') {
+    node.remove();
+    showToast('Line removed', 'success');
+  }
+}
+function teUpdateToolbarState() {
+  document.querySelectorAll('.te-fmt-bar .te-fmt-btn[data-cmd]').forEach(function(btn) {
+    try { btn.classList.toggle('active', document.queryCommandState(btn.getAttribute('data-cmd'))); } catch(e) {}
+  });
+}
+
+// ── HTML-TO-OOXML CONVERTER ──
+const _fszMap = { '1':8, '2':10, '3':12, '4':14, '5':18, '6':24, '7':36 };
+function _xmlEsc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _rgbHex(c) {
+  if (!c) return '000000';
+  if (c.charAt(0)==='#') return c.replace('#','').padEnd(6,'0');
+  var m = c.match(/\d+/g);
+  if (!m||m.length<3) return '000000';
+  return m.slice(0,3).map(function(n){return parseInt(n).toString(16).padStart(2,'0')}).join('');
+}
+function _buildRun(text, sty) {
+  if (!text) return '';
+  var props = [];
+  if (sty.bold) props.push('<w:b/>');
+  if (sty.italic) props.push('<w:i/>');
+  if (sty.underline) props.push('<w:u w:val="single"/>');
+  if (sty.strike) props.push('<w:strike/>');
+  if (sty.fontFamily) props.push('<w:rFonts w:ascii="'+_xmlEsc(sty.fontFamily)+'" w:hAnsi="'+_xmlEsc(sty.fontFamily)+'"/>');
+  if (sty.fontSize) { var v=sty.fontSize*2; props.push('<w:sz w:val="'+v+'"/><w:szCs w:val="'+v+'"/>'); }
+  if (sty.color && sty.color !== '000000') props.push('<w:color w:val="'+sty.color+'"/>');
+  var rPr = props.length ? '<w:rPr>'+props.join('')+'</w:rPr>' : '';
+  var esc = _xmlEsc(text);
+  var pres = (text.charAt(0)===' '||text.charAt(text.length-1)===' ') ? ' xml:space="preserve"' : '';
+  return '<w:r>'+rPr+'<w:t'+pres+'>'+esc+'</w:t></w:r>';
+}
+function _walkInline(node, runs, parentSty) {
+  for (var i=0; i<node.childNodes.length; i++) {
+    var ch = node.childNodes[i];
+    if (ch.nodeType === 3) { // text
+      var t = ch.textContent;
+      if (t) runs.push(_buildRun(t, parentSty));
+    } else if (ch.nodeType === 1) { // element
+      var tag = ch.tagName;
+      if (tag === 'BR') { runs.push('<w:r><w:br/></w:r>'); continue; }
+      var sty = Object.assign({}, parentSty);
+      var cs = window.getComputedStyle(ch);
+      if (tag==='B'||tag==='STRONG'||parseInt(cs.fontWeight)>=700) sty.bold = true;
+      if (tag==='I'||tag==='EM'||cs.fontStyle==='italic') sty.italic = true;
+      if (tag==='U') sty.underline = true;
+      if (tag==='S'||tag==='STRIKE'||tag==='DEL') sty.strike = true;
+      if (tag==='FONT') {
+        if (ch.face) sty.fontFamily = ch.face;
+        if (ch.color) sty.color = _rgbHex(ch.color);
+        if (ch.size && _fszMap[ch.size]) sty.fontSize = _fszMap[ch.size];
+      }
+      // Read inline styles from spans
+      if (cs.fontFamily) {
+        var ff = cs.fontFamily.replace(/["']/g,'').split(',')[0].trim();
+        if (ff && ff !== 'DM Sans') sty.fontFamily = ff;
+      }
+      if (cs.fontSize) {
+        var ptVal = Math.round(parseFloat(cs.fontSize) * 0.75);
+        if (ptVal > 0) sty.fontSize = ptVal;
+      }
+      if (cs.color) sty.color = _rgbHex(cs.color);
+      // Merge tag spans: emit text as-is
+      if (ch.classList && ch.classList.contains('merge-tag')) {
+        runs.push(_buildRun(ch.textContent, sty));
+        continue;
+      }
+      _walkInline(ch, runs, sty);
+    }
+  }
+}
+function _convertPara(pEl) {
+  var cs = window.getComputedStyle(pEl);
+  var align = cs.textAlign;
+  var pPr = '';
+  if (align==='center') pPr='<w:pPr><w:jc w:val="center"/></w:pPr>';
+  else if (align==='right') pPr='<w:pPr><w:jc w:val="right"/></w:pPr>';
+  else if (align==='justify') pPr='<w:pPr><w:jc w:val="both"/></w:pPr>';
+  var runs = [];
+  _walkInline(pEl, runs, {});
+  return '<w:p>'+pPr+runs.join('')+'</w:p>';
+}
+function _convertTable(tblEl) {
+  var xml = '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>'+
+    '<w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+    '<w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+    '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+    '<w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+    '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+    '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
+    '</w:tblBorders></w:tblPr>';
+  for (var r=0; r<tblEl.rows.length; r++) {
+    xml += '<w:tr>';
+    for (var c=0; c<tblEl.rows[r].cells.length; c++) {
+      var cell = tblEl.rows[r].cells[c];
+      xml += '<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr>';
+      var paras = cell.querySelectorAll('p');
+      if (paras.length) { paras.forEach(function(p){ xml += _convertPara(p); }); }
+      else { var cRuns=[]; _walkInline(cell, cRuns, {}); xml += '<w:p>'+cRuns.join('')+'</w:p>'; }
+      xml += '</w:tc>';
+    }
+    xml += '</w:tr>';
+  }
+  xml += '</w:tbl>';
+  return xml;
+}
+function htmlToOoxml(editorEl) {
+  var parts = [];
+  var sections = editorEl.querySelectorAll('section.docx');
+  var secIdx = 0;
+  sections.forEach(function(section) {
+    if (secIdx > 0) parts.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+    var children = section.children;
+    for (var i=0; i<children.length; i++) {
+      var el = children[i];
+      if (el.tagName === 'TABLE') parts.push(_convertTable(el));
+      else if (el.tagName === 'P') parts.push(_convertPara(el));
+      else {
+        // Treat any other block element as a paragraph
+        var runs = [];
+        _walkInline(el, runs, {});
+        if (runs.length) parts.push('<w:p>'+runs.join('')+'</w:p>');
+      }
+    }
+    secIdx++;
+  });
+  return parts.join('\n');
+}
 
 function insertMergeField(tag) {
   const editor = document.getElementById('te-editor');
@@ -2941,115 +3131,28 @@ async function saveTemplateEditor() {
   if (!t) return showToast('Template not found', 'error');
   showToast('Saving template…');
   try {
-    // Extract merge fields from the editor HTML
-    const div = document.createElement('div');
-    div.innerHTML = document.getElementById('te-editor').innerHTML;
-    const editorText = div.textContent.replace(/\u200B/g, '');
-    // Collect all {field} tags from the edited content
-    const fieldMatches = editorText.match(/\{[a-zA-Z0-9_]+\}/g) || [];
-
-    // Use the stored ORIGINAL .docx bytes (not the rendered HTML)
     const bytes = window._originalDocxBytes || await getTemplateBytes(t);
     const zip = new PizZip(bytes.buffer);
-
-    // Get the document.xml content
-    const xmlFiles = ['word/document.xml', 'word/header1.xml', 'word/header2.xml', 'word/footer1.xml', 'word/footer2.xml'];
-
-    // For each field found in the editor, ensure it exists in the .docx XML
-    // The editor is used to PLACE fields — we scan the editor to build a mapping
-    // of what text was replaced with merge fields, then patch the original XML
-
-    // Simpler approach: extract the full text with merge fields from the editor,
-    // and for each paragraph, find the corresponding paragraph in the XML and
-    // inject any new {field} tags that weren't there before
-
-    // Simplest reliable approach: directly modify document.xml to insert merge fields
-    // by finding text runs and replacing literal text with {field} tags
-    // This works because the user places {field} in the HTML editor at the right spots
-
-    // Build a list of new fields to inject by comparing editor content to original
     const docXml = zip.file('word/document.xml')?.asText();
     if (!docXml) throw new Error('Cannot read document.xml');
 
-    // Extract text content from editor, paragraph by paragraph
-    const editorParas = [];
-    div.querySelectorAll('p').forEach(p => {
-      editorParas.push(p.textContent.replace(/\u200B/g, '').trim());
-    });
-    // If no <p> tags (plain text), split by line
-    if (!editorParas.length) {
-      editorText.split('\n').forEach(line => editorParas.push(line.trim()));
-    }
+    // Preserve section properties (page size, margins, orientation)
+    const sectPrMatch = docXml.match(/<w:sectPr[\s\S]*?<\/w:sectPr>/);
+    const sectPr = sectPrMatch ? sectPrMatch[0] : '';
 
-    // Find all {field} patterns that the user added in the editor
-    const newFields = new Set(fieldMatches);
+    // Preserve the <w:document> root element with all namespace declarations
+    const bodyStart = docXml.indexOf('<w:body');
+    const rootOpen = docXml.substring(docXml.indexOf('<w:document'), bodyStart);
+    const xmlDecl = docXml.match(/<\?xml[^?]*\?>/)?.[0] || '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
 
-    // Check which fields already exist in the original XML
-    const existingFields = new Set();
-    const existingMatches = docXml.match(/\{[a-zA-Z0-9_]+\}/g) || [];
-    existingMatches.forEach(f => existingFields.add(f));
+    // Rebuild body from editor DOM
+    const editor = document.getElementById('te-editor');
+    const bodyContent = htmlToOoxml(editor);
 
-    // Fields that need to be added to the document
-    const fieldsToAdd = [...newFields].filter(f => !existingFields.has(f));
+    const newXml = xmlDecl + '\n' + rootOpen + '<w:body>\n' + bodyContent + '\n' + sectPr + '\n</w:body></w:document>';
+    zip.file('word/document.xml', newXml);
 
-    if (fieldsToAdd.length === 0 && newFields.size > 0) {
-      // All fields already exist in the original — nothing to patch
-      closeTemplateEditor();
-      showToast('Template already has all merge fields!', 'success');
-      return;
-    }
-
-    if (fieldsToAdd.length === 0 && newFields.size === 0) {
-      closeTemplateEditor();
-      showToast('No merge fields found to save. Insert fields using the palette.', 'error');
-      return;
-    }
-
-    // For fields that need adding: scan editor paragraphs to find where each field
-    // was placed, identify the surrounding text context, then find and patch the XML
-    let patchedXml = docXml;
-    for (const field of fieldsToAdd) {
-      // Find the paragraph in the editor that contains this field
-      for (const para of editorParas) {
-        if (!para.includes(field)) continue;
-        // Get the text before and after the field in the editor paragraph
-        const fieldIdx = para.indexOf(field);
-        const before = para.substring(Math.max(0, fieldIdx - 40), fieldIdx).trim();
-        const after = para.substring(fieldIdx + field.length, fieldIdx + field.length + 40).trim();
-
-        // Try to find this context in the XML and insert the field
-        // XML text runs look like: <w:t>some text</w:t>
-        // We need to find the <w:t> that contains the text near where the field should go
-
-        if (before.length > 3) {
-          // Find the "before" text in XML (may be split across runs)
-          // Look for the last few words before the field
-          const searchText = before.slice(-20);
-          const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          // Try to find and append the field after the matching text
-          const regex = new RegExp('(' + escapedSearch + ')', 'g');
-          if (regex.test(patchedXml)) {
-            patchedXml = patchedXml.replace(regex, '$1' + field);
-            break;
-          }
-        }
-        if (after.length > 3) {
-          // Insert field before the "after" text
-          const searchText = after.slice(0, 20);
-          const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const regex = new RegExp('(' + escapedSearch + ')', 'g');
-          if (regex.test(patchedXml)) {
-            patchedXml = patchedXml.replace(regex, field + '$1');
-            break;
-          }
-        }
-      }
-    }
-
-    // Write patched XML back to the zip
-    zip.file('word/document.xml', patchedXml);
-
-    // Generate the patched .docx as a blob
+    // Generate the new .docx blob
     const blob = zip.generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 
     // Upload to Supabase Storage
@@ -3074,7 +3177,7 @@ async function saveTemplateEditor() {
 
     renderTemplates();
     closeTemplateEditor();
-    showToast('Template saved — ' + fieldsToAdd.length + ' new field(s) added!', 'success');
+    showToast('Template saved with all changes!', 'success');
   } catch (e) {
     console.error('Save template error:', e);
     showToast('Save failed: ' + (e.message || 'Unknown error'), 'error');
