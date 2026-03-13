@@ -1026,7 +1026,8 @@ async function dbDeleteInvoice(id) {
 }
 
 async function dbSaveVaultFile(data) {
-  const { data: d } = await sb.from('vault_files').insert({ ...data, user_id: currentUser.id }).select().single();
+  const { data: d, error } = await sb.from('vault_files').insert({ ...data, user_id: currentUser.id }).select().single();
+  if (error) { console.error('dbSaveVaultFile error:', error); showToast('Save failed: ' + error.message, 'error'); return null; }
   return d;
 }
 
@@ -2473,6 +2474,7 @@ async function uploadTemplate() {
       data: b64, book_page: '', notes: '',
     };
     const saved = await dbSaveVaultFile(data);
+    if (!saved) return showToast('Template upload failed — check console for details', 'error');
     vaultFiles.push(saved);
     renderTemplates();
     showToast('Template uploaded!', 'success');
