@@ -10,15 +10,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 :root {
-  --bg:#0a0c10; --s1:#111318; --s2:#181b22; --s3:#1e2230;
-  --border:#252a38; --border2:#2e3548;
-  --gold:#c9933a; --gold2:#e8b455; --golddim:rgba(201,147,58,0.13);
-  --green:#2ecc8a; --greendim:rgba(46,204,138,0.1);
-  --red:#e05555; --reddim:rgba(224,85,85,0.1);
-  --blue:#4f8ef5; --bluedim:rgba(79,142,245,0.1);
-  --amber:#e09832; --amberdim:rgba(224,152,50,0.1);
-  --text:#dde1ef; --text2:#8892aa; --text3:#4a5268;
-  --shadow:0 4px 24px rgba(0,0,0,0.5);
+  --bg:#f5f0e8; --s1:#ece5d8; --s2:#e3dbd0; --s3:#d9d0c3;
+  --border:#c9bfb0; --border2:#b8ad9e;
+  --gold:#c9933a; --gold2:#b07e2e; --golddim:rgba(201,147,58,0.15);
+  --green:#2a9d6e; --greendim:rgba(42,157,110,0.12);
+  --red:#c94444; --reddim:rgba(201,68,68,0.1);
+  --blue:#3d73c9; --bluedim:rgba(61,115,201,0.1);
+  --amber:#c98a28; --amberdim:rgba(201,138,40,0.1);
+  --text:#2d2a26; --text2:#6b6358; --text3:#9a8f82;
+  --shadow:0 4px 24px rgba(0,0,0,0.08);
   --r:10px; --r-sm:7px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -38,7 +38,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .auth-label{display:block;text-align:left;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px}
 .auth-input{width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:var(--r-sm);padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;margin-bottom:16px;outline:none;transition:border-color .2s}
 .auth-input:focus{border-color:var(--gold)}
-.auth-btn{width:100%;background:var(--gold);color:#0a0c10;border:none;border-radius:var(--r-sm);padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:4px}
+.auth-btn{width:100%;background:var(--gold);color:#fff;border:none;border-radius:var(--r-sm);padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:4px}
 .auth-btn:hover{background:var(--gold2)}
 .auth-err{color:var(--red);font-size:12px;margin-top:10px;min-height:18px}
 
@@ -111,7 +111,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 
 /* ── BUTTONS ── */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;-webkit-user-select:none}
-.btn-gold{background:var(--gold);color:#0a0c10}
+.btn-gold{background:var(--gold);color:#fff}
 .btn-gold:active{background:var(--gold2)}
 .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
 .btn-ghost:active{background:var(--s3)}
@@ -119,7 +119,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .btn-danger{background:var(--reddim);color:var(--red);border:1px solid rgba(224,85,85,.2)}
 .btn-sm{padding:5px 11px;font-size:12px}
 .btn-block{width:100%;justify-content:center}
-.fab{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));right:16px;width:52px;height:52px;border-radius:50%;background:var(--gold);border:none;color:#0a0c10;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(201,147,58,.4);z-index:40;-webkit-user-select:none}
+.fab{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));right:16px;width:52px;height:52px;border-radius:50%;background:var(--gold);border:none;color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(201,147,58,.4);z-index:40;-webkit-user-select:none}
 @media(min-width:768px){.fab{display:none}}
 
 /* ── STATS GRID ── */
@@ -516,14 +516,14 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="form-section">🏷️ Seller Info</div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Seller Full Name</label><input class="form-input" id="f-seller" placeholder="John Smith"></div>
-        <div class="form-group"><label class="form-label">Seller Phone</label><input class="form-input" id="f-seller-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label class="form-label">Seller Phone</label><input class="form-input" id="f-seller-phone" type="tel" placeholder="5550000000"></div>
         <div class="form-group form-full"><label class="form-label">Seller Address</label><input class="form-input" id="f-seller-address" placeholder="123 Main St, Atlanta GA 30301"></div>
         <div class="form-group"><label class="form-label">Price Paid to Seller</label><input class="form-input" id="f-price-paid" type="number" placeholder="8000"></div>
       </div>
       <div class="form-section">👤 Buyer Info</div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Buyer Full Name *</label><input class="form-input" id="f-borrower" placeholder="John & Jane Smith"></div>
-        <div class="form-group"><label class="form-label">Buyer Phone</label><input class="form-input" id="f-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label class="form-label">Buyer Phone</label><input class="form-input" id="f-phone" type="tel" placeholder="5550000000"></div>
         <div class="form-group"><label class="form-label">Buyer Email</label><input class="form-input" id="f-email" type="email" placeholder="buyer@email.com"></div>
         <div class="form-group form-full"><label class="form-label">Buyer Address</label><input class="form-input" id="f-buyer-address" placeholder="123 Main St, Atlanta GA 30301"></div>
         <div class="form-group"><label class="form-label">SSN / EIN (last 4)</label><input class="form-input" id="f-ssn" placeholder="••••" maxlength="4"></div>
@@ -584,7 +584,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Note Buyer Name</label><input class="form-input" id="f-nb-name" placeholder="Jane Doe"></div>
         <div class="form-group"><label class="form-label">Business Name</label><input class="form-input" id="f-nb-business" placeholder="Horizon Capital LLC"></div>
-        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="f-nb-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="f-nb-phone" type="tel" placeholder="5550000000"></div>
         <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="f-nb-email" type="email" placeholder="buyer@notefund.com"></div>
         <div class="form-group form-full"><label class="form-label">Mailing Address</label><input class="form-input" id="f-nb-address" placeholder="100 Capital Way, Atlanta GA 30301"></div>
       </div>
@@ -688,7 +688,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Company / Name *</label><input class="form-input" id="inv2-name" placeholder="First Capital LLC"></div>
         <div class="form-group"><label class="form-label">Contact Person</label><input class="form-input" id="inv2-contact" placeholder="Robert Kline"></div>
-        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="inv2-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="inv2-phone" type="tel" placeholder="5550000000"></div>
         <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="inv2-email" type="email" placeholder="contact@fund.com"></div>
         <div class="form-group form-full"><label class="form-label">Notes</label><textarea class="form-input" id="inv2-notes" rows="2" placeholder="Preferred note types, criteria..."></textarea></div>
       </div>
@@ -711,7 +711,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="form-grid">
         <div class="form-group form-full"><label class="form-label">Company Name</label><input class="form-input" id="set-company" placeholder="Elk Creek Group USA LLC"></div>
         <div class="form-group form-full"><label class="form-label">Company Address</label><input class="form-input" id="set-address" placeholder="123 Main St, Suite 100, Denver CO 80202"></div>
-        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="set-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="set-phone" type="tel" placeholder="5550000000"></div>
         <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="set-email" type="email" placeholder="info@company.com"></div>
         <div class="form-group form-full">
           <label class="form-label">Company Logo</label>
@@ -1064,6 +1064,7 @@ function balloonDate(orig,bYears){if(!orig||!bYears)return null;const d=new Date
 const fmt=n=>'$'+Math.round(n||0).toLocaleString();
 const fmtD=n=>'$'+(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 const fmtDate=d=>d?new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+const fmtPhone=p=>{if(!p)return'';const d=p.replace(/\D/g,'');if(d.length===10)return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;if(d.length===11&&d[0]==='1')return`(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;return p;};
 
 // Late fee check: returns true if payment is late (past grace period)
 function isPaymentLate(dueDate, graceDays) {
@@ -1376,11 +1377,11 @@ function openDetail(id) {
     ['Maturity', matDate(l.orig_date, l.term), 'mono'],
     ['Payments Made', paid + ' of ' + (l.term*12), 'green'],
     ['Due Day', ordinal(l.payment_due_day || 1) + ' of month', ''],
-    ['Buyer Phone', l.phone||'—', ''],
+    ['Buyer Phone', fmtPhone(l.phone)||'—', ''],
     ['Buyer Email', l.email||'—', ''],
     ['Buyer Address', l.buyer_address||'—', ''],
     ['Seller', l.seller||'—', ''],
-    ['Seller Phone', l.seller_phone||'—', ''],
+    ['Seller Phone', fmtPhone(l.seller_phone)||'—', ''],
     ['Seller Address', l.seller_address||'—', ''],
     ['Price Paid', l.price_paid ? fmt(l.price_paid) : '—', 'mono'],
     ['County', l.county||'—', ''],
@@ -1399,7 +1400,7 @@ function openDetail(id) {
        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
          <div><div class="dp-field-label">Name</div><div>${l.nb_name||'—'}</div></div>
          <div><div class="dp-field-label">Business</div><div>${l.nb_business||'—'}</div></div>
-         <div><div class="dp-field-label">Phone</div><div>${l.nb_phone||'—'}</div></div>
+         <div><div class="dp-field-label">Phone</div><div>${fmtPhone(l.nb_phone)||'—'}</div></div>
          <div><div class="dp-field-label">Email</div><div>${l.nb_email||'—'}</div></div>
          <div style="grid-column:1/-1"><div class="dp-field-label">Address</div><div>${l.nb_address||'—'}</div></div>
        </div>`:''}`
@@ -1713,7 +1714,7 @@ function renderInvoices() {
     return `<div class="invoice-card">
       <div class="inv-head">
         <div>
-          <div class="inv-id">${inv.loan_id?.slice(0,8).toUpperCase()||''} · ${inv.period||''}</div>
+          <div class="inv-id">${l?.parcel || inv.loan_id?.slice(0,8).toUpperCase()||''} · ${inv.period||''}</div>
           <div class="inv-borrower">${inv.borrower||l?.borrower||'—'}</div>
           <div style="font-size:12px;color:var(--text3);margin-top:2px">Due: ${fmtDate(inv.due_date)} · ${inv.email}</div>
         </div>
@@ -1741,6 +1742,7 @@ function viewInvoice(id) {
   const l = loans.find(x => x.id === inv.loan_id);
   // Use the monthly statement view instead if loan exists
   if (l) { generateMonthlyStatement(l.id); return; }
+  const sett = APP.settings || {};
   const w = window.open('', '_blank');
   const bal = 0;
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice</title><style>
@@ -1769,11 +1771,18 @@ function viewInvoice(id) {
   </div>
   <div class="details">
     <div class="row"><span class="label">Period</span><span class="value">${inv.period||''}</span></div>
-    <div class="row"><span class="label">Loan ID</span><span class="value">${inv.loan_id?.slice(0,8).toUpperCase()||''}</span></div>
+    <div class="row"><span class="label">Account #</span><span class="value">${l?.parcel || inv.loan_id?.slice(0,8).toUpperCase()||''}</span></div>
     <div class="row"><span class="label">Property</span><span class="value">${l?.address||'—'}</span></div>
-    <div class="row"><span class="label">Parcel #</span><span class="value">${l?.parcel||'—'}</span></div>
     <div class="row"><span class="label">Remaining Balance</span><span class="value">${fmt(bal)}</span></div>
     ${inv.notes?`<div class="row"><span class="label">Note</span><span class="value">${inv.notes}</span></div>`:''}
+  </div>
+  <div style="margin-top:16px;padding:12px;border-top:2px dashed #ccc;font-size:12px;color:#555">
+    <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Lender Information</div>
+    ${sett.company_name ? `<div><strong>${sett.company_name}</strong></div>` : ''}
+    ${sett.company_address ? `<div>${sett.company_address}</div>` : ''}
+    ${sett.company_phone ? `<div>Phone: ${fmtPhone(sett.company_phone)}</div>` : ''}
+    ${sett.company_email ? `<div>Email: ${sett.company_email}</div>` : ''}
+    <div style="margin-top:8px">Mail payments to: 970 West Broadway, Suite E, 324, Jackson, Wyoming 83002</div>
   </div>
   <div class="footer">LandFlow CRM · Seller Finance Management · Please remit payment by the due date shown above</div>
   </body></html>`);
@@ -1788,8 +1797,9 @@ async function sendInvoice(id) {
   const acctNum = inv.loan_id?.slice(0,8).toUpperCase() || '';
   const graceDays = s.grace_period_days || 15;
   const graceDate = new Date(inv.due_date); graceDate.setDate(graceDate.getDate() + graceDays);
-  const subject = encodeURIComponent(`Payment Statement — Account ${acctNum} — ${inv.period||''}`);
-  const body = encodeURIComponent(`Dear ${inv.borrower},\n\nYour payment of ${fmtD(inv.amount)} is due on ${fmtDate(inv.due_date)}.\n\nAccount #: ${acctNum}\nProperty: ${l?.address||'—'} ${l?.parcel?'| Parcel '+l.parcel:''}\nPeriod: ${inv.period||''}\n\nA late charge of $${(s.late_fee_amount||25).toFixed(2)} will be assessed if payment is not received by ${graceDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}.\n\nPayment Methods: Zelle, Wire, Check, or Credit Card\n${s.company_phone ? 'Questions? Call ' + s.company_phone : ''}\n${inv.notes?'\n'+inv.notes+'\n':''}\nThank you,\n${s.company_name || 'LandFlow CRM'}`);
+  const displayAcct = l?.parcel || acctNum;
+  const subject = encodeURIComponent(`Payment Statement — Account ${displayAcct} — ${inv.period||''}`);
+  const body = encodeURIComponent(`Dear ${inv.borrower},\n\nYour payment of ${fmtD(inv.amount)} is due on ${fmtDate(inv.due_date)}.\n\nAccount #: ${displayAcct}\nProperty: ${l?.address||'—'} ${l?.parcel?'| Parcel '+l.parcel:''}\nPeriod: ${inv.period||''}\n\nA late charge of $${(s.late_fee_amount||25).toFixed(2)} will be assessed if payment is not received by ${graceDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}.\n\nPayment Methods: Zelle, Wire, Check, or Credit Card\n${s.company_phone ? 'Questions? Call ' + fmtPhone(s.company_phone) : ''}\n${inv.notes?'\n'+inv.notes+'\n':''}\nThank you,\n${s.company_name || 'LandFlow CRM'}`);
   window.open(`mailto:${inv.email}?subject=${subject}&body=${body}`);
   await sb.from('invoices').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id);
   const idx = invoices.findIndex(i => i.id === id);
@@ -1844,7 +1854,7 @@ function renderInvestors() {
     return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px">
       <div style="font-weight:700;font-size:14px;margin-bottom:4px">🏦 ${inv.name}</div>
       ${inv.contact&&inv.contact!=='—'?`<div style="font-size:12px;color:var(--text2)">👤 ${inv.contact}</div>`:''}
-      ${inv.phone?`<div style="font-size:12px;color:var(--text2)">📞 ${inv.phone}</div>`:''}
+      ${inv.phone?`<div style="font-size:12px;color:var(--text2)">📞 ${fmtPhone(inv.phone)}</div>`:''}
       ${inv.email?`<div style="font-size:12px;color:var(--text2)">✉️ ${inv.email}</div>`:''}
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
         <div><div class="lc-label">Notes Held</div><div class="lc-val">${assigned.length}</div></div>
@@ -1872,7 +1882,7 @@ function renderBuyers() {
     return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer" onclick="openDetail('${l.id}')">
       <div style="font-weight:700;font-size:14px;margin-bottom:2px">👤 ${l.borrower||'Unnamed'}</div>
       ${getBadge(l)}
-      ${l.phone?`<div style="font-size:12px;color:var(--text2);margin-top:4px">📞 ${l.phone}</div>`:''}
+      ${l.phone?`<div style="font-size:12px;color:var(--text2);margin-top:4px">📞 ${fmtPhone(l.phone)}</div>`:''}
       ${l.email?`<div style="font-size:12px;color:var(--text2)">✉️ ${l.email}</div>`:''}
       <div style="font-size:12px;color:var(--text2)">📍 ${l.address||'—'}</div>
       ${l.parcel?`<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3)">Parcel: ${l.parcel}</div>`:''}
@@ -2146,7 +2156,7 @@ function stmtHeader() {
     <div style="text-align:right">
       <div style="font-size:18px;font-weight:bold;color:#c9933a">${s.company_name || 'LandFlow CRM'}</div>
       ${s.company_address ? `<div style="font-size:11px;color:#666">${s.company_address}</div>` : ''}
-      ${s.company_phone ? `<div style="font-size:11px;color:#666">${s.company_phone}</div>` : ''}
+      ${s.company_phone ? `<div style="font-size:11px;color:#666">${fmtPhone(s.company_phone)}</div>` : ''}
       ${s.company_email ? `<div style="font-size:11px;color:#666">${s.company_email}</div>` : ''}
     </div>
   </div>`;
@@ -2184,7 +2194,7 @@ function generateMonthlyStatement(loanId) {
         <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px">Statement Date</div>
         <div style="font-weight:bold">${now.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
         <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:8px">Account Number</div>
-        <div style="font-weight:bold;font-family:monospace">${acctNum}</div>
+        <div style="font-weight:bold;font-family:monospace">${l.parcel || acctNum}</div>
       </div>
       <div style="flex:1;text-align:right">
         <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px">Borrower</div>
@@ -2240,13 +2250,15 @@ function generateMonthlyStatement(loanId) {
     <div style="border-top:2px dashed #ccc;padding-top:16px;margin-top:20px">
       <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">✂ Payment Remittance — Detach and return with payment</div>
       <div style="display:flex;justify-content:space-between;font-size:12px">
-        <div><strong>Account #:</strong> ${acctNum}</div>
+        <div><strong>Account #:</strong> ${l.parcel || acctNum}</div>
         <div><strong>Due Date:</strong> ${dueDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
         <div><strong>Amount Due:</strong> ${fmtD(totalDue)}</div>
       </div>
       <div style="margin-top:8px;font-size:12px"><strong>Amount Enclosed: $</strong> ______________</div>
       ${s.company_name ? `<div style="margin-top:12px;font-size:11px;color:#666">Make payable to: <strong>${s.company_name}</strong></div>` : ''}
-      ${s.company_address ? `<div style="font-size:11px;color:#666">Mail to: ${s.company_address}</div>` : ''}
+      <div style="font-size:11px;color:#666">Mail to: 970 West Broadway, Suite E, 324, Jackson, Wyoming 83002</div>
+      ${s.company_phone ? `<div style="font-size:11px;color:#666">Phone: ${fmtPhone(s.company_phone)}</div>` : ''}
+      ${s.company_email ? `<div style="font-size:11px;color:#666">Email: ${s.company_email}</div>` : ''}
     </div>`;
 
   document.getElementById('stmtTitle').textContent = 'Payment Statement — ' + (l.borrower || '') + ' — ' + now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
@@ -2287,7 +2299,7 @@ function generateAccountStatement(loanId) {
       </div>
       <div style="text-align:right">
         <div style="font-size:11px;color:#888;text-transform:uppercase">Account #</div>
-        <div style="font-weight:bold;font-family:monospace">${acctNum}</div>
+        <div style="font-weight:bold;font-family:monospace">${l.parcel || acctNum}</div>
         <div style="font-size:11px;color:#888;text-transform:uppercase;margin-top:6px">Statement Date</div>
         <div style="font-weight:bold">${now.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
       </div>
@@ -2399,7 +2411,7 @@ async function downloadStatementPDF() {
 // ============================================================
 // EMAIL STATEMENT
 // ============================================================
-function emailStatement() {
+async function emailStatement() {
   const loan = loans.find(x => x.id === window._currentStmtLoanId);
   if (!loan || !loan.email) return showToast('No borrower email on file', 'error');
   const s = APP.settings || {};
@@ -2409,19 +2421,77 @@ function emailStatement() {
   const now = new Date();
   const dueDate = new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
   const acctNum = loan.id?.slice(0,8).toUpperCase() || '';
+  const displayAcct = loan.parcel || acctNum;
   const isMonthly = window._currentStmtType === 'monthly';
-  const subject = encodeURIComponent(
-    isMonthly
-      ? `Payment Statement — Account ${acctNum} — ${now.toLocaleDateString('en-US',{month:'long',year:'numeric'})}`
-      : `Statement of Account — Account ${acctNum}`
-  );
-  const body = encodeURIComponent(
-    isMonthly
-      ? `Dear ${loan.borrower},\n\nPlease find your monthly payment statement details below:\n\nAccount #: ${acctNum}\nPayment Due: ${dueDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}\nAmount Due: ${fmtD(pmt)}\nCurrent Balance: ${fmtD(realBal.balance)}\n\nPayment Methods: Zelle, Wire, Check, or Credit Card\n${s.company_phone ? 'Questions? Call ' + s.company_phone : ''}\n\nPlease download the attached PDF for full statement details.\n\nThank you,\n${s.company_name || 'LandFlow CRM'}`
-      : `Dear ${loan.borrower},\n\nAttached is your complete Statement of Account for Account #${acctNum}.\n\nOriginal Loan: ${fmt(loan.loan_amount)}\nCurrent Balance: ${fmtD(realBal.balance)}\nTotal Payments: ${realBal.totalPayments}\n\nPlease download the PDF for the full transaction history.\n\nThank you,\n${s.company_name || 'LandFlow CRM'}`
-  );
-  window.open(`mailto:${loan.email}?subject=${subject}&body=${body}`);
-  showToast('📧 Email client opened!', 'success');
+
+  // Generate PDF blob and attach to email via EmailJS or download+mailto fallback
+  const el = document.getElementById('stmtContent');
+  let pdfBlob = null;
+  try {
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+    const { jsPDF } = window.jspdf;
+    const pdfDoc = new jsPDF('p', 'mm', 'letter');
+    const pageWidth = 215.9, pageHeight = 279.4, margin = 10;
+    const imgWidth = pageWidth - margin * 2;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    if (imgHeight <= pageHeight - margin * 2) {
+      pdfDoc.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, imgWidth, imgHeight);
+    } else {
+      const pageContentHeight = pageHeight - margin * 2;
+      const totalPages = Math.ceil(imgHeight / pageContentHeight);
+      for (let i = 0; i < totalPages; i++) {
+        if (i > 0) pdfDoc.addPage();
+        const sourceY = (i * pageContentHeight * canvas.width) / imgWidth;
+        const sourceH = Math.min((pageContentHeight * canvas.width) / imgWidth, canvas.height - sourceY);
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = sourceH;
+        const ctx = tempCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceH, 0, 0, canvas.width, sourceH);
+        const destH = (sourceH * imgWidth) / canvas.width;
+        pdfDoc.addImage(tempCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, imgWidth, destH);
+      }
+    }
+    pdfBlob = pdfDoc.output('blob');
+  } catch (e) {
+    console.error('PDF generation for email failed:', e);
+  }
+
+  const type = isMonthly ? 'Payment_Statement' : 'Statement_of_Account';
+  const name = (loan.borrower || 'Statement').replace(/\s+/g, '_');
+  const month = new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}).replace(' ','_');
+  const fileName = `${type}_${name}_${month}.pdf`;
+
+  const subject = isMonthly
+    ? `Payment Statement — Account ${displayAcct} — ${now.toLocaleDateString('en-US',{month:'long',year:'numeric'})}`
+    : `Statement of Account — Account ${displayAcct}`;
+  const bodyText = isMonthly
+    ? `Dear ${loan.borrower},\n\nPlease find your monthly payment statement attached.\n\nAccount #: ${displayAcct}\nPayment Due: ${dueDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}\nAmount Due: ${fmtD(pmt)}\nCurrent Balance: ${fmtD(realBal.balance)}\n\nPayment Methods: Zelle, Wire, Check, or Credit Card\n${s.company_phone ? 'Questions? Call ' + fmtPhone(s.company_phone) : ''}\n\nThank you,\n${s.company_name || 'LandFlow CRM'}`
+    : `Dear ${loan.borrower},\n\nAttached is your complete Statement of Account for Account #${displayAcct}.\n\nOriginal Loan: ${fmt(loan.loan_amount)}\nCurrent Balance: ${fmtD(realBal.balance)}\nTotal Payments: ${realBal.totalPayments}\n\nThank you,\n${s.company_name || 'LandFlow CRM'}`;
+
+  // Try to open email client with attachment using share API, otherwise download PDF + open mailto
+  if (pdfBlob && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], fileName, { type: 'application/pdf' })] })) {
+    try {
+      await navigator.share({
+        files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+        title: subject,
+        text: bodyText
+      });
+      showToast('Shared successfully!', 'success');
+      return;
+    } catch (e) { /* user cancelled or share failed, fall through to mailto */ }
+  }
+
+  // Fallback: auto-download PDF then open mailto
+  if (pdfBlob) {
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+    showToast('PDF downloaded — please attach it to the email', 'success');
+  }
+  window.open(`mailto:${loan.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`);
+  showToast('Email client opened — attach the downloaded PDF', 'success');
 }
 
 // ============================================================
@@ -2442,6 +2512,17 @@ function showToast(msg, type) {
 document.addEventListener('DOMContentLoaded', () => {
   // Handle Enter key on auth inputs
   document.getElementById('authPass').addEventListener('keydown', e => { if(e.key==='Enter') signIn(); });
+  // Auto-format phone inputs as user types
+  ['f-seller-phone','f-phone','f-nb-phone','inv2-phone','set-phone'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      const digits = el.value.replace(/\D/g, '').slice(0, 10);
+      if (digits.length <= 3) el.value = digits;
+      else if (digits.length <= 6) el.value = `(${digits.slice(0,3)}) ${digits.slice(3)}`;
+      else el.value = `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+    });
+  });
   initAuth();
 });
 </script>
