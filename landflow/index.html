@@ -2979,46 +2979,140 @@ async function saveTemplateEditor() {
   if (!t) return showToast('Template not found', 'error');
   showToast('Saving template…');
   try {
-    // Get editor HTML and convert merge-tag spans back to plain {field} text
+    // Extract merge fields from the editor HTML
     const div = document.createElement('div');
     div.innerHTML = document.getElementById('te-editor').innerHTML;
-    div.querySelectorAll('.merge-tag').forEach(el => {
-      el.replaceWith(document.createTextNode(el.textContent));
+    const editorText = div.textContent.replace(/\u200B/g, '');
+    // Collect all {field} tags from the edited content
+    const fieldMatches = editorText.match(/\{[a-zA-Z0-9_]+\}/g) || [];
+
+    // Load the ORIGINAL .docx and patch merge fields into the XML
+    const bytes = await getTemplateBytes(t);
+    const zip = new PizZip(bytes.buffer);
+
+    // Get the document.xml content
+    const xmlFiles = ['word/document.xml', 'word/header1.xml', 'word/header2.xml', 'word/footer1.xml', 'word/footer2.xml'];
+
+    // For each field found in the editor, ensure it exists in the .docx XML
+    // The editor is used to PLACE fields — we scan the editor to build a mapping
+    // of what text was replaced with merge fields, then patch the original XML
+
+    // Simpler approach: extract the full text with merge fields from the editor,
+    // and for each paragraph, find the corresponding paragraph in the XML and
+    // inject any new {field} tags that weren't there before
+
+    // Simplest reliable approach: directly modify document.xml to insert merge fields
+    // by finding text runs and replacing literal text with {field} tags
+    // This works because the user places {field} in the HTML editor at the right spots
+
+    // Build a list of new fields to inject by comparing editor content to original
+    const docXml = zip.file('word/document.xml')?.asText();
+    if (!docXml) throw new Error('Cannot read document.xml');
+
+    // Extract text content from editor, paragraph by paragraph
+    const editorParas = [];
+    div.querySelectorAll('p').forEach(p => {
+      editorParas.push(p.textContent.replace(/\u200B/g, '').trim());
     });
-    // Clean zero-width spaces
-    let html = div.innerHTML.replace(/\u200B/g, '');
-    // Wrap in full HTML document for html-docx-js
-    const fullHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
-      'body{font-family:Calibri,sans-serif;font-size:11pt;line-height:1.5}' +
-      'table{border-collapse:collapse;width:100%}' +
-      'td,th{border:1px solid #ccc;padding:4px 8px}' +
-      'p{margin:0 0 6px}' +
-      '</style></head><body>' + html + '</body></html>';
-    // Convert to .docx blob
-    const blob = htmlDocx.asBlob(fullHtml);
-    // Determine storage path
+    // If no <p> tags (plain text), split by line
+    if (!editorParas.length) {
+      editorText.split('\n').forEach(line => editorParas.push(line.trim()));
+    }
+
+    // Find all {field} patterns that the user added in the editor
+    const newFields = new Set(fieldMatches);
+
+    // Check which fields already exist in the original XML
+    const existingFields = new Set();
+    const existingMatches = docXml.match(/\{[a-zA-Z0-9_]+\}/g) || [];
+    existingMatches.forEach(f => existingFields.add(f));
+
+    // Fields that need to be added to the document
+    const fieldsToAdd = [...newFields].filter(f => !existingFields.has(f));
+
+    if (fieldsToAdd.length === 0 && newFields.size > 0) {
+      // All fields already exist in the original — nothing to patch
+      closeTemplateEditor();
+      showToast('Template already has all merge fields!', 'success');
+      return;
+    }
+
+    if (fieldsToAdd.length === 0 && newFields.size === 0) {
+      closeTemplateEditor();
+      showToast('No merge fields found to save. Insert fields using the palette.', 'error');
+      return;
+    }
+
+    // For fields that need adding: scan editor paragraphs to find where each field
+    // was placed, identify the surrounding text context, then find and patch the XML
+    let patchedXml = docXml;
+    for (const field of fieldsToAdd) {
+      // Find the paragraph in the editor that contains this field
+      for (const para of editorParas) {
+        if (!para.includes(field)) continue;
+        // Get the text before and after the field in the editor paragraph
+        const fieldIdx = para.indexOf(field);
+        const before = para.substring(Math.max(0, fieldIdx - 40), fieldIdx).trim();
+        const after = para.substring(fieldIdx + field.length, fieldIdx + field.length + 40).trim();
+
+        // Try to find this context in the XML and insert the field
+        // XML text runs look like: <w:t>some text</w:t>
+        // We need to find the <w:t> that contains the text near where the field should go
+
+        if (before.length > 3) {
+          // Find the "before" text in XML (may be split across runs)
+          // Look for the last few words before the field
+          const searchText = before.slice(-20);
+          const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          // Try to find and append the field after the matching text
+          const regex = new RegExp('(' + escapedSearch + ')', 'g');
+          if (regex.test(patchedXml)) {
+            patchedXml = patchedXml.replace(regex, '$1' + field);
+            break;
+          }
+        }
+        if (after.length > 3) {
+          // Insert field before the "after" text
+          const searchText = after.slice(0, 20);
+          const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp('(' + escapedSearch + ')', 'g');
+          if (regex.test(patchedXml)) {
+            patchedXml = patchedXml.replace(regex, field + '$1');
+            break;
+          }
+        }
+      }
+    }
+
+    // Write patched XML back to the zip
+    zip.file('word/document.xml', patchedXml);
+
+    // Generate the patched .docx as a blob
+    const blob = zip.generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+    // Upload to Supabase Storage
     let storagePath;
     if (t.data && t.data.startsWith('storage:')) {
       storagePath = t.data.replace('storage:', '');
     } else {
       storagePath = currentUser.id + '/templates/' + Date.now() + '_' + t.name;
     }
-    // Upload to Supabase Storage
     const { error: uploadErr } = await sb.storage.from('vault-files').upload(storagePath, blob, {
       upsert: true,
       contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     });
     if (uploadErr) throw uploadErr;
+
     // Update metadata
     const updates = { size: blob.size };
     if (!t.data || !t.data.startsWith('storage:')) updates.data = 'storage:' + storagePath;
     await dbUpdateVaultFile(templateId, updates);
-    // Update local cache
     const idx = vaultFiles.findIndex(f => f.id === templateId);
     if (idx >= 0) { vaultFiles[idx].size = blob.size; if (updates.data) vaultFiles[idx].data = updates.data; }
+
     renderTemplates();
     closeTemplateEditor();
-    showToast('Template saved with merge fields!', 'success');
+    showToast('Template saved — ' + fieldsToAdd.length + ' new field(s) added!', 'success');
   } catch (e) {
     console.error('Save template error:', e);
     showToast('Save failed: ' + (e.message || 'Unknown error'), 'error');
