@@ -10,8 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://unpkg.com/pizzip@3.2.0/dist/pizzip.js"></script>
 <script src="https://unpkg.com/docxtemplater@3.68.3/build/docxtemplater.js"></script>
-<script src="https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js"></script>
-<script src="https://unpkg.com/html-docx-js@0.3.1/dist/html-docx.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
 <style>
 :root {
   /* ── Light theme (main area) ── */
@@ -295,12 +294,10 @@ textarea.form-input{resize:vertical;min-height:80px}
 .te-fmt-select{background:var(--s1);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;cursor:pointer}
 .te-body{flex:1;display:flex;overflow:hidden}
 .te-editor-pane{flex:1;overflow-y:auto;padding:40px;background:#f8f6f3}
-.te-editor{max-width:816px;margin:0 auto;min-height:600px;outline:none;font-family:'Times New Roman',serif;font-size:12pt;line-height:1.15;background:#fff;padding:60px 72px;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid var(--border)}
-.te-editor table{border-collapse:collapse;width:100%;margin:8px 0}
-.te-editor td,.te-editor th{border:1px solid #ccc;padding:4px 8px}
-.te-editor p{margin:0 0 2px}
-.te-editor img{max-width:100%;height:auto}
-.te-editor .page-break{border:none;border-top:2px dashed var(--border);margin:30px 0;page-break-after:always}
+.te-editor{max-width:860px;margin:0 auto;min-height:600px;outline:none;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid var(--border);overflow:hidden}
+.te-editor .docx-wrapper{background:#fff !important;padding:0 !important}
+.te-editor .docx-wrapper>section.docx{margin:0 auto !important;padding:60px 72px !important;box-shadow:none !important;min-height:auto !important;margin-bottom:20px !important;border-bottom:2px dashed var(--border) !important}
+.te-editor .docx-wrapper>section.docx:last-child{border-bottom:none !important;margin-bottom:0 !important}
 .te-loading{display:flex;align-items:center;justify-content:center;flex:1;color:var(--text3);font-size:15px}
 .te-palette{width:280px;flex-shrink:0;border-left:1px solid var(--border);background:var(--s2);overflow-y:auto;padding:16px}
 .te-section-title{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);font-weight:700;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
@@ -2827,27 +2824,63 @@ async function openTemplateEditor(templateId) {
   renderFieldPalette();
   try {
     const bytes = await getTemplateBytes(t);
-    const result = await mammoth.convertToHtml(
-      { arrayBuffer: bytes.buffer },
-      { convertImage: mammoth.images.imgElement(function(image) {
-          return image.read('base64').then(function(buf) {
-            return { src: 'data:' + image.contentType + ';base64,' + buf };
-          });
-        })
-      }
-    );
-    let html = result.value;
-    // Wrap existing {field} placeholders in styled merge-tag spans
-    html = html.replace(/\{([a-zA-Z0-9_]+)\}/g, '<span class="merge-tag" contenteditable="false">{$1}</span>');
-    document.getElementById('te-editor').innerHTML = html;
+    // Store original bytes for patching on save
+    window._originalDocxBytes = bytes;
+    const editor = document.getElementById('te-editor');
+    editor.innerHTML = '';
+    // Render with docx-preview for pixel-perfect Word fidelity
+    await docx.renderAsync(bytes.buffer, editor, null, {
+      className: 'docx',
+      inWrapper: true,
+      ignoreWidth: false,
+      ignoreHeight: false,
+      ignoreFonts: false,
+      breakPages: true,
+      ignoreLastRenderedPageBreak: false,
+      experimental: true,
+      renderHeaders: true,
+      renderFooters: true,
+      renderFootnotes: true,
+      renderEndnotes: true
+    });
+    // Make the rendered content editable so user can place cursor and insert fields
+    editor.setAttribute('contenteditable', 'true');
+    // Also make inner sections editable
+    editor.querySelectorAll('section.docx, article').forEach(el => el.setAttribute('contenteditable', 'true'));
+    // Highlight existing {field} merge tags
+    highlightMergeTags(editor);
     document.getElementById('te-loading').style.display = 'none';
-    document.getElementById('te-editor').style.display = 'block';
-    if (result.messages.length) console.warn('mammoth warnings:', result.messages);
+    editor.style.display = 'block';
   } catch (e) {
     console.error('Template editor error:', e);
     showToast('Failed to load template: ' + (e.message || ''), 'error');
     closeTemplateEditor();
   }
+}
+
+function highlightMergeTags(container) {
+  // Walk all text nodes and wrap {field} patterns in merge-tag spans
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  textNodes.forEach(node => {
+    if (/\{[a-zA-Z0-9_]+\}/.test(node.textContent)) {
+      const frag = document.createDocumentFragment();
+      const parts = node.textContent.split(/(\{[a-zA-Z0-9_]+\})/);
+      parts.forEach(part => {
+        if (/^\{[a-zA-Z0-9_]+\}$/.test(part)) {
+          const span = document.createElement('span');
+          span.className = 'merge-tag';
+          span.contentEditable = 'false';
+          span.textContent = part;
+          frag.appendChild(span);
+        } else if (part) {
+          frag.appendChild(document.createTextNode(part));
+        }
+      });
+      node.parentNode.replaceChild(frag, node);
+    }
+  });
 }
 
 function renderFieldPalette() {
@@ -2971,6 +3004,7 @@ function closeTemplateEditor() {
   document.getElementById('templateEditorOverlay').classList.remove('open');
   document.getElementById('te-editor').innerHTML = '';
   window._editingTemplateId = null;
+  window._originalDocxBytes = null;
 }
 
 async function saveTemplateEditor() {
@@ -2986,8 +3020,8 @@ async function saveTemplateEditor() {
     // Collect all {field} tags from the edited content
     const fieldMatches = editorText.match(/\{[a-zA-Z0-9_]+\}/g) || [];
 
-    // Load the ORIGINAL .docx and patch merge fields into the XML
-    const bytes = await getTemplateBytes(t);
+    // Use the stored ORIGINAL .docx bytes (not the rendered HTML)
+    const bytes = window._originalDocxBytes || await getTemplateBytes(t);
     const zip = new PizZip(bytes.buffer);
 
     // Get the document.xml content
