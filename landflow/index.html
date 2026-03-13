@@ -2637,7 +2637,8 @@ function buildMergeData(loan) {
     down_payment: loan.down_payment || '', down_payment_fmt: fmt(loan.down_payment || 0),
     rate: loan.rate || '', rate_fmt: (loan.rate || 0) + '%',
     term: loan.term || '', balloon: loan.balloon || '',
-    orig_date: fmtDate(loan.orig_date), first_pay_date: fmtDate(loan.first_pay_date),
+    orig_date: fmtDate(loan.orig_date), contract_date: fmtDate(loan.orig_date), date: fmtDate(loan.orig_date),
+    first_pay_date: fmtDate(loan.first_pay_date),
     payment_due_day: loan.payment_due_day || '', status: loan.status || '',
     notes: loan.notes || '',
     // Investor / Note Buyer
@@ -2774,7 +2775,8 @@ const MERGE_FIELDS = [
     ['{down_payment}', 'Down payment (raw)'], ['{down_payment_fmt}', 'Down payment ($)'],
     ['{rate}', 'Interest rate (number)'], ['{rate_fmt}', 'Interest rate (%)'],
     ['{term}', 'Loan term (years)'], ['{balloon}', 'Balloon (years)'],
-    ['{orig_date}', 'Origination date'], ['{first_pay_date}', 'First payment date'],
+    ['{orig_date}', 'Origination/contract date'], ['{contract_date}', 'Same as orig_date'], ['{date}', 'Contract date'],
+    ['{first_pay_date}', 'First payment date'],
     ['{payment_due_day}', 'Due day of month'], ['{status}', 'Loan status'], ['{notes}', 'Notes'],
   ]},
   { section: 'Computed Values', fields: [
