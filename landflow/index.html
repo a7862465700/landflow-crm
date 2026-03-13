@@ -2817,27 +2817,42 @@ function renderFieldPalette() {
       <div class="te-section-title">${section.section}</div>
       <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px">
         ${section.fields.map(([tag, desc]) =>
-          `<span class="te-field-btn" title="${desc}" onclick="insertMergeField('${tag}')">${tag}</span>`
+          `<span class="te-field-btn" title="${desc}" onmousedown="event.preventDefault();insertMergeField('${tag}')">${tag}</span>`
         ).join('')}
       </div>
     </div>
   `).join('');
 }
 
-function insertMergeField(tag) {
-  const editor = document.getElementById('te-editor');
-  editor.focus();
+// Save cursor position whenever selection changes inside the editor
+let _teLastRange = null;
+document.addEventListener('selectionchange', function() {
   const sel = window.getSelection();
   if (!sel.rangeCount) return;
-  let range = sel.getRangeAt(0);
-  // If cursor isn't inside the editor, place it at the end
-  if (!editor.contains(range.commonAncestorContainer)) {
+  const editor = document.getElementById('te-editor');
+  if (editor && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    _teLastRange = sel.getRangeAt(0).cloneRange();
+  }
+});
+
+function insertMergeField(tag) {
+  const editor = document.getElementById('te-editor');
+  const sel = window.getSelection();
+  let range;
+  // Use the saved cursor position if available
+  if (_teLastRange && editor.contains(_teLastRange.commonAncestorContainer)) {
+    range = _teLastRange;
+  } else if (sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    range = sel.getRangeAt(0);
+  } else {
+    // Fallback: place at end of editor
+    editor.focus();
     range = document.createRange();
     range.selectNodeContents(editor);
     range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
   }
+  sel.removeAllRanges();
+  sel.addRange(range);
   // Create merge tag span
   const span = document.createElement('span');
   span.className = 'merge-tag';
