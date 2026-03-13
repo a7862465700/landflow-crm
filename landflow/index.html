@@ -2495,7 +2495,7 @@ async function uploadTemplate() {
       }
       // Save metadata to vault_files table (storage_path instead of huge base64)
       const data = {
-        loan_id: '00000000-0000-0000-0000-000000000000',
+        loan_id: null,
         cat_id: 'template',
         name: f.name, size: f.size, type: f.type,
         data: 'storage:' + storagePath, book_page: '', notes: '',
