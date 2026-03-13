@@ -2081,11 +2081,25 @@ async function vaultDelete(loanId, fileId) {
   renderVault();
 }
 
-function vaultDownload(loanId, fileId) {
+async function vaultDownload(loanId, fileId) {
   const f = vaultFiles.find(x => x.id === fileId);
   if (!f) return;
-  const a = document.createElement('a');
-  a.href = f.data; a.download = f.name; a.click();
+  try {
+    if (f.data && f.data.startsWith('storage:')) {
+      const path = f.data.replace('storage:', '');
+      const { data, error } = await sb.storage.from('vault-files').download(path);
+      if (error) return showToast('Download failed: ' + error.message, 'error');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(data);
+      a.download = f.name; a.click();
+      URL.revokeObjectURL(a.href);
+    } else {
+      const a = document.createElement('a');
+      a.href = f.data; a.download = f.name; a.click();
+    }
+  } catch (e) {
+    showToast('Download error: ' + (e.message || ''), 'error');
+  }
 }
 
 async function vaultSaveNote(loanId, fileId, field, val) {
@@ -2461,23 +2475,40 @@ async function uploadTemplate() {
     const f = input.files[0];
     if (!f) return;
     if (!f.name.endsWith('.docx')) return showToast('Please upload a .docx file', 'error');
-    const b64 = await new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result); r.onerror = rej;
-      r.readAsDataURL(f);
-    });
     showToast('Uploading template…');
-    const data = {
-      loan_id: '00000000-0000-0000-0000-000000000000',
-      cat_id: 'template',
-      name: f.name, size: f.size, type: f.type,
-      data: b64, book_page: '', notes: '',
-    };
-    const saved = await dbSaveVaultFile(data);
-    if (!saved) return showToast('Template upload failed — check console for details', 'error');
-    vaultFiles.push(saved);
-    renderTemplates();
-    showToast('Template uploaded!', 'success');
+    try {
+      // Upload file to Supabase Storage
+      const storagePath = `${currentUser.id}/templates/${Date.now()}_${f.name}`;
+      const { error: uploadErr } = await sb.storage.from('vault-files').upload(storagePath, f, { upsert: true });
+      if (uploadErr) {
+        // If bucket doesn't exist, try creating it
+        if (uploadErr.message && uploadErr.message.includes('not found')) {
+          const { error: bucketErr } = await sb.storage.createBucket('vault-files', { public: false });
+          if (bucketErr && !bucketErr.message.includes('already exists')) {
+            return showToast('Storage not set up. Error: ' + bucketErr.message, 'error');
+          }
+          const { error: retryErr } = await sb.storage.from('vault-files').upload(storagePath, f, { upsert: true });
+          if (retryErr) return showToast('Upload failed: ' + retryErr.message, 'error');
+        } else {
+          return showToast('Upload failed: ' + uploadErr.message, 'error');
+        }
+      }
+      // Save metadata to vault_files table (storage_path instead of huge base64)
+      const data = {
+        loan_id: '00000000-0000-0000-0000-000000000000',
+        cat_id: 'template',
+        name: f.name, size: f.size, type: f.type,
+        data: 'storage:' + storagePath, book_page: '', notes: '',
+      };
+      const saved = await dbSaveVaultFile(data);
+      if (!saved) return; // dbSaveVaultFile already shows error toast
+      vaultFiles.push(saved);
+      renderTemplates();
+      showToast('Template uploaded!', 'success');
+    } catch (e) {
+      console.error('Upload error:', e);
+      showToast('Upload error: ' + (e.message || 'Unknown error'), 'error');
+    }
   };
   input.click();
 }
@@ -2544,6 +2575,23 @@ function buildMergeData(loan) {
   };
 }
 
+// Helper: get template file as Uint8Array (supports both storage and legacy base64)
+async function getTemplateBytes(t) {
+  if (t.data && t.data.startsWith('storage:')) {
+    const path = t.data.replace('storage:', '');
+    const { data, error } = await sb.storage.from('vault-files').download(path);
+    if (error) throw new Error('Download failed: ' + error.message);
+    const buf = await data.arrayBuffer();
+    return new Uint8Array(buf);
+  } else {
+    const b64 = t.data.split(',')[1];
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+}
+
 function openTemplateGenerate(templateId) {
   const t = vaultFiles.find(f => f.id === templateId);
   if (!t) return showToast('Template not found', 'error');
@@ -2564,12 +2612,7 @@ async function executeTemplateGenerate() {
 
   showToast('Generating document…');
   try {
-    // Convert base64 data URL to binary
-    const b64 = t.data.split(',')[1];
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
+    const bytes = await getTemplateBytes(t);
     const zip = new PizZip(bytes.buffer);
     const doc = new window.docxtemplater(zip, {
       paragraphLoop: true, linebreaks: true,
@@ -2595,10 +2638,7 @@ async function previewTemplateFields(templateId) {
   const t = vaultFiles.find(f => f.id === templateId);
   if (!t) return;
   try {
-    const b64 = t.data.split(',')[1];
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const bytes = await getTemplateBytes(t);
     const zip = new PizZip(bytes.buffer);
     const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
     doc.render({});
