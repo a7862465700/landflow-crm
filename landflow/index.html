@@ -286,14 +286,21 @@ textarea.form-input{resize:vertical;min-height:80px}
 .template-editor-overlay{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px)}
 .template-editor-overlay.open{display:flex}
 .template-editor{width:100%;height:100%;display:flex;flex-direction:column;background:var(--s1)}
-.te-toolbar{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--s2);flex-shrink:0}
+.te-toolbar{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--s2);flex-shrink:0}
+.te-fmt-bar{padding:6px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:4px;background:var(--s1);flex-shrink:0;flex-wrap:wrap}
+.te-fmt-btn{background:none;border:1px solid var(--border);border-radius:4px;padding:4px 10px;cursor:pointer;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;transition:all .15s;min-width:32px;text-align:center}
+.te-fmt-btn:hover{background:var(--golddim);border-color:var(--gold)}
+.te-fmt-btn.active{background:var(--gold);color:#fff;border-color:var(--gold)}
+.te-fmt-sep{width:1px;height:24px;background:var(--border);margin:0 4px}
+.te-fmt-select{background:var(--s1);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;cursor:pointer}
 .te-body{flex:1;display:flex;overflow:hidden}
 .te-editor-pane{flex:1;overflow-y:auto;padding:40px;background:#f8f6f3}
-.te-editor{max-width:816px;margin:0 auto;min-height:600px;outline:none;font-family:'Times New Roman',serif;font-size:12pt;line-height:1.6;background:#fff;padding:60px 72px;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid var(--border)}
+.te-editor{max-width:816px;margin:0 auto;min-height:600px;outline:none;font-family:'Times New Roman',serif;font-size:12pt;line-height:1.15;background:#fff;padding:60px 72px;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid var(--border)}
 .te-editor table{border-collapse:collapse;width:100%;margin:8px 0}
 .te-editor td,.te-editor th{border:1px solid #ccc;padding:4px 8px}
-.te-editor p{margin:0 0 8px}
+.te-editor p{margin:0 0 2px}
 .te-editor img{max-width:100%;height:auto}
+.te-editor .page-break{border:none;border-top:2px dashed var(--border);margin:30px 0;page-break-after:always}
 .te-loading{display:flex;align-items:center;justify-content:center;flex:1;color:var(--text3);font-size:15px}
 .te-palette{width:280px;flex-shrink:0;border-left:1px solid var(--border);background:var(--s2);overflow-y:auto;padding:16px}
 .te-section-title{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);font-weight:700;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
@@ -850,6 +857,36 @@ textarea.form-input{resize:vertical;min-height:80px}
         <button class="btn btn-ghost" onclick="closeTemplateEditor()">Cancel</button>
         <button class="btn btn-gold" onclick="saveTemplateEditor()">💾 Save Template</button>
       </div>
+    </div>
+    <div class="te-fmt-bar">
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('bold')" title="Bold"><b>B</b></button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('italic')" title="Italic"><i>I</i></button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('underline')" title="Underline"><u>U</u></button>
+      <div class="te-fmt-sep"></div>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('justifyLeft')" title="Align Left">⫷</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('justifyCenter')" title="Align Center">☰</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('justifyRight')" title="Align Right">⫸</button>
+      <div class="te-fmt-sep"></div>
+      <select class="te-fmt-select" onchange="teFmtFontSize(this.value);this.blur()" title="Font Size">
+        <option value="">Size</option>
+        <option value="1">8pt</option>
+        <option value="2">10pt</option>
+        <option value="3">12pt</option>
+        <option value="4">14pt</option>
+        <option value="5">18pt</option>
+        <option value="6">24pt</option>
+        <option value="7">36pt</option>
+      </select>
+      <select class="te-fmt-select" onchange="teFmtLineHeight(this.value);this.blur()" title="Line Spacing">
+        <option value="">Spacing</option>
+        <option value="1">Single</option>
+        <option value="1.15">1.15</option>
+        <option value="1.5">1.5</option>
+        <option value="2">Double</option>
+      </select>
+      <div class="te-fmt-sep"></div>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teInsertLogo()" title="Insert Logo/Image">🖼 Logo</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teInsertPageBreak()" title="Insert Page Break">📄 Page Break</button>
     </div>
     <div class="te-body">
       <div class="te-editor-pane">
@@ -2869,6 +2906,63 @@ function insertMergeField(tag) {
   range.collapse(true);
   sel.removeAllRanges();
   sel.addRange(range);
+}
+
+// Formatting toolbar functions
+function teFmt(cmd) { document.execCommand(cmd, false, null); }
+function teFmtFontSize(val) { if (val) document.execCommand('fontSize', false, val); }
+function teFmtLineHeight(val) {
+  if (!val) return;
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  // Apply line-height to the selected block element(s)
+  let node = sel.getRangeAt(0).commonAncestorContainer;
+  if (node.nodeType === 3) node = node.parentElement;
+  const block = node.closest('p,div,li,h1,h2,h3,h4,h5,h6,td') || node;
+  block.style.lineHeight = val;
+}
+function teInsertLogo() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = () => {
+    const f = input.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const editor = document.getElementById('te-editor');
+      const sel = window.getSelection();
+      let range = _teLastRange && editor.contains(_teLastRange.commonAncestorContainer) ? _teLastRange : null;
+      if (!range && sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) range = sel.getRangeAt(0);
+      if (!range) { range = document.createRange(); range.selectNodeContents(editor); range.collapse(true); }
+      sel.removeAllRanges(); sel.addRange(range);
+      const img = document.createElement('img');
+      img.src = reader.result;
+      img.style.maxWidth = '300px';
+      img.style.height = 'auto';
+      img.style.display = 'block';
+      img.style.margin = '8px 0';
+      range.deleteContents();
+      range.insertNode(img);
+      range.setStartAfter(img); range.collapse(true);
+      sel.removeAllRanges(); sel.addRange(range);
+    };
+    reader.readAsDataURL(f);
+  };
+  input.click();
+}
+function teInsertPageBreak() {
+  const editor = document.getElementById('te-editor');
+  const sel = window.getSelection();
+  let range = _teLastRange && editor.contains(_teLastRange.commonAncestorContainer) ? _teLastRange : null;
+  if (!range && sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) range = sel.getRangeAt(0);
+  if (!range) { range = document.createRange(); range.selectNodeContents(editor); range.collapse(false); }
+  sel.removeAllRanges(); sel.addRange(range);
+  const hr = document.createElement('hr');
+  hr.className = 'page-break';
+  range.deleteContents();
+  range.insertNode(hr);
+  range.setStartAfter(hr); range.collapse(true);
+  sel.removeAllRanges(); sel.addRange(range);
 }
 
 function closeTemplateEditor() {
