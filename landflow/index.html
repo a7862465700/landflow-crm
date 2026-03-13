@@ -2826,10 +2826,10 @@ async function openTemplateEditor(templateId) {
       renderFootnotes: true,
       renderEndnotes: true
     });
+    // Make inner sections editable so user can select/delete text and place fields
+    editor.querySelectorAll('section.docx').forEach(el => el.setAttribute('contenteditable', 'true'));
     // Highlight existing {field} merge tags
     highlightMergeTags(editor);
-    // Click-to-place: detect click position for merge field insertion
-    editor.addEventListener('click', teHandleClick);
     document.getElementById('te-loading').style.display = 'none';
     editor.style.display = 'block';
   } catch (e) {
@@ -2881,61 +2881,53 @@ function renderFieldPalette() {
   `).join('');
 }
 
-// Click-to-place: track where the user clicked in the preview
-let _teInsertionPoint = null; // { node, offset }
-
-function teHandleClick(e) {
+// Save cursor position whenever selection changes inside the editor
+let _teLastRange = null;
+document.addEventListener('selectionchange', function() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
   const editor = document.getElementById('te-editor');
-  // Remove any existing insertion marker
-  editor.querySelectorAll('.te-insert-marker').forEach(el => el.remove());
-  // Use caretRangeFromPoint to find the text position at click coordinates
-  let range = null;
-  if (document.caretRangeFromPoint) {
-    range = document.caretRangeFromPoint(e.clientX, e.clientY);
-  } else if (document.caretPositionFromPoint) {
-    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
-    if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); }
+  if (editor && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    _teLastRange = sel.getRangeAt(0).cloneRange();
   }
-  if (!range || !editor.contains(range.startContainer)) return;
-  _teInsertionPoint = { node: range.startContainer, offset: range.startOffset };
-  // Show a blinking cursor marker at the click position
-  const marker = document.createElement('span');
-  marker.className = 'te-insert-marker';
-  marker.textContent = '\u200B'; // zero-width space
-  range.insertNode(marker);
-}
+});
 
 function insertMergeField(tag) {
   const editor = document.getElementById('te-editor');
-  if (!_teInsertionPoint) {
+  const sel = window.getSelection();
+  let range;
+  if (_teLastRange && editor.contains(_teLastRange.commonAncestorContainer)) {
+    range = _teLastRange;
+  } else if (sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    range = sel.getRangeAt(0);
+  } else {
     showToast('Click in the document first to place your cursor, then click the field.', 'error');
     return;
   }
-  // Find existing marker or insertion point
-  const marker = editor.querySelector('.te-insert-marker');
-  if (!marker) {
-    showToast('Click in the document first to place your cursor.', 'error');
-    return;
-  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+  // Delete any selected text (the placeholder being replaced)
+  range.deleteContents();
   // Create merge tag span
   const span = document.createElement('span');
   span.className = 'merge-tag';
+  span.contentEditable = 'false';
   span.textContent = '{' + tag + '}';
-  marker.parentNode.insertBefore(span, marker);
-  // Remove the marker
-  marker.remove();
-  _teInsertionPoint = null;
+  range.insertNode(span);
+  // Move cursor after the span
+  range.setStartAfter(span);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
   showToast('Inserted {' + tag + '}', 'success');
 }
 
 function closeTemplateEditor() {
-  const editor = document.getElementById('te-editor');
-  editor.removeEventListener('click', teHandleClick);
   document.getElementById('templateEditorOverlay').classList.remove('open');
-  editor.innerHTML = '';
+  document.getElementById('te-editor').innerHTML = '';
   window._editingTemplateId = null;
   window._originalDocxBytes = null;
-  _teInsertionPoint = null;
+  _teLastRange = null;
 }
 
 async function saveTemplateEditor() {
@@ -2944,8 +2936,6 @@ async function saveTemplateEditor() {
   if (!t) return showToast('Template not found', 'error');
   showToast('Saving template…');
   try {
-    // Clean up any insertion markers before extracting
-    document.getElementById('te-editor').querySelectorAll('.te-insert-marker').forEach(el => el.remove());
     // Extract merge fields from the editor HTML
     const div = document.createElement('div');
     div.innerHTML = document.getElementById('te-editor').innerHTML;
