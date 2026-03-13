@@ -10,6 +10,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://unpkg.com/pizzip@3.2.0/dist/pizzip.js"></script>
 <script src="https://unpkg.com/docxtemplater@3.68.3/build/docxtemplater.js"></script>
+<script src="https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://unpkg.com/html-docx-js@0.3.1/dist/html-docx.js"></script>
 <style>
 :root {
   /* ── Light theme (main area) ── */
@@ -279,6 +281,27 @@ textarea.form-input{resize:vertical;min-height:80px}
 .toast{position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:var(--dark2);border:1px solid var(--dark-border);border-radius:10px;padding:12px 20px;font-size:13px;font-weight:600;color:var(--dark-text);opacity:0;transition:all .3s;pointer-events:none;white-space:normal;z-index:999;max-width:90vw;text-align:center;line-height:1.4}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(min-width:768px){.toast{bottom:30px}}
+
+/* ── TEMPLATE EDITOR ── */
+.template-editor-overlay{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px)}
+.template-editor-overlay.open{display:flex}
+.template-editor{width:100%;height:100%;display:flex;flex-direction:column;background:var(--s1)}
+.te-toolbar{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--s2);flex-shrink:0}
+.te-body{flex:1;display:flex;overflow:hidden}
+.te-editor-pane{flex:1;overflow-y:auto;padding:40px;background:#f8f6f3}
+.te-editor{max-width:816px;margin:0 auto;min-height:600px;outline:none;font-family:'Times New Roman',serif;font-size:12pt;line-height:1.6;background:#fff;padding:60px 72px;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid var(--border)}
+.te-editor table{border-collapse:collapse;width:100%;margin:8px 0}
+.te-editor td,.te-editor th{border:1px solid #ccc;padding:4px 8px}
+.te-editor p{margin:0 0 8px}
+.te-editor img{max-width:100%;height:auto}
+.te-loading{display:flex;align-items:center;justify-content:center;flex:1;color:var(--text3);font-size:15px}
+.te-palette{width:280px;flex-shrink:0;border-left:1px solid var(--border);background:var(--s2);overflow-y:auto;padding:16px}
+.te-section-title{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);font-weight:700;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.te-section-title:first-child{margin-top:0}
+.te-field-btn{display:inline-block;font-family:'DM Sans',sans-serif;font-size:11px;background:var(--golddim);color:var(--gold2);border:1px solid rgba(201,147,58,0.25);border-radius:4px;padding:3px 8px;margin:2px;cursor:pointer;transition:all .15s}
+.te-field-btn:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
+.merge-tag{background:rgba(201,147,58,0.15);color:var(--gold2);border:1px solid rgba(201,147,58,0.3);border-radius:3px;padding:1px 5px;font-family:'DM Sans',sans-serif;font-size:11px;display:inline;white-space:nowrap;user-select:all;font-weight:600}
+@media(max-width:767px){.te-palette{width:100%;border-left:none;border-top:1px solid var(--border);max-height:200px}.te-body{flex-direction:column}.te-editor-pane{padding:16px}.te-editor{padding:24px}}
 
 /* ── EMPTY STATES ── */
 .empty-state{text-align:center;padding:40px 20px;color:var(--text3)}
@@ -811,6 +834,33 @@ textarea.form-input{resize:vertical;min-height:80px}
       <button class="modal-close" onclick="closeModal('mergeFieldModal')">✕</button>
     </div>
     <div class="modal-body" id="mergeFieldContent"></div>
+  </div>
+</div>
+
+<!-- TEMPLATE EDITOR -->
+<div class="template-editor-overlay" id="templateEditorOverlay">
+  <div class="template-editor">
+    <div class="te-toolbar">
+      <div>
+        <div class="modal-title" id="te-title">Edit Template</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px" id="te-subtitle"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:11px;color:var(--text3);margin-right:8px">Headers/footers preserved but not shown here</span>
+        <button class="btn btn-ghost" onclick="closeTemplateEditor()">Cancel</button>
+        <button class="btn btn-gold" onclick="saveTemplateEditor()">💾 Save Template</button>
+      </div>
+    </div>
+    <div class="te-body">
+      <div class="te-editor-pane">
+        <div class="te-loading" id="te-loading">Loading document…</div>
+        <div id="te-editor" contenteditable="true" class="te-editor" style="display:none"></div>
+      </div>
+      <div class="te-palette">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Click where you want the field in the document, then click a field below to insert it.</div>
+        <div id="te-fields"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2460,6 +2510,7 @@ function renderTemplates() {
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn btn-gold btn-sm" onclick="openTemplateEditor('${t.id}')">✏️ Edit Fields</button>
       <button class="btn btn-gold btn-sm" onclick="openTemplateGenerate('${t.id}')">📄 Generate</button>
       <button class="btn btn-ghost btn-sm" onclick="previewTemplateFields('${t.id}')">🔍 Preview Fields</button>
       <button class="btn btn-ghost btn-sm" onclick="vaultDownload(null,'${t.id}')">📥 Download</button>
@@ -2720,6 +2771,147 @@ function showMergeFieldReference() {
     </div>`).join('');
   document.getElementById('mergeFieldContent').innerHTML = html;
   openModal('mergeFieldModal');
+}
+
+// ============================================================
+// TEMPLATE EDITOR (in-browser .docx editing with merge fields)
+// ============================================================
+async function openTemplateEditor(templateId) {
+  const t = vaultFiles.find(f => f.id === templateId);
+  if (!t) return showToast('Template not found', 'error');
+  window._editingTemplateId = templateId;
+  document.getElementById('te-title').textContent = 'Edit Template';
+  document.getElementById('te-subtitle').textContent = t.name;
+  document.getElementById('te-editor').style.display = 'none';
+  document.getElementById('te-loading').style.display = 'flex';
+  document.getElementById('templateEditorOverlay').classList.add('open');
+  renderFieldPalette();
+  try {
+    const bytes = await getTemplateBytes(t);
+    const result = await mammoth.convertToHtml(
+      { arrayBuffer: bytes.buffer },
+      { convertImage: mammoth.images.imgElement(function(image) {
+          return image.read('base64').then(function(buf) {
+            return { src: 'data:' + image.contentType + ';base64,' + buf };
+          });
+        })
+      }
+    );
+    let html = result.value;
+    // Wrap existing {field} placeholders in styled merge-tag spans
+    html = html.replace(/\{([a-zA-Z0-9_]+)\}/g, '<span class="merge-tag" contenteditable="false">{$1}</span>');
+    document.getElementById('te-editor').innerHTML = html;
+    document.getElementById('te-loading').style.display = 'none';
+    document.getElementById('te-editor').style.display = 'block';
+    if (result.messages.length) console.warn('mammoth warnings:', result.messages);
+  } catch (e) {
+    console.error('Template editor error:', e);
+    showToast('Failed to load template: ' + (e.message || ''), 'error');
+    closeTemplateEditor();
+  }
+}
+
+function renderFieldPalette() {
+  document.getElementById('te-fields').innerHTML = MERGE_FIELDS.map(section => `
+    <div>
+      <div class="te-section-title">${section.section}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px">
+        ${section.fields.map(([tag, desc]) =>
+          `<span class="te-field-btn" title="${desc}" onclick="insertMergeField('${tag}')">${tag}</span>`
+        ).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function insertMergeField(tag) {
+  const editor = document.getElementById('te-editor');
+  editor.focus();
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  let range = sel.getRangeAt(0);
+  // If cursor isn't inside the editor, place it at the end
+  if (!editor.contains(range.commonAncestorContainer)) {
+    range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  // Create merge tag span
+  const span = document.createElement('span');
+  span.className = 'merge-tag';
+  span.contentEditable = 'false';
+  span.textContent = '{' + tag + '}';
+  range.deleteContents();
+  range.insertNode(span);
+  // Move cursor after the span with a zero-width space so cursor can land there
+  const spacer = document.createTextNode('\u200B');
+  range.setStartAfter(span);
+  range.collapse(true);
+  range.insertNode(spacer);
+  range.setStartAfter(spacer);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function closeTemplateEditor() {
+  document.getElementById('templateEditorOverlay').classList.remove('open');
+  document.getElementById('te-editor').innerHTML = '';
+  window._editingTemplateId = null;
+}
+
+async function saveTemplateEditor() {
+  const templateId = window._editingTemplateId;
+  const t = vaultFiles.find(f => f.id === templateId);
+  if (!t) return showToast('Template not found', 'error');
+  showToast('Saving template…');
+  try {
+    // Get editor HTML and convert merge-tag spans back to plain {field} text
+    const div = document.createElement('div');
+    div.innerHTML = document.getElementById('te-editor').innerHTML;
+    div.querySelectorAll('.merge-tag').forEach(el => {
+      el.replaceWith(document.createTextNode(el.textContent));
+    });
+    // Clean zero-width spaces
+    let html = div.innerHTML.replace(/\u200B/g, '');
+    // Wrap in full HTML document for html-docx-js
+    const fullHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+      'body{font-family:Calibri,sans-serif;font-size:11pt;line-height:1.5}' +
+      'table{border-collapse:collapse;width:100%}' +
+      'td,th{border:1px solid #ccc;padding:4px 8px}' +
+      'p{margin:0 0 6px}' +
+      '</style></head><body>' + html + '</body></html>';
+    // Convert to .docx blob
+    const blob = htmlDocx.asBlob(fullHtml);
+    // Determine storage path
+    let storagePath;
+    if (t.data && t.data.startsWith('storage:')) {
+      storagePath = t.data.replace('storage:', '');
+    } else {
+      storagePath = currentUser.id + '/templates/' + Date.now() + '_' + t.name;
+    }
+    // Upload to Supabase Storage
+    const { error: uploadErr } = await sb.storage.from('vault-files').upload(storagePath, blob, {
+      upsert: true,
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
+    if (uploadErr) throw uploadErr;
+    // Update metadata
+    const updates = { size: blob.size };
+    if (!t.data || !t.data.startsWith('storage:')) updates.data = 'storage:' + storagePath;
+    await dbUpdateVaultFile(templateId, updates);
+    // Update local cache
+    const idx = vaultFiles.findIndex(f => f.id === templateId);
+    if (idx >= 0) { vaultFiles[idx].size = blob.size; if (updates.data) vaultFiles[idx].data = updates.data; }
+    renderTemplates();
+    closeTemplateEditor();
+    showToast('Template saved with merge fields!', 'success');
+  } catch (e) {
+    console.error('Save template error:', e);
+    showToast('Save failed: ' + (e.message || 'Unknown error'), 'error');
+  }
 }
 
 // ============================================================
