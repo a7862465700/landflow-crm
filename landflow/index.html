@@ -2669,7 +2669,8 @@ function buildMergeData(loan) {
     nb_phone: fmtPhone(loan.nb_phone) || '', nb_email: loan.nb_email || '',
     nb_address: loan.nb_address || '',
     // Computed
-    monthly_payment: fmtD(pmt), current_balance: fmtD(realBal.balance),
+    monthly_payment: fmtD(pmt), payment: pmt.toFixed(2), payment_fmt: fmtD(pmt),
+    current_balance: fmtD(realBal.balance),
     maturity_date: fmtDate(matDate.toISOString()),
     total_interest: fmtD(totalInterest),
     // Company / Lender
@@ -2801,7 +2802,8 @@ const MERGE_FIELDS = [
     ['{payment_due_day}', 'Due day of month'], ['{status}', 'Loan status'], ['{notes}', 'Notes'],
   ]},
   { section: 'Computed Values', fields: [
-    ['{monthly_payment}', 'Monthly payment ($)'], ['{current_balance}', 'Current balance ($)'],
+    ['{monthly_payment}', 'Monthly payment ($)'], ['{payment}', 'Payment (raw number)'], ['{payment_fmt}', 'Payment ($)'],
+    ['{current_balance}', 'Current balance ($)'],
     ['{maturity_date}', 'Maturity date'], ['{total_interest}', 'Total interest over life ($)'],
     ['{account_number}', 'Account # (parcel or loan ID)'],
   ]},
