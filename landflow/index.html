@@ -2968,6 +2968,9 @@ function teUpdateToolbarState() {
 }
 
 // ── HTML-TO-OOXML CONVERTER ──
+// Unit helpers: 1px = 15 twips (at 96dpi), 1pt = 20 twips, font sizes in half-points
+var _px2twip = function(px) { return Math.round(parseFloat(px) * 15); };
+var _px2hp = function(px) { return Math.round(parseFloat(px) * 1.5); }; // half-points
 const _fszMap = { '1':8, '2':10, '3':12, '4':14, '5':18, '6':24, '7':36 };
 function _xmlEsc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function _rgbHex(c) {
@@ -2985,8 +2988,9 @@ function _buildRun(text, sty) {
   if (sty.underline) props.push('<w:u w:val="single"/>');
   if (sty.strike) props.push('<w:strike/>');
   if (sty.fontFamily) props.push('<w:rFonts w:ascii="'+_xmlEsc(sty.fontFamily)+'" w:hAnsi="'+_xmlEsc(sty.fontFamily)+'"/>');
-  if (sty.fontSize) { var v=sty.fontSize*2; props.push('<w:sz w:val="'+v+'"/><w:szCs w:val="'+v+'"/>'); }
+  if (sty.fontSizeHP) { props.push('<w:sz w:val="'+sty.fontSizeHP+'"/><w:szCs w:val="'+sty.fontSizeHP+'"/>'); }
   if (sty.color && sty.color !== '000000') props.push('<w:color w:val="'+sty.color+'"/>');
+  if (sty.letterSpacing) props.push('<w:spacing w:val="'+sty.letterSpacing+'"/>');
   var rPr = props.length ? '<w:rPr>'+props.join('')+'</w:rPr>' : '';
   var esc = _xmlEsc(text);
   var pres = (text.charAt(0)===' '||text.charAt(text.length-1)===' ') ? ' xml:space="preserve"' : '';
@@ -3010,18 +3014,21 @@ function _walkInline(node, runs, parentSty) {
       if (tag==='FONT') {
         if (ch.face) sty.fontFamily = ch.face;
         if (ch.color) sty.color = _rgbHex(ch.color);
-        if (ch.size && _fszMap[ch.size]) sty.fontSize = _fszMap[ch.size];
+        if (ch.size && _fszMap[ch.size]) sty.fontSizeHP = _fszMap[ch.size] * 2;
       }
-      // Read inline styles from spans
+      // Read computed styles
       if (cs.fontFamily) {
         var ff = cs.fontFamily.replace(/["']/g,'').split(',')[0].trim();
         if (ff && ff !== 'DM Sans') sty.fontFamily = ff;
       }
       if (cs.fontSize) {
-        var ptVal = Math.round(parseFloat(cs.fontSize) * 0.75);
-        if (ptVal > 0) sty.fontSize = ptVal;
+        var hp = _px2hp(cs.fontSize);
+        if (hp > 0) sty.fontSizeHP = hp;
       }
       if (cs.color) sty.color = _rgbHex(cs.color);
+      if (cs.letterSpacing && cs.letterSpacing !== 'normal') {
+        sty.letterSpacing = _px2twip(cs.letterSpacing);
+      }
       // Merge tag spans: emit text as-is
       if (ch.classList && ch.classList.contains('merge-tag')) {
         runs.push(_buildRun(ch.textContent, sty));
@@ -3033,11 +3040,43 @@ function _walkInline(node, runs, parentSty) {
 }
 function _convertPara(pEl) {
   var cs = window.getComputedStyle(pEl);
+  // Build paragraph properties
+  var pPrParts = [];
+  // Alignment
   var align = cs.textAlign;
-  var pPr = '';
-  if (align==='center') pPr='<w:pPr><w:jc w:val="center"/></w:pPr>';
-  else if (align==='right') pPr='<w:pPr><w:jc w:val="right"/></w:pPr>';
-  else if (align==='justify') pPr='<w:pPr><w:jc w:val="both"/></w:pPr>';
+  if (align==='center') pPrParts.push('<w:jc w:val="center"/>');
+  else if (align==='right') pPrParts.push('<w:jc w:val="right"/>');
+  else if (align==='justify') pPrParts.push('<w:jc w:val="both"/>');
+  // Indentation (left, right, first-line)
+  var indParts = [];
+  var ml = parseFloat(cs.marginLeft) || parseFloat(cs.paddingLeft) || 0;
+  var mr = parseFloat(cs.marginRight) || parseFloat(cs.paddingRight) || 0;
+  var ti = parseFloat(cs.textIndent) || 0;
+  if (ml > 1) indParts.push('w:left="'+_px2twip(ml)+'"');
+  if (mr > 1) indParts.push('w:right="'+_px2twip(mr)+'"');
+  if (ti > 1) indParts.push('w:firstLine="'+_px2twip(ti)+'"');
+  else if (ti < -1) indParts.push('w:hanging="'+_px2twip(Math.abs(ti))+'"');
+  if (indParts.length) pPrParts.push('<w:ind '+indParts.join(' ')+'/>');
+  // Spacing (before, after, line)
+  var spaceParts = [];
+  var mt = parseFloat(cs.marginTop) || 0;
+  var mb = parseFloat(cs.marginBottom) || 0;
+  if (mt > 1) spaceParts.push('w:before="'+_px2twip(mt)+'"');
+  if (mb > 1) spaceParts.push('w:after="'+_px2twip(mb)+'"');
+  // Line spacing: compute from line-height and font-size
+  var lh = cs.lineHeight;
+  if (lh && lh !== 'normal') {
+    var lhPx = parseFloat(lh);
+    var fsPx = parseFloat(cs.fontSize) || 16;
+    if (lhPx > 0) {
+      // OOXML line spacing: 240 = single (1.0), 360 = 1.5, 480 = double
+      var ratio = lhPx / fsPx;
+      var ooxmlLine = Math.round(ratio * 240);
+      spaceParts.push('w:line="'+ooxmlLine+'" w:lineRule="auto"');
+    }
+  }
+  if (spaceParts.length) pPrParts.push('<w:spacing '+spaceParts.join(' ')+'/>');
+  var pPr = pPrParts.length ? '<w:pPr>'+pPrParts.join('')+'</w:pPr>' : '';
   var runs = [];
   _walkInline(pEl, runs, {});
   return '<w:p>'+pPr+runs.join('')+'</w:p>';
@@ -3066,23 +3105,43 @@ function _convertTable(tblEl) {
   xml += '</w:tbl>';
   return xml;
 }
+function _walkBlock(el, parts) {
+  // Recursively find block-level content (p, table) inside containers (div, article, section, etc.)
+  var tag = el.tagName;
+  if (tag === 'TABLE') { parts.push(_convertTable(el)); return; }
+  if (tag === 'P') { parts.push(_convertPara(el)); return; }
+  // For container elements (div, article, header, footer, etc.), walk children
+  if (el.children && el.children.length > 0) {
+    var hasBlockChild = false;
+    for (var i=0; i<el.children.length; i++) {
+      var child = el.children[i];
+      var ct = child.tagName;
+      if (ct==='P'||ct==='TABLE'||ct==='DIV'||ct==='ARTICLE'||ct==='SECTION'||ct==='HEADER'||ct==='FOOTER'||ct==='UL'||ct==='OL'||ct==='LI'||ct==='BLOCKQUOTE') {
+        hasBlockChild = true;
+        _walkBlock(child, parts);
+      }
+    }
+    // If no block children found, treat the element itself as a paragraph
+    if (!hasBlockChild) {
+      var runs = [];
+      _walkInline(el, runs, {});
+      if (runs.length) parts.push('<w:p>'+runs.join('')+'</w:p>');
+    }
+  } else {
+    // Leaf element with no children — treat as paragraph
+    var runs = [];
+    _walkInline(el, runs, {});
+    if (runs.length) parts.push('<w:p>'+runs.join('')+'</w:p>');
+  }
+}
 function htmlToOoxml(editorEl) {
   var parts = [];
   var sections = editorEl.querySelectorAll('section.docx');
   var secIdx = 0;
   sections.forEach(function(section) {
     if (secIdx > 0) parts.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
-    var children = section.children;
-    for (var i=0; i<children.length; i++) {
-      var el = children[i];
-      if (el.tagName === 'TABLE') parts.push(_convertTable(el));
-      else if (el.tagName === 'P') parts.push(_convertPara(el));
-      else {
-        // Treat any other block element as a paragraph
-        var runs = [];
-        _walkInline(el, runs, {});
-        if (runs.length) parts.push('<w:p>'+runs.join('')+'</w:p>');
-      }
+    for (var i=0; i<section.children.length; i++) {
+      _walkBlock(section.children[i], parts);
     }
     secIdx++;
   });
