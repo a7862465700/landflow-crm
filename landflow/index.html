@@ -1500,23 +1500,22 @@ async function saveLoan() {
     showToast('✅ Loan created!', 'success');
     setTimeout(() => openDetail(saved.id), 400);
 
-    // Auto-save imported PDF to vault
+    // Save deed PDF reference to vault (metadata only, no large base64)
     if (pendingImportPDF) {
       try {
         const vaultData = {
           loan_id: saved.id, cat_id: 'recorded',
           name: pendingImportPDF.name, size: pendingImportPDF.size,
-          type: pendingImportPDF.type, data: pendingImportPDF.dataUrl,
-          book_page: '', notes: 'Auto-imported deed',
+          type: pendingImportPDF.type, data: '',
+          book_page: '', notes: 'Auto-imported deed — re-upload file via Files tab to store',
         };
         const vaultSaved = await dbSaveVaultFile(vaultData);
         if (vaultSaved) {
           vaultFiles.push(vaultSaved);
-          showToast('📄 Deed saved to vault', 'success');
+          showToast('📄 Deed recorded in vault', 'success');
         }
       } catch (err) {
         console.error('Vault save error:', err);
-        showToast('Deed vault save failed: ' + (err.message || err), 'error');
       }
       pendingImportPDF = null;
     }
