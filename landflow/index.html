@@ -1508,16 +1508,29 @@ async function saveLoan() {
         const blob = await resp.blob();
         const storagePath = `${currentUser.id}/deeds/${Date.now()}_${pendingImportPDF.name}`;
         let uploadOk = false;
+        let lastErr = null;
+
+        // Attempt 1: direct upload
         const { error: uploadErr } = await sb.storage.from('vault-files').upload(storagePath, blob, { upsert: true });
         if (uploadErr) {
-          if (uploadErr.message && uploadErr.message.includes('not found')) {
-            await sb.storage.createBucket('vault-files', { public: false });
+          console.warn('Deed upload attempt 1 failed:', uploadErr.message || uploadErr);
+          lastErr = uploadErr;
+          // If bucket doesn't exist, create it and retry
+          if (uploadErr.message && (uploadErr.message.includes('not found') || uploadErr.message.includes('does not exist'))) {
+            const { error: bucketErr } = await sb.storage.createBucket('vault-files', { public: false });
+            if (bucketErr) console.warn('Bucket creation:', bucketErr.message || bucketErr);
             const { error: retryErr } = await sb.storage.from('vault-files').upload(storagePath, blob, { upsert: true });
-            if (!retryErr) uploadOk = true;
+            if (retryErr) {
+              console.error('Deed upload attempt 2 failed:', retryErr.message || retryErr);
+              lastErr = retryErr;
+            } else {
+              uploadOk = true;
+            }
           }
         } else {
           uploadOk = true;
         }
+
         if (uploadOk) {
           const vaultData = {
             loan_id: saved.id, cat_id: 'recorded',
@@ -1531,11 +1544,13 @@ async function saveLoan() {
             showToast('📄 Deed saved to vault', 'success');
           }
         } else {
-          showToast('Deed vault upload failed', 'error');
+          const errMsg = lastErr ? (lastErr.message || JSON.stringify(lastErr)) : 'Unknown error';
+          console.error('Deed vault upload failed:', errMsg);
+          showToast('Deed vault upload failed: ' + errMsg, 'error');
         }
       } catch (err) {
         console.error('Vault upload error:', err);
-        showToast('Deed vault upload failed', 'error');
+        showToast('Deed vault upload failed: ' + (err.message || err), 'error');
       }
       pendingImportPDF = null;
     }
