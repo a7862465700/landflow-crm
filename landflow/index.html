@@ -10,12 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://unpkg.com/pizzip@3.2.0/dist/pizzip.js"></script>
 <script src="https://unpkg.com/docxtemplater@3.68.3/build/docxtemplater.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
-<script>
-// docx-preview exports as 'docx' which can conflict with other libs — save a reference
-window.docxPreview = window.docx;
-</script>
 <style>
 :root {
   /* ── Light theme (main area) ── */
@@ -299,12 +294,10 @@ textarea.form-input{resize:vertical;min-height:80px}
 .te-fmt-select{background:var(--s1);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;cursor:pointer}
 .te-body{flex:1;display:flex;overflow:hidden}
 .te-editor-pane{flex:1;overflow-y:auto;padding:40px;background:#f8f6f3}
-.te-editor{max-width:900px;margin:0 auto;min-height:600px;outline:none;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid var(--border);overflow:hidden;cursor:text}
+.te-editor{max-width:860px;margin:0 auto;min-height:600px;outline:none;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid var(--border);overflow:hidden}
 .te-editor .docx-wrapper{background:#fff !important;padding:0 !important}
-.te-editor .docx-wrapper>section.docx{margin:0 auto !important;box-shadow:none !important;min-height:auto !important;margin-bottom:20px !important;border-bottom:2px dashed var(--border) !important}
+.te-editor .docx-wrapper>section.docx{margin:0 auto !important;padding:60px 72px !important;box-shadow:none !important;min-height:auto !important;margin-bottom:20px !important;border-bottom:2px dashed var(--border) !important}
 .te-editor .docx-wrapper>section.docx:last-child{border-bottom:none !important;margin-bottom:0 !important}
-.te-insert-marker{display:inline-block;width:2px;height:1em;background:var(--gold);animation:te-blink 1s step-end infinite;vertical-align:text-bottom;pointer-events:none}
-@keyframes te-blink{0%,100%{opacity:1}50%{opacity:0}}
 .te-loading{display:flex;align-items:center;justify-content:center;flex:1;color:var(--text3);font-size:15px}
 .te-palette{width:280px;flex-shrink:0;border-left:1px solid var(--border);background:var(--s2);overflow-y:auto;padding:16px}
 .te-section-title{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);font-weight:700;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
@@ -585,7 +578,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="form-section">👤 Buyer Info</div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Buyer Full Name *</label><input class="form-input" id="f-borrower" placeholder="John & Jane Smith"></div>
-        <div class="form-group"><label class="form-label">Buyer Company</label><input class="form-input" id="f-buyer-company" placeholder="ABC Holdings LLC"></div>
+        <div class="form-group"><label class="form-label">Buyer Company</label><input class="form-input" id="f-buyer-company" placeholder="Terra Equity Holdings LLC"></div>
         <div class="form-group"><label class="form-label">Buyer Phone</label><input class="form-input" id="f-phone" type="tel" placeholder="5550000000"></div>
         <div class="form-group"><label class="form-label">Buyer Email</label><input class="form-input" id="f-email" type="email" placeholder="buyer@email.com"></div>
         <div class="form-group form-full"><label class="form-label">Buyer Address</label><input class="form-input" id="f-buyer-address" placeholder="123 Main St, Atlanta GA 30301"></div>
@@ -870,57 +863,45 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div style="font-size:11px;color:var(--text3);margin-top:2px" id="te-subtitle"></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <span style="font-size:11px;color:var(--text3);margin-right:8px">Your document formatting is fully preserved</span>
+        <span style="font-size:11px;color:var(--text3);margin-right:8px">Headers/footers preserved but not shown here</span>
         <button class="btn btn-ghost" onclick="closeTemplateEditor()">Cancel</button>
         <button class="btn btn-gold" onclick="saveTemplateEditor()">💾 Save Template</button>
       </div>
     </div>
     <div class="te-fmt-bar">
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('undo')" title="Undo">↩</button>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('redo')" title="Redo">↪</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('bold')" title="Bold"><b>B</b></button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('italic')" title="Italic"><i>I</i></button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('underline')" title="Underline"><u>U</u></button>
       <div class="te-fmt-sep"></div>
-      <select class="te-fmt-select" id="te-font-family" onchange="teExec('fontName',this.value);this.blur()" title="Font">
-        <option value="">Font</option>
-        <option value="Arial">Arial</option>
-        <option value="Calibri">Calibri</option>
-        <option value="Times New Roman">Times New Roman</option>
-        <option value="Georgia">Georgia</option>
-        <option value="Courier New">Courier New</option>
-        <option value="Verdana">Verdana</option>
-        <option value="Garamond">Garamond</option>
-      </select>
-      <select class="te-fmt-select" id="te-font-size" onchange="teExecFontSize(this.value);this.blur()" title="Font Size">
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('justifyLeft')" title="Align Left">⫷</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('justifyCenter')" title="Align Center">☰</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('justifyRight')" title="Align Right">⫸</button>
+      <div class="te-fmt-sep"></div>
+      <select class="te-fmt-select" onchange="teFmtFontSize(this.value);this.blur()" title="Font Size">
         <option value="">Size</option>
-        <option value="1">8</option>
-        <option value="2">10</option>
-        <option value="3">12</option>
-        <option value="4">14</option>
-        <option value="5">18</option>
-        <option value="6">24</option>
-        <option value="7">36</option>
+        <option value="1">8pt</option>
+        <option value="2">10pt</option>
+        <option value="3">12pt</option>
+        <option value="4">14pt</option>
+        <option value="5">18pt</option>
+        <option value="6">24pt</option>
+        <option value="7">36pt</option>
+      </select>
+      <select class="te-fmt-select" onchange="teFmtLineHeight(this.value);this.blur()" title="Line Spacing">
+        <option value="">Spacing</option>
+        <option value="1">Single</option>
+        <option value="1.15">1.15</option>
+        <option value="1.5">1.5</option>
+        <option value="2">Double</option>
       </select>
       <div class="te-fmt-sep"></div>
-      <button class="te-fmt-btn" data-cmd="bold" onmousedown="event.preventDefault();teExec('bold')" title="Bold"><b>B</b></button>
-      <button class="te-fmt-btn" data-cmd="italic" onmousedown="event.preventDefault();teExec('italic')" title="Italic"><i>I</i></button>
-      <button class="te-fmt-btn" data-cmd="underline" onmousedown="event.preventDefault();teExec('underline')" title="Underline"><u>U</u></button>
-      <button class="te-fmt-btn" data-cmd="strikeThrough" onmousedown="event.preventDefault();teExec('strikeThrough')" title="Strikethrough"><s>S</s></button>
-      <div class="te-fmt-sep"></div>
-      <label class="te-fmt-btn" title="Text Color" style="position:relative;cursor:pointer">
-        A<span id="te-color-indicator" style="display:block;height:3px;background:#000;margin-top:-2px;border-radius:1px"></span>
-        <input type="color" id="te-text-color" value="#000000" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" onchange="teExec('foreColor',this.value);document.getElementById('te-color-indicator').style.background=this.value">
-      </label>
-      <div class="te-fmt-sep"></div>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('justifyLeft')" title="Align Left">⇤</button>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('justifyCenter')" title="Center">⇔</button>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('justifyRight')" title="Align Right">⇥</button>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teExec('justifyFull')" title="Justify">☰</button>
-      <div class="te-fmt-sep"></div>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teRemoveLine()" title="Remove Line">✕ Line</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teInsertLogo()" title="Insert Logo/Image">🖼 Logo</button>
+      <button class="te-fmt-btn" onmousedown="event.preventDefault();teInsertPageBreak()" title="Insert Page Break">📄 Page Break</button>
     </div>
     <div class="te-body">
       <div class="te-editor-pane">
         <div class="te-loading" id="te-loading">Loading document…</div>
-        <div id="te-editor" class="te-editor" style="display:none"></div>
+        <div id="te-editor" contenteditable="true" class="te-editor" style="display:none"></div>
       </div>
       <div class="te-palette">
         <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Click where you want the field in the document, then click a field below to insert it.</div>
@@ -1424,7 +1405,7 @@ function openLoanModal(editId) {
 }
 
 function clearLoanForm() {
-  ['f-borrower','f-buyer-company','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-address','f-phone','f-email','f-ssn','f-county','f-parcel','f-address','f-legaldesc',
+  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-company','f-buyer-address','f-phone','f-email','f-ssn','f-county','f-parcel','f-address','f-legaldesc',
    'f-saleprice','f-down','f-loanamt','f-rate','f-origdate','f-firstpay','f-investor','f-inv-contact',
    'f-inv-date','f-inv-price','f-nb-name','f-nb-business','f-nb-phone','f-nb-email','f-nb-address','f-notes']
   .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
@@ -1551,6 +1532,7 @@ function editLoan() { if (currentLoanId) openLoanModal(currentLoanId); }
 // ============================================================
 const ARKANSAS_DEFAULTS = {
   borrower: 'Michael Lazar',
+  buyer_company: 'Terra Equity Holdings LLC',
   buyer_address: '950 Seven Hills Drive, Henderson, NV 89052',
   phone: '501-725-0268',
   email: 'terraequityml@gmail.com',
@@ -1621,6 +1603,7 @@ async function handlePDFFile(e) {
 
     // Apply Arkansas defaults
     document.getElementById('f-borrower').value = ARKANSAS_DEFAULTS.borrower;
+    document.getElementById('f-buyer-company').value = ARKANSAS_DEFAULTS.buyer_company;
     document.getElementById('f-buyer-address').value = ARKANSAS_DEFAULTS.buyer_address;
     document.getElementById('f-phone').value = ARKANSAS_DEFAULTS.phone;
     document.getElementById('f-email').value = ARKANSAS_DEFAULTS.email;
@@ -1640,10 +1623,10 @@ async function handlePDFFile(e) {
     document.getElementById('f-firstpay').value = firstPay.toISOString().split('T')[0];
     document.getElementById('f-dueday').value = '1';
 
-    // Add note about buyer company
+    // Add EIN to notes
     const notesEl = document.getElementById('f-notes');
     const existingNotes = notesEl.value;
-    notesEl.value = (existingNotes ? existingNotes + '\n' : '') + 'Buyer company: Terra Equity Holdings LLC | EIN: 41-3934318';
+    notesEl.value = (existingNotes ? existingNotes + '\n' : '') + 'EIN: 41-3934318';
 
     // Trigger live calculation preview
     updatePreview();
@@ -1694,6 +1677,7 @@ function openDetail(id) {
     ['Maturity', matDate(l.orig_date, l.term), 'mono'],
     ['Payments Made', paid + ' of ' + (l.term*12), 'green'],
     ['Due Day', ordinal(l.payment_due_day || 1) + ' of month', ''],
+    ['Buyer Company', l.buyer_company||'—', ''],
     ['Buyer Phone', fmtPhone(l.phone)||'—', ''],
     ['Buyer Email', l.email||'—', ''],
     ['Buyer Address', l.buyer_address||'—', ''],
@@ -2790,8 +2774,7 @@ function buildMergeData(loan) {
 
   return {
     // Borrower / Buyer
-    borrower: loan.borrower || '', buyer_company: loan.buyer_company || '',
-    signatory: loan.borrower || '', buyer_address: loan.buyer_address || '',
+    borrower: loan.borrower || '', buyer_company: loan.buyer_company || '', buyer_address: loan.buyer_address || '',
     phone: fmtPhone(loan.phone) || '', email: loan.email || '', ssn: loan.ssn || '',
     // Seller
     seller: loan.seller || '', seller_phone: fmtPhone(loan.seller_phone) || '',
@@ -2818,8 +2801,7 @@ function buildMergeData(loan) {
     nb_phone: fmtPhone(loan.nb_phone) || '', nb_email: loan.nb_email || '',
     nb_address: loan.nb_address || '',
     // Computed
-    monthly_payment: fmtD(pmt), payment: pmt.toFixed(2), payment_fmt: fmtD(pmt),
-    current_balance: fmtD(realBal.balance),
+    monthly_payment: fmtD(pmt), current_balance: fmtD(realBal.balance),
     maturity_date: fmtDate(matDate.toISOString()),
     total_interest: fmtD(totalInterest),
     // Company / Lender
@@ -2928,8 +2910,7 @@ async function previewTemplateFields(templateId) {
 
 const MERGE_FIELDS = [
   { section: 'Borrower / Buyer', fields: [
-    ['{borrower}', 'Full name'], ['{buyer_company}', 'Company name'], ['{signatory}', 'Signatory (buyer name)'],
-    ['{buyer_address}', 'Mailing address'], ['{phone}', 'Phone (formatted)'],
+    ['{borrower}', 'Full name'], ['{buyer_company}', 'Company name'], ['{buyer_address}', 'Mailing address'], ['{phone}', 'Phone (formatted)'],
     ['{email}', 'Email'], ['{ssn}', 'SSN/EIN (last 4)'],
   ]},
   { section: 'Seller', fields: [
@@ -2951,8 +2932,7 @@ const MERGE_FIELDS = [
     ['{payment_due_day}', 'Due day of month'], ['{status}', 'Loan status'], ['{notes}', 'Notes'],
   ]},
   { section: 'Computed Values', fields: [
-    ['{monthly_payment}', 'Monthly payment ($)'], ['{payment}', 'Payment (raw number)'], ['{payment_fmt}', 'Payment ($)'],
-    ['{current_balance}', 'Current balance ($)'],
+    ['{monthly_payment}', 'Monthly payment ($)'], ['{current_balance}', 'Current balance ($)'],
     ['{maturity_date}', 'Maturity date'], ['{total_interest}', 'Total interest over life ($)'],
     ['{account_number}', 'Account # (parcel or loan ID)'],
   ]},
@@ -2998,16 +2978,13 @@ async function openTemplateEditor(templateId) {
   document.getElementById('templateEditorOverlay').classList.add('open');
   renderFieldPalette();
   try {
-    console.log('Loading template bytes for:', t.name, 'data type:', t.data?.substring(0, 20));
     const bytes = await getTemplateBytes(t);
-    console.log('Template bytes loaded:', bytes.length, 'bytes');
     // Store original bytes for patching on save
     window._originalDocxBytes = bytes;
     const editor = document.getElementById('te-editor');
     editor.innerHTML = '';
-    // Render with docx-preview for pixel-perfect Word fidelity (read-only)
-    console.log('Rendering with docx-preview...');
-    await docxPreview.renderAsync(bytes.buffer, editor, null, {
+    // Render with docx-preview for pixel-perfect Word fidelity
+    await docx.renderAsync(bytes.buffer, editor, null, {
       className: 'docx',
       inWrapper: true,
       ignoreWidth: false,
@@ -3021,21 +2998,18 @@ async function openTemplateEditor(templateId) {
       renderFootnotes: true,
       renderEndnotes: true
     });
-    // Make inner sections editable so user can select/delete text and place fields
-    editor.querySelectorAll('section.docx').forEach(el => el.setAttribute('contenteditable', 'true'));
+    // Make the rendered content editable so user can place cursor and insert fields
+    editor.setAttribute('contenteditable', 'true');
+    // Also make inner sections editable
+    editor.querySelectorAll('section.docx, article').forEach(el => el.setAttribute('contenteditable', 'true'));
     // Highlight existing {field} merge tags
     highlightMergeTags(editor);
     document.getElementById('te-loading').style.display = 'none';
     editor.style.display = 'block';
   } catch (e) {
     console.error('Template editor error:', e);
-    // Show error in the loading area instead of closing — so user can see what went wrong
-    document.getElementById('te-loading').innerHTML = `
-      <div style="text-align:center;padding:40px">
-        <div style="font-size:16px;color:#e74c3c;margin-bottom:12px">Failed to load template</div>
-        <div style="font-size:13px;color:var(--text3);margin-bottom:20px">${e.message || 'Unknown error'}</div>
-        <button class="btn btn-ghost" onclick="closeTemplateEditor()">Close</button>
-      </div>`;
+    showToast('Failed to load template: ' + (e.message || ''), 'error');
+    closeTemplateEditor();
   }
 }
 
@@ -3052,6 +3026,7 @@ function highlightMergeTags(container) {
         if (/^\{[a-zA-Z0-9_]+\}$/.test(part)) {
           const span = document.createElement('span');
           span.className = 'merge-tag';
+          span.contentEditable = 'false';
           span.textContent = part;
           frag.appendChild(span);
         } else if (part) {
@@ -3084,247 +3059,100 @@ document.addEventListener('selectionchange', function() {
   const editor = document.getElementById('te-editor');
   if (editor && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
     _teLastRange = sel.getRangeAt(0).cloneRange();
-    teUpdateToolbarState();
   }
 });
-
-// ── FORMATTING TOOLBAR ──
-function teExec(command, value) {
-  document.execCommand(command, false, value || null);
-  teUpdateToolbarState();
-}
-function teExecFontSize(sizeValue) {
-  if (!sizeValue) return;
-  document.execCommand('fontSize', false, sizeValue);
-  teUpdateToolbarState();
-}
-function teRemoveLine() {
-  const sel = window.getSelection();
-  if (!sel.rangeCount) return;
-  let node = sel.getRangeAt(0).startContainer;
-  while (node && node.tagName !== 'P' && !node.classList?.contains('docx')) {
-    node = node.parentElement;
-  }
-  if (node && node.tagName === 'P') {
-    node.remove();
-    showToast('Line removed', 'success');
-  }
-}
-function teUpdateToolbarState() {
-  document.querySelectorAll('.te-fmt-bar .te-fmt-btn[data-cmd]').forEach(function(btn) {
-    try { btn.classList.toggle('active', document.queryCommandState(btn.getAttribute('data-cmd'))); } catch(e) {}
-  });
-}
-
-// ── HTML-TO-OOXML CONVERTER ──
-// Unit helpers: 1px = 15 twips (at 96dpi), 1pt = 20 twips, font sizes in half-points
-var _px2twip = function(px) { return Math.round(parseFloat(px) * 15); };
-var _px2hp = function(px) { return Math.round(parseFloat(px) * 1.5); }; // half-points
-const _fszMap = { '1':8, '2':10, '3':12, '4':14, '5':18, '6':24, '7':36 };
-function _xmlEsc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function _rgbHex(c) {
-  if (!c) return '000000';
-  if (c.charAt(0)==='#') return c.replace('#','').padEnd(6,'0');
-  var m = c.match(/\d+/g);
-  if (!m||m.length<3) return '000000';
-  return m.slice(0,3).map(function(n){return parseInt(n).toString(16).padStart(2,'0')}).join('');
-}
-function _buildRun(text, sty) {
-  if (!text) return '';
-  var props = [];
-  if (sty.bold) props.push('<w:b/>');
-  if (sty.italic) props.push('<w:i/>');
-  if (sty.underline) props.push('<w:u w:val="single"/>');
-  if (sty.strike) props.push('<w:strike/>');
-  if (sty.fontFamily) props.push('<w:rFonts w:ascii="'+_xmlEsc(sty.fontFamily)+'" w:hAnsi="'+_xmlEsc(sty.fontFamily)+'"/>');
-  if (sty.fontSizeHP) { props.push('<w:sz w:val="'+sty.fontSizeHP+'"/><w:szCs w:val="'+sty.fontSizeHP+'"/>'); }
-  if (sty.color && sty.color !== '000000') props.push('<w:color w:val="'+sty.color+'"/>');
-  if (sty.letterSpacing) props.push('<w:spacing w:val="'+sty.letterSpacing+'"/>');
-  var rPr = props.length ? '<w:rPr>'+props.join('')+'</w:rPr>' : '';
-  var esc = _xmlEsc(text);
-  var pres = (text.charAt(0)===' '||text.charAt(text.length-1)===' ') ? ' xml:space="preserve"' : '';
-  return '<w:r>'+rPr+'<w:t'+pres+'>'+esc+'</w:t></w:r>';
-}
-function _walkInline(node, runs, parentSty) {
-  for (var i=0; i<node.childNodes.length; i++) {
-    var ch = node.childNodes[i];
-    if (ch.nodeType === 3) { // text
-      var t = ch.textContent;
-      if (t) runs.push(_buildRun(t, parentSty));
-    } else if (ch.nodeType === 1) { // element
-      var tag = ch.tagName;
-      if (tag === 'BR') { runs.push('<w:r><w:br/></w:r>'); continue; }
-      var sty = Object.assign({}, parentSty);
-      var cs = window.getComputedStyle(ch);
-      if (tag==='B'||tag==='STRONG'||parseInt(cs.fontWeight)>=700) sty.bold = true;
-      if (tag==='I'||tag==='EM'||cs.fontStyle==='italic') sty.italic = true;
-      if (tag==='U') sty.underline = true;
-      if (tag==='S'||tag==='STRIKE'||tag==='DEL') sty.strike = true;
-      if (tag==='FONT') {
-        if (ch.face) sty.fontFamily = ch.face;
-        if (ch.color) sty.color = _rgbHex(ch.color);
-        if (ch.size && _fszMap[ch.size]) sty.fontSizeHP = _fszMap[ch.size] * 2;
-      }
-      // Read computed styles
-      if (cs.fontFamily) {
-        var ff = cs.fontFamily.replace(/["']/g,'').split(',')[0].trim();
-        if (ff && ff !== 'DM Sans') sty.fontFamily = ff;
-      }
-      if (cs.fontSize) {
-        var hp = _px2hp(cs.fontSize);
-        if (hp > 0) sty.fontSizeHP = hp;
-      }
-      if (cs.color) sty.color = _rgbHex(cs.color);
-      if (cs.letterSpacing && cs.letterSpacing !== 'normal') {
-        sty.letterSpacing = _px2twip(cs.letterSpacing);
-      }
-      // Merge tag spans: emit text as-is
-      if (ch.classList && ch.classList.contains('merge-tag')) {
-        runs.push(_buildRun(ch.textContent, sty));
-        continue;
-      }
-      _walkInline(ch, runs, sty);
-    }
-  }
-}
-function _convertPara(pEl) {
-  var cs = window.getComputedStyle(pEl);
-  // Build paragraph properties
-  var pPrParts = [];
-  // Alignment
-  var align = cs.textAlign;
-  if (align==='center') pPrParts.push('<w:jc w:val="center"/>');
-  else if (align==='right') pPrParts.push('<w:jc w:val="right"/>');
-  else if (align==='justify') pPrParts.push('<w:jc w:val="both"/>');
-  // Indentation (left, right, first-line)
-  var indParts = [];
-  var ml = parseFloat(cs.marginLeft) || parseFloat(cs.paddingLeft) || 0;
-  var mr = parseFloat(cs.marginRight) || parseFloat(cs.paddingRight) || 0;
-  var ti = parseFloat(cs.textIndent) || 0;
-  if (ml > 1) indParts.push('w:left="'+_px2twip(ml)+'"');
-  if (mr > 1) indParts.push('w:right="'+_px2twip(mr)+'"');
-  if (ti > 1) indParts.push('w:firstLine="'+_px2twip(ti)+'"');
-  else if (ti < -1) indParts.push('w:hanging="'+_px2twip(Math.abs(ti))+'"');
-  if (indParts.length) pPrParts.push('<w:ind '+indParts.join(' ')+'/>');
-  // Spacing (before, after, line)
-  var spaceParts = [];
-  var mt = parseFloat(cs.marginTop) || 0;
-  var mb = parseFloat(cs.marginBottom) || 0;
-  if (mt > 1) spaceParts.push('w:before="'+_px2twip(mt)+'"');
-  if (mb > 1) spaceParts.push('w:after="'+_px2twip(mb)+'"');
-  // Line spacing: compute from line-height and font-size
-  var lh = cs.lineHeight;
-  if (lh && lh !== 'normal') {
-    var lhPx = parseFloat(lh);
-    var fsPx = parseFloat(cs.fontSize) || 16;
-    if (lhPx > 0) {
-      // OOXML line spacing: 240 = single (1.0), 360 = 1.5, 480 = double
-      var ratio = lhPx / fsPx;
-      var ooxmlLine = Math.round(ratio * 240);
-      spaceParts.push('w:line="'+ooxmlLine+'" w:lineRule="auto"');
-    }
-  }
-  if (spaceParts.length) pPrParts.push('<w:spacing '+spaceParts.join(' ')+'/>');
-  var pPr = pPrParts.length ? '<w:pPr>'+pPrParts.join('')+'</w:pPr>' : '';
-  var runs = [];
-  _walkInline(pEl, runs, {});
-  return '<w:p>'+pPr+runs.join('')+'</w:p>';
-}
-function _convertTable(tblEl) {
-  var xml = '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>'+
-    '<w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
-    '<w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
-    '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
-    '<w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
-    '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
-    '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>'+
-    '</w:tblBorders></w:tblPr>';
-  for (var r=0; r<tblEl.rows.length; r++) {
-    xml += '<w:tr>';
-    for (var c=0; c<tblEl.rows[r].cells.length; c++) {
-      var cell = tblEl.rows[r].cells[c];
-      xml += '<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr>';
-      var paras = cell.querySelectorAll('p');
-      if (paras.length) { paras.forEach(function(p){ xml += _convertPara(p); }); }
-      else { var cRuns=[]; _walkInline(cell, cRuns, {}); xml += '<w:p>'+cRuns.join('')+'</w:p>'; }
-      xml += '</w:tc>';
-    }
-    xml += '</w:tr>';
-  }
-  xml += '</w:tbl>';
-  return xml;
-}
-function _walkBlock(el, parts) {
-  // Recursively find block-level content (p, table) inside containers (div, article, section, etc.)
-  var tag = el.tagName;
-  if (tag === 'TABLE') { parts.push(_convertTable(el)); return; }
-  if (tag === 'P') { parts.push(_convertPara(el)); return; }
-  // For container elements (div, article, header, footer, etc.), walk children
-  if (el.children && el.children.length > 0) {
-    var hasBlockChild = false;
-    for (var i=0; i<el.children.length; i++) {
-      var child = el.children[i];
-      var ct = child.tagName;
-      if (ct==='P'||ct==='TABLE'||ct==='DIV'||ct==='ARTICLE'||ct==='SECTION'||ct==='HEADER'||ct==='FOOTER'||ct==='UL'||ct==='OL'||ct==='LI'||ct==='BLOCKQUOTE') {
-        hasBlockChild = true;
-        _walkBlock(child, parts);
-      }
-    }
-    // If no block children found, treat the element itself as a paragraph
-    if (!hasBlockChild) {
-      var runs = [];
-      _walkInline(el, runs, {});
-      if (runs.length) parts.push('<w:p>'+runs.join('')+'</w:p>');
-    }
-  } else {
-    // Leaf element with no children — treat as paragraph
-    var runs = [];
-    _walkInline(el, runs, {});
-    if (runs.length) parts.push('<w:p>'+runs.join('')+'</w:p>');
-  }
-}
-function htmlToOoxml(editorEl) {
-  var parts = [];
-  var sections = editorEl.querySelectorAll('section.docx');
-  var secIdx = 0;
-  sections.forEach(function(section) {
-    if (secIdx > 0) parts.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
-    for (var i=0; i<section.children.length; i++) {
-      _walkBlock(section.children[i], parts);
-    }
-    secIdx++;
-  });
-  return parts.join('\n');
-}
 
 function insertMergeField(tag) {
   const editor = document.getElementById('te-editor');
   const sel = window.getSelection();
   let range;
+  // Use the saved cursor position if available
   if (_teLastRange && editor.contains(_teLastRange.commonAncestorContainer)) {
     range = _teLastRange;
   } else if (sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
     range = sel.getRangeAt(0);
   } else {
-    showToast('Click in the document first to place your cursor, then click the field.', 'error');
-    return;
+    // Fallback: place at end of editor
+    editor.focus();
+    range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
   }
   sel.removeAllRanges();
   sel.addRange(range);
-  // Delete any selected text (the placeholder being replaced)
-  range.deleteContents();
   // Create merge tag span
   const span = document.createElement('span');
   span.className = 'merge-tag';
   span.contentEditable = 'false';
   span.textContent = '{' + tag + '}';
+  range.deleteContents();
   range.insertNode(span);
-  // Move cursor after the span
+  // Move cursor after the span with a zero-width space so cursor can land there
+  const spacer = document.createTextNode('\u200B');
   range.setStartAfter(span);
+  range.collapse(true);
+  range.insertNode(spacer);
+  range.setStartAfter(spacer);
   range.collapse(true);
   sel.removeAllRanges();
   sel.addRange(range);
-  showToast('Inserted {' + tag + '}', 'success');
+}
+
+// Formatting toolbar functions
+function teFmt(cmd) { document.execCommand(cmd, false, null); }
+function teFmtFontSize(val) { if (val) document.execCommand('fontSize', false, val); }
+function teFmtLineHeight(val) {
+  if (!val) return;
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  // Apply line-height to the selected block element(s)
+  let node = sel.getRangeAt(0).commonAncestorContainer;
+  if (node.nodeType === 3) node = node.parentElement;
+  const block = node.closest('p,div,li,h1,h2,h3,h4,h5,h6,td') || node;
+  block.style.lineHeight = val;
+}
+function teInsertLogo() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = () => {
+    const f = input.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const editor = document.getElementById('te-editor');
+      const sel = window.getSelection();
+      let range = _teLastRange && editor.contains(_teLastRange.commonAncestorContainer) ? _teLastRange : null;
+      if (!range && sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) range = sel.getRangeAt(0);
+      if (!range) { range = document.createRange(); range.selectNodeContents(editor); range.collapse(true); }
+      sel.removeAllRanges(); sel.addRange(range);
+      const img = document.createElement('img');
+      img.src = reader.result;
+      img.style.maxWidth = '300px';
+      img.style.height = 'auto';
+      img.style.display = 'block';
+      img.style.margin = '8px 0';
+      range.deleteContents();
+      range.insertNode(img);
+      range.setStartAfter(img); range.collapse(true);
+      sel.removeAllRanges(); sel.addRange(range);
+    };
+    reader.readAsDataURL(f);
+  };
+  input.click();
+}
+function teInsertPageBreak() {
+  const editor = document.getElementById('te-editor');
+  const sel = window.getSelection();
+  let range = _teLastRange && editor.contains(_teLastRange.commonAncestorContainer) ? _teLastRange : null;
+  if (!range && sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) range = sel.getRangeAt(0);
+  if (!range) { range = document.createRange(); range.selectNodeContents(editor); range.collapse(false); }
+  sel.removeAllRanges(); sel.addRange(range);
+  const hr = document.createElement('hr');
+  hr.className = 'page-break';
+  range.deleteContents();
+  range.insertNode(hr);
+  range.setStartAfter(hr); range.collapse(true);
+  sel.removeAllRanges(); sel.addRange(range);
 }
 
 function closeTemplateEditor() {
@@ -3332,7 +3160,6 @@ function closeTemplateEditor() {
   document.getElementById('te-editor').innerHTML = '';
   window._editingTemplateId = null;
   window._originalDocxBytes = null;
-  _teLastRange = null;
 }
 
 async function saveTemplateEditor() {
@@ -3341,28 +3168,115 @@ async function saveTemplateEditor() {
   if (!t) return showToast('Template not found', 'error');
   showToast('Saving template…');
   try {
+    // Extract merge fields from the editor HTML
+    const div = document.createElement('div');
+    div.innerHTML = document.getElementById('te-editor').innerHTML;
+    const editorText = div.textContent.replace(/\u200B/g, '');
+    // Collect all {field} tags from the edited content
+    const fieldMatches = editorText.match(/\{[a-zA-Z0-9_]+\}/g) || [];
+
+    // Use the stored ORIGINAL .docx bytes (not the rendered HTML)
     const bytes = window._originalDocxBytes || await getTemplateBytes(t);
     const zip = new PizZip(bytes.buffer);
+
+    // Get the document.xml content
+    const xmlFiles = ['word/document.xml', 'word/header1.xml', 'word/header2.xml', 'word/footer1.xml', 'word/footer2.xml'];
+
+    // For each field found in the editor, ensure it exists in the .docx XML
+    // The editor is used to PLACE fields — we scan the editor to build a mapping
+    // of what text was replaced with merge fields, then patch the original XML
+
+    // Simpler approach: extract the full text with merge fields from the editor,
+    // and for each paragraph, find the corresponding paragraph in the XML and
+    // inject any new {field} tags that weren't there before
+
+    // Simplest reliable approach: directly modify document.xml to insert merge fields
+    // by finding text runs and replacing literal text with {field} tags
+    // This works because the user places {field} in the HTML editor at the right spots
+
+    // Build a list of new fields to inject by comparing editor content to original
     const docXml = zip.file('word/document.xml')?.asText();
     if (!docXml) throw new Error('Cannot read document.xml');
 
-    // Preserve section properties (page size, margins, orientation)
-    const sectPrMatch = docXml.match(/<w:sectPr[\s\S]*?<\/w:sectPr>/);
-    const sectPr = sectPrMatch ? sectPrMatch[0] : '';
+    // Extract text content from editor, paragraph by paragraph
+    const editorParas = [];
+    div.querySelectorAll('p').forEach(p => {
+      editorParas.push(p.textContent.replace(/\u200B/g, '').trim());
+    });
+    // If no <p> tags (plain text), split by line
+    if (!editorParas.length) {
+      editorText.split('\n').forEach(line => editorParas.push(line.trim()));
+    }
 
-    // Preserve the <w:document> root element with all namespace declarations
-    const bodyStart = docXml.indexOf('<w:body');
-    const rootOpen = docXml.substring(docXml.indexOf('<w:document'), bodyStart);
-    const xmlDecl = docXml.match(/<\?xml[^?]*\?>/)?.[0] || '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    // Find all {field} patterns that the user added in the editor
+    const newFields = new Set(fieldMatches);
 
-    // Rebuild body from editor DOM
-    const editor = document.getElementById('te-editor');
-    const bodyContent = htmlToOoxml(editor);
+    // Check which fields already exist in the original XML
+    const existingFields = new Set();
+    const existingMatches = docXml.match(/\{[a-zA-Z0-9_]+\}/g) || [];
+    existingMatches.forEach(f => existingFields.add(f));
 
-    const newXml = xmlDecl + '\n' + rootOpen + '<w:body>\n' + bodyContent + '\n' + sectPr + '\n</w:body></w:document>';
-    zip.file('word/document.xml', newXml);
+    // Fields that need to be added to the document
+    const fieldsToAdd = [...newFields].filter(f => !existingFields.has(f));
 
-    // Generate the new .docx blob
+    if (fieldsToAdd.length === 0 && newFields.size > 0) {
+      // All fields already exist in the original — nothing to patch
+      closeTemplateEditor();
+      showToast('Template already has all merge fields!', 'success');
+      return;
+    }
+
+    if (fieldsToAdd.length === 0 && newFields.size === 0) {
+      closeTemplateEditor();
+      showToast('No merge fields found to save. Insert fields using the palette.', 'error');
+      return;
+    }
+
+    // For fields that need adding: scan editor paragraphs to find where each field
+    // was placed, identify the surrounding text context, then find and patch the XML
+    let patchedXml = docXml;
+    for (const field of fieldsToAdd) {
+      // Find the paragraph in the editor that contains this field
+      for (const para of editorParas) {
+        if (!para.includes(field)) continue;
+        // Get the text before and after the field in the editor paragraph
+        const fieldIdx = para.indexOf(field);
+        const before = para.substring(Math.max(0, fieldIdx - 40), fieldIdx).trim();
+        const after = para.substring(fieldIdx + field.length, fieldIdx + field.length + 40).trim();
+
+        // Try to find this context in the XML and insert the field
+        // XML text runs look like: <w:t>some text</w:t>
+        // We need to find the <w:t> that contains the text near where the field should go
+
+        if (before.length > 3) {
+          // Find the "before" text in XML (may be split across runs)
+          // Look for the last few words before the field
+          const searchText = before.slice(-20);
+          const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          // Try to find and append the field after the matching text
+          const regex = new RegExp('(' + escapedSearch + ')', 'g');
+          if (regex.test(patchedXml)) {
+            patchedXml = patchedXml.replace(regex, '$1' + field);
+            break;
+          }
+        }
+        if (after.length > 3) {
+          // Insert field before the "after" text
+          const searchText = after.slice(0, 20);
+          const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp('(' + escapedSearch + ')', 'g');
+          if (regex.test(patchedXml)) {
+            patchedXml = patchedXml.replace(regex, field + '$1');
+            break;
+          }
+        }
+      }
+    }
+
+    // Write patched XML back to the zip
+    zip.file('word/document.xml', patchedXml);
+
+    // Generate the patched .docx as a blob
     const blob = zip.generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 
     // Upload to Supabase Storage
@@ -3387,7 +3301,7 @@ async function saveTemplateEditor() {
 
     renderTemplates();
     closeTemplateEditor();
-    showToast('Template saved with all changes!', 'success');
+    showToast('Template saved — ' + fieldsToAdd.length + ' new field(s) added!', 'success');
   } catch (e) {
     console.error('Save template error:', e);
     showToast('Save failed: ' + (e.message || 'Unknown error'), 'error');
