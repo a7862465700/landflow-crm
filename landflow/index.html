@@ -424,6 +424,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="desktop-title" id="desktopTitle">Portfolio</div>
       <div class="topbar-right">
         <button class="btn btn-gold btn-sm" onclick="openLoanModal()">＋ New Loan</button>
+        <button class="btn btn-sm" style="background:#3b7be0;color:#fff" onclick="importPDF()">📄 Import PDF</button>
         <button class="settings-btn" onclick="openSettingsModal()" title="Company Settings">⚙</button>
         <button class="logout-btn" onclick="signOut()">Sign Out</button>
       </div>
@@ -460,6 +461,7 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="section-header">
           <div class="section-title">Active Loans</div>
           <button class="btn btn-gold btn-sm" onclick="openLoanModal()">＋ New Loan</button>
+          <button class="btn btn-sm" style="background:#3b7be0;color:#fff" onclick="importPDF()">📄 Import PDF</button>
         </div>
         <div class="search-bar">
           <input class="search-input" id="loanSearch" placeholder="🔍  Search by buyer, seller, parcel, county..." oninput="renderLoans()">
@@ -551,6 +553,9 @@ textarea.form-input{resize:vertical;min-height:80px}
   <button class="fab" onclick="openLoanModal()">＋</button>
 
 </div><!-- /app -->
+
+<!-- Hidden file input for PDF import -->
+<input type="file" id="pdfFileInput" accept=".pdf" style="display:none" onchange="handlePDFFile(event)">
 
 <!-- ─── MODALS ─── -->
 
@@ -1476,6 +1481,25 @@ async function saveLoan() {
     loans.unshift(saved);
     showToast('✅ Loan created!', 'success');
     setTimeout(() => openDetail(saved.id), 400);
+
+    // Auto-upload imported PDF to vault
+    if (pendingImportPDF) {
+      try {
+        const vaultData = {
+          loan_id: saved.id, cat_id: 'recorded',
+          name: pendingImportPDF.name, size: pendingImportPDF.size,
+          type: pendingImportPDF.type, data: pendingImportPDF.dataUrl,
+          book_page: '', notes: 'Auto-imported deed',
+        };
+        const vaultSaved = await dbSaveVaultFile(vaultData);
+        vaultFiles.push(vaultSaved);
+        showToast('📄 Deed saved to vault', 'success');
+      } catch (err) {
+        console.error('Vault upload error:', err);
+        showToast('Deed vault upload failed', 'error');
+      }
+      pendingImportPDF = null;
+    }
   }
   renderLoans(); updateStats();
   closeModal('loanModal');
@@ -1484,6 +1508,95 @@ async function saveLoan() {
 }
 
 function editLoan() { if (currentLoanId) openLoanModal(currentLoanId); }
+
+// ============================================================
+// PDF IMPORT
+// ============================================================
+const ARKANSAS_DEFAULTS = {
+  borrower: 'Terra Equity Holdings LLC',
+  sale_price: 13000,
+  down_payment: 1450,
+  loan_amount: 11550,
+  rate: 10,
+  term: '5',
+};
+
+let pendingImportPDF = null; // { name, size, type, dataUrl }
+
+function importPDF() {
+  const input = document.getElementById('pdfFileInput');
+  input.value = '';
+  input.click();
+}
+
+async function handlePDFFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // Read as base64 for both the API call and vault storage
+  const dataUrl = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
+  // Extract raw base64 (strip data:application/pdf;base64, prefix)
+  const base64 = dataUrl.split(',')[1];
+
+  showToast('Extracting data from PDF…');
+
+  try {
+    const resp = await fetch('/.netlify/functions/extract-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdf_base64: base64 }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || 'Extraction failed');
+    }
+
+    const extracted = await resp.json();
+
+    // Store PDF for vault upload after save
+    pendingImportPDF = { name: file.name, size: file.size, type: file.type, dataUrl };
+
+    // Open a fresh loan modal
+    openLoanModal();
+
+    // Fill extracted fields
+    if (extracted.seller) document.getElementById('f-seller').value = extracted.seller;
+    if (extracted.seller_address) document.getElementById('f-seller-address').value = extracted.seller_address;
+    if (extracted.parcel) document.getElementById('f-parcel').value = extracted.parcel;
+    if (extracted.legal_desc) document.getElementById('f-legaldesc').value = extracted.legal_desc;
+    if (extracted.county) document.getElementById('f-county').value = extracted.county;
+    if (extracted.city) document.getElementById('f-address').value = extracted.city;
+    if (extracted.price_paid) document.getElementById('f-price-paid').value = extracted.price_paid;
+    if (extracted.previous_owner) {
+      document.getElementById('f-notes').value = 'Previous owner: ' + extracted.previous_owner;
+    }
+
+    // Apply Arkansas defaults
+    document.getElementById('f-borrower').value = ARKANSAS_DEFAULTS.borrower;
+    document.getElementById('f-saleprice').value = ARKANSAS_DEFAULTS.sale_price;
+    document.getElementById('f-down').value = ARKANSAS_DEFAULTS.down_payment;
+    document.getElementById('f-loanamt').value = ARKANSAS_DEFAULTS.loan_amount;
+    document.getElementById('f-rate').value = ARKANSAS_DEFAULTS.rate;
+    document.getElementById('f-term').value = ARKANSAS_DEFAULTS.term;
+    document.getElementById('f-origdate').value = new Date().toISOString().split('T')[0];
+
+    // Trigger live calculation preview
+    updatePreview();
+
+    showToast('PDF data extracted — review and save', 'success');
+  } catch (err) {
+    console.error('PDF import error:', err);
+    showToast('PDF import failed: ' + err.message, 'error');
+    pendingImportPDF = null;
+  }
+}
 
 async function deleteLoan() {
   if (!currentLoanId) return;

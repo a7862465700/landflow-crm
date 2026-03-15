@@ -1,0 +1,10 @@
+{
+  "name": "landflow-functions",
+  "private": true,
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  },
+  "devDependencies": {
+    "serve": "^14.2.6"
+  }
+}
