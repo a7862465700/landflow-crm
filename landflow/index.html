@@ -1569,6 +1569,13 @@ async function handlePDFFile(e) {
   // Extract raw base64 (strip data:application/pdf;base64, prefix)
   const base64 = dataUrl.split(',')[1];
 
+  // Check payload size — Netlify Functions have a ~1MB body limit
+  const payloadSize = JSON.stringify({ pdf_base64: base64 }).length;
+  if (payloadSize > 900000) {
+    showToast('PDF too large (' + Math.round(file.size/1024) + 'KB). Max ~750KB for import.', 'error');
+    return;
+  }
+
   showToast('Extracting data from PDF…');
 
   try {
@@ -1579,8 +1586,11 @@ async function handlePDFFile(e) {
     });
 
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error || 'Extraction failed');
+      const errBody = await resp.text();
+      console.error('Extract PDF response:', resp.status, errBody);
+      let errMsg = 'Extraction failed (HTTP ' + resp.status + ')';
+      try { errMsg = JSON.parse(errBody).error || errMsg; } catch(_) {}
+      throw new Error(errMsg);
     }
 
     const extracted = await resp.json();
