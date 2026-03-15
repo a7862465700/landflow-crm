@@ -8,6 +8,7 @@ create table if not exists loans (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   borrower text,
+  buyer_company text,
   seller text,
   phone text,
   email text,

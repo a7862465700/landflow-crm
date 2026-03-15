@@ -578,6 +578,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="form-section">👤 Buyer Info</div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Buyer Full Name *</label><input class="form-input" id="f-borrower" placeholder="John & Jane Smith"></div>
+        <div class="form-group"><label class="form-label">Buyer Company</label><input class="form-input" id="f-buyer-company" placeholder="Terra Equity Holdings LLC"></div>
         <div class="form-group"><label class="form-label">Buyer Phone</label><input class="form-input" id="f-phone" type="tel" placeholder="5550000000"></div>
         <div class="form-group"><label class="form-label">Buyer Email</label><input class="form-input" id="f-email" type="email" placeholder="buyer@email.com"></div>
         <div class="form-group form-full"><label class="form-label">Buyer Address</label><input class="form-input" id="f-buyer-address" placeholder="123 Main St, Atlanta GA 30301"></div>
@@ -1364,6 +1365,7 @@ function openLoanModal(editId) {
     document.getElementById('f-seller-phone').value = l.seller_phone||'';
     document.getElementById('f-seller-address').value = l.seller_address||'';
     document.getElementById('f-price-paid').value = l.price_paid||'';
+    document.getElementById('f-buyer-company').value = l.buyer_company||'';
     document.getElementById('f-buyer-address').value = l.buyer_address||'';
     document.getElementById('f-phone').value = l.phone||'';
     document.getElementById('f-email').value = l.email||'';
@@ -1403,7 +1405,7 @@ function openLoanModal(editId) {
 }
 
 function clearLoanForm() {
-  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-address','f-phone','f-email','f-ssn','f-county','f-parcel','f-address','f-legaldesc',
+  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-company','f-buyer-address','f-phone','f-email','f-ssn','f-county','f-parcel','f-address','f-legaldesc',
    'f-saleprice','f-down','f-loanamt','f-rate','f-origdate','f-firstpay','f-investor','f-inv-contact',
    'f-inv-date','f-inv-price','f-nb-name','f-nb-business','f-nb-phone','f-nb-email','f-nb-address','f-notes']
   .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
@@ -1460,6 +1462,7 @@ async function saveLoan() {
     seller_phone: document.getElementById('f-seller-phone').value.trim(),
     seller_address: document.getElementById('f-seller-address').value.trim(),
     price_paid: parseFloat(document.getElementById('f-price-paid').value)||0,
+    buyer_company: document.getElementById('f-buyer-company').value.trim(),
     buyer_address: document.getElementById('f-buyer-address').value.trim(),
     phone: document.getElementById('f-phone').value,
     email: document.getElementById('f-email').value,
@@ -1529,6 +1532,7 @@ function editLoan() { if (currentLoanId) openLoanModal(currentLoanId); }
 // ============================================================
 const ARKANSAS_DEFAULTS = {
   borrower: 'Michael Lazar',
+  buyer_company: 'Terra Equity Holdings LLC',
   buyer_address: '950 Seven Hills Drive, Henderson, NV 89052',
   phone: '501-725-0268',
   email: 'terraequityml@gmail.com',
@@ -1599,6 +1603,7 @@ async function handlePDFFile(e) {
 
     // Apply Arkansas defaults
     document.getElementById('f-borrower').value = ARKANSAS_DEFAULTS.borrower;
+    document.getElementById('f-buyer-company').value = ARKANSAS_DEFAULTS.buyer_company;
     document.getElementById('f-buyer-address').value = ARKANSAS_DEFAULTS.buyer_address;
     document.getElementById('f-phone').value = ARKANSAS_DEFAULTS.phone;
     document.getElementById('f-email').value = ARKANSAS_DEFAULTS.email;
@@ -1618,10 +1623,10 @@ async function handlePDFFile(e) {
     document.getElementById('f-firstpay').value = firstPay.toISOString().split('T')[0];
     document.getElementById('f-dueday').value = '1';
 
-    // Add note about buyer company
+    // Add EIN to notes
     const notesEl = document.getElementById('f-notes');
     const existingNotes = notesEl.value;
-    notesEl.value = (existingNotes ? existingNotes + '\n' : '') + 'Buyer company: Terra Equity Holdings LLC | EIN: 41-3934318';
+    notesEl.value = (existingNotes ? existingNotes + '\n' : '') + 'EIN: 41-3934318';
 
     // Trigger live calculation preview
     updatePreview();
@@ -1672,6 +1677,7 @@ function openDetail(id) {
     ['Maturity', matDate(l.orig_date, l.term), 'mono'],
     ['Payments Made', paid + ' of ' + (l.term*12), 'green'],
     ['Due Day', ordinal(l.payment_due_day || 1) + ' of month', ''],
+    ['Buyer Company', l.buyer_company||'—', ''],
     ['Buyer Phone', fmtPhone(l.phone)||'—', ''],
     ['Buyer Email', l.email||'—', ''],
     ['Buyer Address', l.buyer_address||'—', ''],
@@ -2768,7 +2774,7 @@ function buildMergeData(loan) {
 
   return {
     // Borrower / Buyer
-    borrower: loan.borrower || '', buyer_address: loan.buyer_address || '',
+    borrower: loan.borrower || '', buyer_company: loan.buyer_company || '', buyer_address: loan.buyer_address || '',
     phone: fmtPhone(loan.phone) || '', email: loan.email || '', ssn: loan.ssn || '',
     // Seller
     seller: loan.seller || '', seller_phone: fmtPhone(loan.seller_phone) || '',
@@ -2904,7 +2910,7 @@ async function previewTemplateFields(templateId) {
 
 const MERGE_FIELDS = [
   { section: 'Borrower / Buyer', fields: [
-    ['{borrower}', 'Full name'], ['{buyer_address}', 'Mailing address'], ['{phone}', 'Phone (formatted)'],
+    ['{borrower}', 'Full name'], ['{buyer_company}', 'Company name'], ['{buyer_address}', 'Mailing address'], ['{phone}', 'Phone (formatted)'],
     ['{email}', 'Email'], ['{ssn}', 'SSN/EIN (last 4)'],
   ]},
   { section: 'Seller', fields: [
