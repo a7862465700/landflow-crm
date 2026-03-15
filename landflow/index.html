@@ -627,6 +627,13 @@ textarea.form-input{resize:vertical;min-height:80px}
           <div><div class="pv-label">Total Interest</div><div class="pv-val" id="pv-totalint">—</div></div>
           <div><div class="pv-label">Maturity</div><div class="pv-val" id="pv-maturity">—</div></div>
         </div>
+        <div class="preview-title" style="margin-top:10px;font-size:11px;color:var(--text3)">Truth-In-Lending (TILA)</div>
+        <div class="preview-grid" style="grid-template-columns:repeat(4,1fr)">
+          <div><div class="pv-label">Finance Charge</div><div class="pv-val" id="pv-finance-charge">—</div></div>
+          <div><div class="pv-label">Amount Financed</div><div class="pv-val" id="pv-amount-financed">—</div></div>
+          <div><div class="pv-label">Total of Payments</div><div class="pv-val" id="pv-total-payments">—</div></div>
+          <div><div class="pv-label">Total Sale Price</div><div class="pv-val" id="pv-total-sale">—</div></div>
+        </div>
       </div>
       <div class="form-section" style="margin-top:16px">💼 Note Assignment (Optional)</div>
       <div class="form-grid">
@@ -1419,14 +1426,22 @@ function updatePreview() {
   const r = parseFloat(document.getElementById('f-rate').value);
   const t = parseInt(document.getElementById('f-term').value);
   const orig = document.getElementById('f-origdate').value;
+  const down = parseFloat(document.getElementById('f-down').value) || 0;
   if (p && r && t) {
     const pmt = calcPayment(p,r,t);
-    const total = pmt * t * 12;
+    const totalPayments = pmt * t * 12;
+    const financeCharge = totalPayments - p;
+    const totalSalePrice = totalPayments + down;
     document.getElementById('pv-payment').textContent = fmtD(pmt);
-    document.getElementById('pv-totalint').textContent = fmt(total - p);
+    document.getElementById('pv-totalint').textContent = fmt(financeCharge);
     document.getElementById('pv-maturity').textContent = matDate(orig, t);
+    // TILA fields
+    document.getElementById('pv-finance-charge').textContent = fmt(financeCharge);
+    document.getElementById('pv-amount-financed').textContent = fmt(p);
+    document.getElementById('pv-total-payments').textContent = fmt(totalPayments);
+    document.getElementById('pv-total-sale').textContent = fmt(totalSalePrice);
   } else {
-    ['pv-payment','pv-totalint','pv-maturity'].forEach(id => document.getElementById(id).textContent = '—');
+    ['pv-payment','pv-totalint','pv-maturity','pv-finance-charge','pv-amount-financed','pv-total-payments','pv-total-sale'].forEach(id => document.getElementById(id).textContent = '—');
   }
 }
 
@@ -1513,7 +1528,11 @@ function editLoan() { if (currentLoanId) openLoanModal(currentLoanId); }
 // PDF IMPORT
 // ============================================================
 const ARKANSAS_DEFAULTS = {
-  borrower: 'Terra Equity Holdings LLC',
+  borrower: 'Michael Lazar',
+  buyer_address: '950 Seven Hills Drive, Henderson, NV 89052',
+  phone: '501-725-0268',
+  email: 'teraequityml@gmail.com',
+  ssn: '4318', // last 4 of EIN 41-3934318
   sale_price: 13000,
   down_payment: 1450,
   loan_amount: 11550,
@@ -1580,12 +1599,29 @@ async function handlePDFFile(e) {
 
     // Apply Arkansas defaults
     document.getElementById('f-borrower').value = ARKANSAS_DEFAULTS.borrower;
+    document.getElementById('f-buyer-address').value = ARKANSAS_DEFAULTS.buyer_address;
+    document.getElementById('f-phone').value = ARKANSAS_DEFAULTS.phone;
+    document.getElementById('f-email').value = ARKANSAS_DEFAULTS.email;
+    document.getElementById('f-ssn').value = ARKANSAS_DEFAULTS.ssn;
     document.getElementById('f-saleprice').value = ARKANSAS_DEFAULTS.sale_price;
     document.getElementById('f-down').value = ARKANSAS_DEFAULTS.down_payment;
     document.getElementById('f-loanamt').value = ARKANSAS_DEFAULTS.loan_amount;
     document.getElementById('f-rate').value = ARKANSAS_DEFAULTS.rate;
     document.getElementById('f-term').value = ARKANSAS_DEFAULTS.term;
-    document.getElementById('f-origdate').value = new Date().toISOString().split('T')[0];
+
+    // Set origination date to today
+    const today = new Date();
+    document.getElementById('f-origdate').value = today.toISOString().split('T')[0];
+
+    // First payment date = 1st of the following month
+    const firstPay = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    document.getElementById('f-firstpay').value = firstPay.toISOString().split('T')[0];
+    document.getElementById('f-dueday').value = '1';
+
+    // Add note about buyer company
+    const notesEl = document.getElementById('f-notes');
+    const existingNotes = notesEl.value;
+    notesEl.value = (existingNotes ? existingNotes + '\n' : '') + 'Buyer company: Terra Equity Holdings LLC | EIN: 41-3934318';
 
     // Trigger live calculation preview
     updatePreview();
