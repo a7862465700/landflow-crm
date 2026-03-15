@@ -1086,10 +1086,12 @@ async function loadAllData() {
 async function dbSaveLoan(data, id) {
   const row = { ...data, user_id: currentUser.id };
   if (id) {
-    const { data: d } = await sb.from('loans').update(row).eq('id', id).eq('user_id', currentUser.id).select().single();
+    const { data: d, error } = await sb.from('loans').update(row).eq('id', id).eq('user_id', currentUser.id).select().single();
+    if (error) { console.error('dbSaveLoan update error:', error); showToast('Save failed: ' + error.message, 'error'); return null; }
     return d;
   } else {
-    const { data: d } = await sb.from('loans').insert(row).select().single();
+    const { data: d, error } = await sb.from('loans').insert(row).select().single();
+    if (error) { console.error('dbSaveLoan insert error:', error); showToast('Save failed: ' + error.message, 'error'); return null; }
     return d;
   }
 }
@@ -1491,6 +1493,10 @@ async function saveLoan() {
   };
   showToast('Saving…');
   const saved = await dbSaveLoan(data, editingLoanId);
+  if (!saved) {
+    pendingImportPDF = null;
+    return;
+  }
   if (editingLoanId) {
     const idx = loans.findIndex(l => l.id === editingLoanId);
     if (idx >= 0) loans[idx] = saved;
