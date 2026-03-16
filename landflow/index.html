@@ -2299,6 +2299,25 @@ async function vaultDelete(loanId, fileId) {
   renderVault();
 }
 
+async function vaultOpen(loanId, fileId) {
+  const f = vaultFiles.find(x => x.id === fileId);
+  if (!f) return;
+  try {
+    let url;
+    if (f.data && f.data.startsWith('storage:')) {
+      const path = f.data.replace('storage:', '');
+      const { data, error } = await sb.storage.from('vault-files').download(path);
+      if (error) return showToast('Open failed: ' + error.message, 'error');
+      url = URL.createObjectURL(data);
+    } else {
+      url = f.data;
+    }
+    window.open(url, '_blank');
+  } catch (e) {
+    showToast('Open error: ' + (e.message || ''), 'error');
+  }
+}
+
 async function vaultDownload(loanId, fileId) {
   const f = vaultFiles.find(x => x.id === fileId);
   if (!f) return;
@@ -2359,7 +2378,7 @@ function renderFileVault(loanId) {
         html += `<div class="vault-file-row">
           <div class="vault-file-icon">${fileIcon(f.type, f.name)}</div>
           <div style="flex:1;min-width:0">
-            <div class="vault-file-name">${f.name}</div>
+            <div class="vault-file-name" style="cursor:pointer;color:var(--gold)" onclick="vaultOpen('${loanId}','${f.id}')" title="Click to open">${f.name}</div>
             <div class="vault-file-meta">${fmtFileSize(f.size)} · ${new Date(f.created_at||f.uploaded_at||Date.now()).toLocaleDateString()}</div>
             ${cat.id==='recorded' ? `
             <div style="display:flex;gap:6px;margin-top:6px">
@@ -2368,8 +2387,9 @@ function renderFileVault(loanId) {
             </div>` : `<input class="form-input" style="width:100%;font-size:11px;padding:4px 8px;height:26px;margin-top:6px" placeholder="Notes" value="${f.notes||''}" onchange="vaultSaveNote('${loanId}','${f.id}','notes',this.value)">`}
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
-            <button class="btn btn-ghost btn-sm" onclick="vaultDownload('${loanId}','${f.id}')">⬇</button>
-            <button class="btn btn-danger btn-sm" onclick="vaultDelete('${loanId}','${f.id}')">🗑</button>
+            <button class="btn btn-ghost btn-sm" onclick="vaultOpen('${loanId}','${f.id}')" title="Open">👁</button>
+            <button class="btn btn-ghost btn-sm" onclick="vaultDownload('${loanId}','${f.id}')" title="Download">⬇</button>
+            <button class="btn btn-danger btn-sm" onclick="vaultDelete('${loanId}','${f.id}')" title="Delete">🗑</button>
           </div>
         </div>`;
       });
