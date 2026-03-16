@@ -307,7 +307,23 @@ textarea.form-input{resize:vertical;min-height:80px}
 .te-field-btn{display:inline-block;font-family:'DM Sans',sans-serif;font-size:11px;background:var(--golddim);color:var(--gold2);border:1px solid rgba(201,147,58,0.25);border-radius:4px;padding:3px 8px;margin:2px;cursor:pointer;transition:all .15s}
 .te-field-btn:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
 .merge-tag{background:rgba(201,147,58,0.15);color:var(--gold2);border:1px solid rgba(201,147,58,0.3);border-radius:3px;padding:1px 5px;font-family:'DM Sans',sans-serif;font-size:11px;display:inline;white-space:nowrap;user-select:all;font-weight:600}
-@media(max-width:767px){.te-palette{width:100%;border-left:none;border-top:1px solid var(--border);max-height:200px}.te-body{flex-direction:column}.te-editor-pane{padding:16px}.te-editor{padding:24px}}
+/* ── RULER ── */
+.te-ruler-wrap{max-width:860px;margin:0 auto 0;position:sticky;top:0;z-index:10;padding:0}
+.te-ruler{position:relative;height:28px;background:#e8e4de;border:1px solid var(--border);border-bottom:2px solid #c0bbb4;overflow:visible;user-select:none;
+  background-image:repeating-linear-gradient(90deg,transparent,transparent calc(var(--ru) * 0.125 - 0.5px),#ccc8c0 calc(var(--ru) * 0.125 - 0.5px),#ccc8c0 calc(var(--ru) * 0.125 + 0.5px));
+}
+.te-ruler-tick{position:absolute;bottom:0;width:1px;background:#999}
+.te-ruler-tick.major{height:14px;background:#666}
+.te-ruler-tick.half{height:9px}
+.te-ruler-tick.quarter{height:5px;background:#aaa}
+.te-ruler-label{position:absolute;top:2px;font-size:9px;color:#555;font-family:'DM Sans',sans-serif;transform:translateX(-50%);pointer-events:none}
+.te-ruler-handle{position:absolute;cursor:ew-resize;font-size:10px;line-height:1;color:#555;z-index:2;user-select:none;transition:color .15s}
+.te-ruler-handle:hover,.te-ruler-handle.dragging{color:var(--gold)}
+.te-ruler-fl{top:0;transform:translateX(-50%)}
+.te-ruler-li{bottom:0;transform:translateX(-50%)}
+.te-ruler-ri{bottom:0;transform:translateX(-50%)}
+.te-ruler-margin{position:absolute;top:0;bottom:0;background:rgba(0,0,0,0.06)}
+@media(max-width:767px){.te-palette{width:100%;border-left:none;border-top:1px solid var(--border);max-height:200px}.te-body{flex-direction:column}.te-editor-pane{padding:16px}.te-editor{padding:24px}.te-ruler-wrap{display:none !important}}
 
 /* ── EMPTY STATES ── */
 .empty-state{text-align:center;padding:40px 20px;color:var(--text3)}
@@ -902,6 +918,13 @@ textarea.form-input{resize:vertical;min-height:80px}
     </div>
     <div class="te-body">
       <div class="te-editor-pane">
+        <div class="te-ruler-wrap" id="te-ruler-wrap" style="display:none">
+          <div class="te-ruler" id="te-ruler">
+            <div class="te-ruler-handle te-ruler-fl" id="rulerFL" title="First Line Indent">▼</div>
+            <div class="te-ruler-handle te-ruler-li" id="rulerLI" title="Left Indent">▲</div>
+            <div class="te-ruler-handle te-ruler-ri" id="rulerRI" title="Right Indent">▲</div>
+          </div>
+        </div>
         <div class="te-loading" id="te-loading">Loading document…</div>
         <div id="te-editor" contenteditable="true" class="te-editor" style="display:none"></div>
       </div>
@@ -3025,6 +3048,7 @@ async function openTemplateEditor(templateId) {
     highlightMergeTags(editor);
     document.getElementById('te-loading').style.display = 'none';
     editor.style.display = 'block';
+    initRuler();
   } catch (e) {
     console.error('Template editor error:', e);
     showToast('Failed to load template: ' + (e.message || ''), 'error');
@@ -3174,11 +3198,197 @@ function teInsertPageBreak() {
   sel.removeAllRanges(); sel.addRange(range);
 }
 
+// ============================================================
+// RULER (Word-style indentation ruler)
+// ============================================================
+function initRuler() {
+  const ruler = document.getElementById('te-ruler');
+  const wrap = document.getElementById('te-ruler-wrap');
+  const editor = document.getElementById('te-editor');
+  const flH = document.getElementById('rulerFL');
+  const liH = document.getElementById('rulerLI');
+  const riH = document.getElementById('rulerRI');
+
+  wrap.style.display = 'block';
+
+  // Build tick marks — 8.5 inches for letter page
+  ruler.innerHTML = '';
+  ruler.appendChild(flH); ruler.appendChild(liH); ruler.appendChild(riH);
+
+  const totalInches = 8.5;
+  const rulerW = ruler.offsetWidth || 858;
+  const pxPerInch = rulerW / totalInches;
+  ruler.style.setProperty('--ru', pxPerInch + 'px');
+
+  // Page margins: 72px CSS ≈ ~1 inch each side, so content = 6.5 inches (from 1" to 7.5")
+  const marginL = pxPerInch * 1;    // 1 inch left margin
+  const marginR = pxPerInch * 1;    // 1 inch right margin
+  const contentW = rulerW - marginL - marginR;
+
+  // Draw margin shading
+  const lmDiv = document.createElement('div');
+  lmDiv.className = 'te-ruler-margin';
+  lmDiv.style.left = '0'; lmDiv.style.width = marginL + 'px';
+  ruler.appendChild(lmDiv);
+  const rmDiv = document.createElement('div');
+  rmDiv.className = 'te-ruler-margin';
+  rmDiv.style.right = '0'; rmDiv.style.width = marginR + 'px';
+  ruler.appendChild(rmDiv);
+
+  // Draw ticks and labels
+  for (let q = 0; q <= totalInches * 4; q++) {
+    const inch = q / 4;
+    const px = inch * pxPerInch;
+    if (q % 4 === 0) {
+      // Major tick + label
+      const tick = document.createElement('div');
+      tick.className = 'te-ruler-tick major';
+      tick.style.left = px + 'px';
+      ruler.appendChild(tick);
+      if (inch > 0 && inch < totalInches) {
+        const lbl = document.createElement('div');
+        lbl.className = 'te-ruler-label';
+        lbl.style.left = px + 'px';
+        lbl.textContent = inch;
+        ruler.appendChild(lbl);
+      }
+    } else if (q % 2 === 0) {
+      const tick = document.createElement('div');
+      tick.className = 'te-ruler-tick half';
+      tick.style.left = px + 'px';
+      ruler.appendChild(tick);
+    } else {
+      const tick = document.createElement('div');
+      tick.className = 'te-ruler-tick quarter';
+      tick.style.left = px + 'px';
+      ruler.appendChild(tick);
+    }
+  }
+
+  // State
+  let curPara = null;
+
+  function getSelectedParagraph() {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    let node = sel.anchorNode;
+    while (node && node !== editor) {
+      if (node.nodeType === 1 && /^(P|DIV|LI|H[1-6])$/i.test(node.tagName) && editor.contains(node)) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function pxToRulerPx(cssPx) {
+    // Convert CSS px of content margin to ruler position (offset from left margin)
+    return marginL + (cssPx / 72 * pxPerInch); // 72 CSS px ≈ 1 inch
+  }
+
+  function rulerPxToCss(rulerPx) {
+    return Math.max(0, (rulerPx - marginL) / pxPerInch * 72);
+  }
+
+  function updateHandles() {
+    const p = curPara;
+    if (!p) {
+      flH.style.left = marginL + 'px';
+      liH.style.left = marginL + 'px';
+      riH.style.left = (rulerW - marginR) + 'px';
+      return;
+    }
+    const cs = window.getComputedStyle(p);
+    const ml = parseFloat(cs.marginLeft) || 0;
+    const ti = parseFloat(cs.textIndent) || 0;
+    const mr = parseFloat(cs.marginRight) || 0;
+
+    liH.style.left = (marginL + ml / 72 * pxPerInch) + 'px';
+    flH.style.left = (marginL + (ml + ti) / 72 * pxPerInch) + 'px';
+    riH.style.left = (rulerW - marginR - mr / 72 * pxPerInch) + 'px';
+  }
+
+  function onSelChange() {
+    const p = getSelectedParagraph();
+    if (p !== curPara) {
+      curPara = p;
+      updateHandles();
+    }
+  }
+
+  document.addEventListener('selectionchange', onSelChange);
+
+  // Drag logic
+  function makeDraggable(handle, apply) {
+    let startX, startLeft;
+    function onDown(e) {
+      e.preventDefault();
+      handle.classList.add('dragging');
+      startX = e.clientX || e.touches?.[0]?.clientX;
+      startLeft = parseFloat(handle.style.left) || 0;
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onUp);
+    }
+    function onMove(e) {
+      e.preventDefault();
+      const cx = e.clientX || e.touches?.[0]?.clientX;
+      const dx = cx - startX;
+      let newLeft = Math.max(0, Math.min(rulerW, startLeft + dx));
+      // Snap to quarter inches
+      const snapPx = pxPerInch / 4;
+      newLeft = Math.round(newLeft / snapPx) * snapPx;
+      handle.style.left = newLeft + 'px';
+      apply(newLeft);
+    }
+    function onUp() {
+      handle.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
+    }
+    handle.addEventListener('mousedown', onDown);
+    handle.addEventListener('touchstart', onDown, { passive: false });
+  }
+
+  makeDraggable(liH, (px) => {
+    if (!curPara) return;
+    const cssPx = rulerPxToCss(px);
+    curPara.style.marginLeft = cssPx + 'px';
+    // Keep first-line indent relative
+    const flPx = parseFloat(flH.style.left) || marginL;
+    curPara.style.textIndent = ((flPx - px) / pxPerInch * 72) + 'px';
+  });
+
+  makeDraggable(flH, (px) => {
+    if (!curPara) return;
+    const liPx = parseFloat(liH.style.left) || marginL;
+    curPara.style.textIndent = ((px - liPx) / pxPerInch * 72) + 'px';
+  });
+
+  makeDraggable(riH, (px) => {
+    if (!curPara) return;
+    const cssPx = Math.max(0, (rulerW - marginR - px) / pxPerInch * 72);
+    curPara.style.marginRight = cssPx + 'px';
+  });
+
+  // Set initial positions
+  updateHandles();
+
+  // Cleanup function
+  window._rulerCleanup = () => {
+    document.removeEventListener('selectionchange', onSelChange);
+    window._rulerCleanup = null;
+  };
+}
+
 function closeTemplateEditor() {
   document.getElementById('templateEditorOverlay').classList.remove('open');
   document.getElementById('te-editor').innerHTML = '';
+  document.getElementById('te-ruler-wrap').style.display = 'none';
   window._editingTemplateId = null;
   window._originalDocxBytes = null;
+  window._rulerCleanup?.();
 }
 
 async function saveTemplateEditor() {
