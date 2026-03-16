@@ -262,16 +262,6 @@ textarea.form-input{resize:vertical;min-height:80px}
 .amort-table td{padding:5px 8px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border)}
 .amort-table .p{color:var(--green)}.amort-table .i{color:var(--red)}.amort-table .b{color:var(--text)}
 
-/* ── FILE VAULT ── */
-.vault-cat{margin-bottom:16px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.vault-cat-head{padding:10px 14px;background:var(--s2);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
-.vault-cat-title{font-size:13px;font-weight:600}
-.vault-file-row{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start}
-.vault-file-row:last-child{border-bottom:none}
-.vault-file-icon{font-size:18px;flex-shrink:0;margin-top:1px}
-.vault-file-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
-.vault-file-meta{font-size:11px;color:var(--text3);margin-top:1px}
-
 /* ── INVOICE CARDS ── */
 .invoice-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
 .inv-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
@@ -398,9 +388,6 @@ textarea.form-input{resize:vertical;min-height:80px}
     </div>
     <div class="nav-section">
       <div class="nav-label">Documents</div>
-      <div class="nav-item" onclick="nav('vault',this)" data-title="Doc Vault">
-        <span class="nav-icon">🗄</span>Document Vault
-      </div>
       <div class="nav-item" onclick="nav('templates',this)" data-title="Templates">
         <span class="nav-icon">📋</span>Templates
       </div>
@@ -487,12 +474,6 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px" id="investorsGrid"></div>
       </div>
 
-      <!-- VAULT -->
-      <div class="view" id="view-vault">
-        <div class="section-header"><div class="section-title">Document Vault</div></div>
-        <div id="vaultContent"></div>
-      </div>
-
       <!-- TEMPLATES -->
       <div class="view" id="view-templates">
         <div class="section-header">
@@ -533,9 +514,6 @@ textarea.form-input{resize:vertical;min-height:80px}
     </div>
     <div class="bn-item" onclick="nav('invoices',this)" data-title="Invoices">
       <span class="bn-icon">🧾</span>Invoices
-    </div>
-    <div class="bn-item" onclick="nav('vault',this)" data-title="Doc Vault">
-      <span class="bn-icon">🗄</span>Vault
     </div>
     <div class="bn-item" onclick="nav('alerts',this)" data-title="Alerts">
       <span class="bn-icon">🔔</span>Alerts
@@ -903,7 +881,6 @@ textarea.form-input{resize:vertical;min-height:80px}
       <button class="tab-btn" onclick="dpTab('schedule',this)">Schedule</button>
       <button class="tab-btn" onclick="dpTab('history',this)">Payments</button>
       <button class="tab-btn" onclick="dpTab('docs',this)">Docs</button>
-      <button class="tab-btn" onclick="dpTab('files',this)">📁 Files</button>
     </div>
     <div id="dp-tab-details" style="overflow-y:auto">
       <div class="dp-section">
@@ -935,14 +912,6 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="dp-section">
         <div class="dp-section-title">Document Checklist</div>
         <div id="dp-docs"></div>
-      </div>
-    </div>
-    <div id="dp-tab-files" style="display:none;overflow-y:auto">
-      <div class="dp-section">
-        <div class="dp-section-title" style="display:flex;justify-content:space-between;align-items:center">
-          <span>Parcel File Vault</span>
-        </div>
-        <div id="dp-file-vault"></div>
       </div>
     </div>
   </div>
@@ -1221,7 +1190,6 @@ function nav(view, el) {
   if (view === 'payments') renderPaymentLedger();
   if (view === 'buyers') renderBuyers();
   if (view === 'investors') renderInvestors();
-  if (view === 'vault') renderVault();
   if (view === 'templates') renderTemplates();
   if (view === 'alerts') renderAlerts();
   if (view === 'invoices') renderInvoices();
@@ -1690,14 +1658,13 @@ function openDetail(id) {
   document.getElementById('dp-amort-preview').innerHTML = `<table class="amort-table"><thead><tr><th>#</th><th>Date</th><th>Payment</th><th>Principal</th><th>Interest</th><th>Balance</th></tr></thead><tbody>${sched.map(r=>`<tr><td>${r.num}</td><td>${r.date}</td><td>${fmtD(r.payment)}</td><td class="p">${fmtD(r.principal)}</td><td class="i">${fmtD(r.interest)}</td><td class="b">${fmtD(r.balance)}</td></tr>`).join('')}</tbody></table>`;
   renderDpPayments(l);
   renderDpDocs(l);
-  renderFileVault(l.id);
   document.getElementById('detailPanel').classList.add('open');
   document.getElementById('detailOverlay').classList.add('open');
   dpTab('details', document.querySelector('#detailPanel .tab-btn'));
 }
 
 function dpTab(name, btn) {
-  ['details','schedule','history','docs','files'].forEach(t => {
+  ['details','schedule','history','docs'].forEach(t => {
     document.getElementById('dp-tab-'+t).style.display = t === name ? '' : 'none';
   });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1742,20 +1709,13 @@ function renderDpPayments(l) {
 }
 
 function renderDpDocs(l) {
-  const loanFiles = vaultFiles.filter(f => f.loan_id === l.id);
-  const byCategory = {};
-  FILE_CATEGORIES.forEach(c => { byCategory[c.id] = loanFiles.filter(f => f.cat_id === c.id).length; });
-  const total = loanFiles.length;
-  document.getElementById('dp-docs').innerHTML = total === 0
-    ? `<div style="color:var(--text3);font-size:13px;padding:8px 0">No files uploaded yet — click the <strong>📁 Files</strong> tab to upload documents</div>`
-    : FILE_CATEGORIES.map(c => {
-        const count = byCategory[c.id];
-        if (!count) return '';
-        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-          <span>${c.icon} ${c.label}</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--gold)">${count} file${count!==1?'s':''}</span>
-        </div>`;
-      }).join('') + `<div style="padding-top:8px;font-size:12px;color:var(--text3)">${total} total file${total!==1?'s':''}</div>`;
+  const genFiles = vaultFiles.filter(f => f.loan_id === l.id && f.cat_id === 'generated');
+  document.getElementById('dp-docs').innerHTML = genFiles.length === 0
+    ? `<div style="color:var(--text3);font-size:13px;padding:8px 0">No generated documents yet</div>`
+    : genFiles.map(f => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>📄 ${f.name}</span>
+        <button class="btn btn-ghost btn-sm" onclick="vaultDownload('${l.id}','${f.id}')">⬇</button>
+      </div>`).join('') + `<div style="padding-top:8px;font-size:12px;color:var(--text3)">${genFiles.length} generated document${genFiles.length!==1?'s':''}</div>`;
 }
 
 // ============================================================
@@ -2216,91 +2176,8 @@ function renderAlerts() {
 }
 
 // ============================================================
-// DOCUMENT VAULT (status tracking)
+// VAULT UTILITIES (used by templates and generated docs)
 // ============================================================
-function renderVault() {
-  const el = document.getElementById('vaultContent');
-  if (!loans.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🗄</div><div class="empty-title">No loans yet</div><div class="empty-sub">Add loans first</div></div>`;
-    return;
-  }
-  el.innerHTML = loans.map(l => {
-    const loanFiles = vaultFiles.filter(f => f.loan_id === l.id);
-    const totalFiles = loanFiles.length;
-    const recCount = loanFiles.filter(f => f.cat_id === 'recorded').length;
-    return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;cursor:pointer" onclick="openDetail('${l.id}');setTimeout(()=>dpTab('files',document.querySelectorAll('.tab-btn')[4]),200)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div style="font-weight:700;font-size:14px">${l.borrower||'Unnamed'}</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px">${l.id?.slice(0,8).toUpperCase()||''} ${l.parcel?'· Parcel '+l.parcel:''} ${l.county?'· '+l.county+' County':''}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gold)">${totalFiles} file${totalFiles!==1?'s':''}</div>
-          ${recCount?`<div style="font-size:11px;color:var(--green)">${recCount} recorded</div>`:''}
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        ${FILE_CATEGORIES.map(c => {
-          const cnt = loanFiles.filter(f => f.cat_id === c.id).length;
-          return cnt ? `<span style="background:var(--s3);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px">${c.icon} ${c.label}: ${cnt}</span>` : '';
-        }).join('')}
-        ${!totalFiles?`<span style="color:var(--text3);font-size:12px">No files uploaded yet — click to open file vault</span>`:''}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// ============================================================
-// FILE VAULT (per parcel)
-// ============================================================
-const FILE_CATEGORIES = [
-  { id:'recorded', icon:'🏛', label:'Recorded & Stamped' },
-  { id:'notarized', icon:'✍️', label:'Signed & Notarized' },
-  { id:'plats', icon:'🗺', label:'Plats & Maps' },
-  { id:'county', icon:'🏢', label:'County Information' },
-  { id:'photos', icon:'📸', label:'Photos' },
-  { id:'generated', icon:'📄', label:'Generated Documents' },
-  { id:'other', icon:'📎', label:'Other Documents' },
-];
-
-async function vaultUpload(loanId, catId) {
-  const input = document.createElement('input');
-  input.type = 'file'; input.multiple = true; input.accept = '*/*';
-  input.onchange = async () => {
-    let added = 0;
-    for (const f of input.files) {
-      const b64 = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result); r.onerror = rej;
-        r.readAsDataURL(f);
-      });
-      const data = {
-        loan_id: loanId, cat_id: catId,
-        name: f.name, size: f.size, type: f.type,
-        data: b64, book_page: '', notes: '',
-      };
-      showToast('Uploading…');
-      const saved = await dbSaveVaultFile(data);
-      vaultFiles.push(saved);
-      added++;
-    }
-    showToast('✅ ' + added + ' file(s) uploaded', 'success');
-    renderFileVault(loanId);
-    renderDpDocs(loans.find(l => l.id === loanId));
-    renderVault();
-  };
-  input.click();
-}
-
-async function vaultDelete(loanId, fileId) {
-  if (!confirm('Remove this file?')) return;
-  await dbDeleteVaultFile(fileId);
-  vaultFiles = vaultFiles.filter(f => f.id !== fileId);
-  renderFileVault(loanId);
-  renderDpDocs(loans.find(l => l.id === loanId));
-  renderVault();
-}
-
 async function vaultDownload(loanId, fileId) {
   const f = vaultFiles.find(x => x.id === fileId);
   if (!f) return;
@@ -2322,63 +2199,10 @@ async function vaultDownload(loanId, fileId) {
   }
 }
 
-async function vaultSaveNote(loanId, fileId, field, val) {
-  const updates = { [field]: val };
-  await dbUpdateVaultFile(fileId, updates);
-  const f = vaultFiles.find(x => x.id === fileId);
-  if (f) f[field] = val;
-}
-
 function fmtFileSize(b) {
   if (b < 1024) return b + ' B';
   if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
   return (b/1048576).toFixed(1) + ' MB';
-}
-
-function fileIcon(type, name) {
-  if (type?.startsWith('image/')) return '🖼';
-  if (type === 'application/pdf') return '📄';
-  if (type?.includes('word') || name?.endsWith('.docx')) return '📝';
-  return '📎';
-}
-
-function renderFileVault(loanId) {
-  const el = document.getElementById('dp-file-vault');
-  if (!el) return;
-  const allFiles = vaultFiles.filter(f => f.loan_id === loanId);
-  let html = '';
-  FILE_CATEGORIES.forEach(cat => {
-    const catFiles = allFiles.filter(f => f.cat_id === cat.id);
-    html += `<div class="vault-cat">
-      <div class="vault-cat-head">
-        <div class="vault-cat-title">${cat.icon} ${cat.label} <span style="color:var(--text3);font-weight:400">(${catFiles.length})</span></div>
-        <button class="btn btn-ghost btn-sm" onclick="vaultUpload('${loanId}','${cat.id}')">＋ Upload</button>
-      </div>`;
-    if (!catFiles.length) {
-      html += `<div style="padding:10px 14px;color:var(--text3);font-size:12px">No files yet</div>`;
-    } else {
-      catFiles.forEach(f => {
-        html += `<div class="vault-file-row">
-          <div class="vault-file-icon">${fileIcon(f.type, f.name)}</div>
-          <div style="flex:1;min-width:0">
-            <div class="vault-file-name">${f.name}</div>
-            <div class="vault-file-meta">${fmtFileSize(f.size)} · ${new Date(f.created_at||f.uploaded_at||Date.now()).toLocaleDateString()}</div>
-            ${cat.id==='recorded' ? `
-            <div style="display:flex;gap:6px;margin-top:6px">
-              <input class="form-input" style="flex:1;font-size:11px;padding:4px 8px;height:26px" placeholder="Book / Instrument #" value="${f.book_page||''}" onchange="vaultSaveNote('${loanId}','${f.id}','book_page',this.value)">
-              <input class="form-input" style="flex:2;font-size:11px;padding:4px 8px;height:26px" placeholder="Notes" value="${f.notes||''}" onchange="vaultSaveNote('${loanId}','${f.id}','notes',this.value)">
-            </div>` : `<input class="form-input" style="width:100%;font-size:11px;padding:4px 8px;height:26px;margin-top:6px" placeholder="Notes" value="${f.notes||''}" onchange="vaultSaveNote('${loanId}','${f.id}','notes',this.value)">`}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
-            <button class="btn btn-ghost btn-sm" onclick="vaultDownload('${loanId}','${f.id}')">⬇</button>
-            <button class="btn btn-danger btn-sm" onclick="vaultDelete('${loanId}','${f.id}')">🗑</button>
-          </div>
-        </div>`;
-      });
-    }
-    html += `</div>`;
-  });
-  el.innerHTML = html;
 }
 
 // ============================================================
