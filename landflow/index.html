@@ -878,8 +878,9 @@ textarea.form-input{resize:vertical;min-height:80px}
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <span style="font-size:11px;color:var(--text3);margin-right:8px">Headers/footers preserved but not shown here</span>
-        <button class="btn btn-ghost" onclick="closeTemplateEditor()">Cancel</button>
-        <button class="btn btn-gold" onclick="saveTemplateEditor()">💾 Save Template</button>
+        <button class="btn btn-ghost" id="te-undo-btn" onclick="templateUndo()" disabled title="Undo last change">↩ Undo</button>
+        <button class="btn btn-ghost" onclick="closeTemplateEditor()">Close</button>
+        <button class="btn btn-gold" onclick="saveTemplateEditor()">💾 Save</button>
       </div>
     </div>
     <!-- Formatting toolbar removed: all edits now go through Word XML directly -->
@@ -2976,6 +2977,38 @@ function showMergeFieldReference() {
 // ============================================================
 // TEMPLATE EDITOR (in-browser .docx editing with merge fields)
 // ============================================================
+
+// --- Undo stack for template editor ---
+window._teUndoStack = [];
+const TE_MAX_UNDO = 20;
+
+function tePushUndo() {
+  if (!window._currentDocxZip) return;
+  const snapshot = window._currentDocxZip.generate({ type: 'uint8array' });
+  window._teUndoStack.push(snapshot);
+  if (window._teUndoStack.length > TE_MAX_UNDO) window._teUndoStack.shift();
+  const btn = document.getElementById('te-undo-btn');
+  if (btn) btn.disabled = false;
+}
+
+async function templateUndo() {
+  if (!window._teUndoStack.length) return;
+  const prev = window._teUndoStack.pop();
+  window._currentDocxZip = new PizZip(prev.buffer);
+  window._currentDocxBytes = prev;
+  // Re-render preview
+  const editor = document.getElementById('te-editor');
+  editor.innerHTML = '';
+  await docx.renderAsync(prev.buffer, editor, null, {
+    className: 'docx', inWrapper: true, ignoreWidth: false, ignoreHeight: false,
+    ignoreFonts: false, breakPages: true, ignoreLastRenderedPageBreak: false
+  });
+  setupClickToPosition(editor);
+  showToast('Undo successful', 'success');
+  const btn = document.getElementById('te-undo-btn');
+  if (btn) btn.disabled = window._teUndoStack.length === 0;
+}
+
 async function openTemplateEditor(templateId) {
   const t = vaultFiles.find(f => f.id === templateId);
   if (!t) return showToast('Template not found', 'error');
@@ -2986,6 +3019,9 @@ async function openTemplateEditor(templateId) {
   document.getElementById('te-loading').style.display = 'flex';
   document.getElementById('templateEditorOverlay').classList.add('open');
   renderFieldPalette();
+  window._teUndoStack = [];
+  const undoBtn = document.getElementById('te-undo-btn');
+  if (undoBtn) undoBtn.disabled = true;
   try {
     const bytes = await getTemplateBytes(t);
     // Initialize XML-first editing state
@@ -3270,6 +3306,7 @@ function insertMergeField(tag) {
     return;
   }
   if (!window._currentDocxZip) return;
+  tePushUndo();
 
   const { paraIndex, charOffset } = window._insertionPoint;
   const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
@@ -3394,6 +3431,7 @@ function initRuler() {
   // Apply indentation to XML (values in twips)
   function applyXmlIndent(paraIndex, leftTwips, firstLineTwips, rightTwips) {
     if (!window._currentDocxZip) return;
+    tePushUndo();
     const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
     if (!xmlStr) return;
     const parser = new DOMParser();
@@ -3585,7 +3623,6 @@ async function saveTemplateEditor() {
     if (idx >= 0) { vaultFiles[idx].size = blob.size; if (updates.data) vaultFiles[idx].data = updates.data; }
 
     renderTemplates();
-    closeTemplateEditor();
     showToast('Template saved!', 'success');
   } catch (e) {
     console.error('Save template error:', e);
