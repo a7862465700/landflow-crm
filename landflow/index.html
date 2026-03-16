@@ -288,12 +288,8 @@ textarea.form-input{resize:vertical;min-height:80px}
 .template-editor-overlay.open{display:flex}
 .template-editor{width:100%;height:100%;display:flex;flex-direction:column;background:var(--s1)}
 .te-toolbar{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--s2);flex-shrink:0}
-.te-fmt-bar{padding:6px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:4px;background:var(--s1);flex-shrink:0;flex-wrap:wrap}
-.te-fmt-btn{background:none;border:1px solid var(--border);border-radius:4px;padding:4px 10px;cursor:pointer;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;transition:all .15s;min-width:32px;text-align:center}
-.te-fmt-btn:hover{background:var(--golddim);border-color:var(--gold)}
-.te-fmt-btn.active{background:var(--gold);color:#fff;border-color:var(--gold)}
-.te-fmt-sep{width:1px;height:24px;background:var(--border);margin:0 4px}
-.te-fmt-select{background:var(--s1);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;cursor:pointer}
+.te-insert-cursor{position:absolute;width:2px;height:1.2em;background:var(--gold);animation:te-blink 1s step-end infinite;pointer-events:none;z-index:10}
+@keyframes te-blink{0%,100%{opacity:1}50%{opacity:0}}
 .te-body{flex:1;display:flex;overflow:hidden}
 .te-editor-pane{flex:1;overflow-y:auto;padding:40px;background:#f8f6f3}
 .te-editor{max-width:860px;margin:0 auto;min-height:600px;outline:none;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid var(--border);overflow:hidden}
@@ -886,36 +882,7 @@ textarea.form-input{resize:vertical;min-height:80px}
         <button class="btn btn-gold" onclick="saveTemplateEditor()">💾 Save Template</button>
       </div>
     </div>
-    <div class="te-fmt-bar">
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('bold')" title="Bold"><b>B</b></button>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('italic')" title="Italic"><i>I</i></button>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('underline')" title="Underline"><u>U</u></button>
-      <div class="te-fmt-sep"></div>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('justifyLeft')" title="Align Left">⫷</button>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('justifyCenter')" title="Align Center">☰</button>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teFmt('justifyRight')" title="Align Right">⫸</button>
-      <div class="te-fmt-sep"></div>
-      <select class="te-fmt-select" onchange="teFmtFontSize(this.value);this.blur()" title="Font Size">
-        <option value="">Size</option>
-        <option value="1">8pt</option>
-        <option value="2">10pt</option>
-        <option value="3">12pt</option>
-        <option value="4">14pt</option>
-        <option value="5">18pt</option>
-        <option value="6">24pt</option>
-        <option value="7">36pt</option>
-      </select>
-      <select class="te-fmt-select" onchange="teFmtLineHeight(this.value);this.blur()" title="Line Spacing">
-        <option value="">Spacing</option>
-        <option value="1">Single</option>
-        <option value="1.15">1.15</option>
-        <option value="1.5">1.5</option>
-        <option value="2">Double</option>
-      </select>
-      <div class="te-fmt-sep"></div>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teInsertLogo()" title="Insert Logo/Image">🖼 Logo</button>
-      <button class="te-fmt-btn" onmousedown="event.preventDefault();teInsertPageBreak()" title="Insert Page Break">📄 Page Break</button>
-    </div>
+    <!-- Formatting toolbar removed: all edits now go through Word XML directly -->
     <div class="te-body">
       <div class="te-editor-pane">
         <div class="te-ruler-wrap" id="te-ruler-wrap" style="display:none">
@@ -926,7 +893,7 @@ textarea.form-input{resize:vertical;min-height:80px}
           </div>
         </div>
         <div class="te-loading" id="te-loading">Loading document…</div>
-        <div id="te-editor" contenteditable="true" class="te-editor" style="display:none"></div>
+        <div id="te-editor" class="te-editor" style="display:none;cursor:text"></div>
       </div>
       <div class="te-palette">
         <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Click where you want the field in the document, then click a field below to insert it.</div>
@@ -3021,12 +2988,17 @@ async function openTemplateEditor(templateId) {
   renderFieldPalette();
   try {
     const bytes = await getTemplateBytes(t);
-    // Store original bytes for patching on save
-    window._originalDocxBytes = bytes;
+    // Initialize XML-first editing state
+    window._currentDocxZip = new PizZip(bytes.buffer);
+    window._currentDocxBytes = bytes;
+    window._insertionPoint = null;
+    // Consolidate runs for cleaner XML
+    consolidateDocxRuns(window._currentDocxZip);
+    window._currentDocxBytes = new Uint8Array(window._currentDocxZip.generate({ type: 'arraybuffer' }));
     const editor = document.getElementById('te-editor');
     editor.innerHTML = '';
-    // Render with docx-preview for pixel-perfect Word fidelity
-    await docx.renderAsync(bytes.buffer, editor, null, {
+    // Render read-only with docx-preview for pixel-perfect Word fidelity
+    await docx.renderAsync(window._currentDocxBytes.buffer, editor, null, {
       className: 'docx',
       inWrapper: true,
       ignoreWidth: false,
@@ -3040,12 +3012,9 @@ async function openTemplateEditor(templateId) {
       renderFootnotes: true,
       renderEndnotes: true
     });
-    // Make the rendered content editable so user can place cursor and insert fields
-    editor.setAttribute('contenteditable', 'true');
-    // Also make inner sections editable
-    editor.querySelectorAll('section.docx, article').forEach(el => el.setAttribute('contenteditable', 'true'));
-    // Highlight existing {field} merge tags
+    // Preview stays read-only — edits go through XML
     highlightMergeTags(editor);
+    editor.addEventListener('click', handlePreviewClick);
     document.getElementById('te-loading').style.display = 'none';
     editor.style.display = 'block';
     initRuler();
@@ -3094,108 +3063,246 @@ function renderFieldPalette() {
   `).join('');
 }
 
-// Save cursor position whenever selection changes inside the editor
-let _teLastRange = null;
-document.addEventListener('selectionchange', function() {
-  const sel = window.getSelection();
-  if (!sel.rangeCount) return;
-  const editor = document.getElementById('te-editor');
-  if (editor && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-    _teLastRange = sel.getRangeAt(0).cloneRange();
-  }
-});
+// ---- XML-First Template Editing Helpers ----
 
-function insertMergeField(tag) {
+// Consolidate adjacent runs with identical formatting in document.xml
+function consolidateDocxRuns(zip) {
+  const xmlStr = zip.file('word/document.xml')?.asText();
+  if (!xmlStr) return;
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const paras = xmlDoc.getElementsByTagNameNS(ns, 'p');
+  for (let i = 0; i < paras.length; i++) {
+    const runs = Array.from(paras[i].children).filter(el => el.localName === 'r' && el.namespaceURI === ns);
+    for (let j = runs.length - 1; j > 0; j--) {
+      const prev = runs[j - 1], cur = runs[j];
+      const prevRpr = prev.getElementsByTagNameNS(ns, 'rPr')[0];
+      const curRpr = cur.getElementsByTagNameNS(ns, 'rPr')[0];
+      const prevXml = prevRpr ? prevRpr.outerHTML || new XMLSerializer().serializeToString(prevRpr) : '';
+      const curXml = curRpr ? curRpr.outerHTML || new XMLSerializer().serializeToString(curRpr) : '';
+      if (prevXml === curXml) {
+        // Merge text content
+        const prevT = prev.getElementsByTagNameNS(ns, 't')[0];
+        const curT = cur.getElementsByTagNameNS(ns, 't')[0];
+        if (prevT && curT) {
+          prevT.textContent += curT.textContent;
+          prevT.setAttribute('xml:space', 'preserve');
+          paras[i].removeChild(cur);
+          runs.splice(j, 1);
+        }
+      }
+    }
+  }
+  zip.file('word/document.xml', new XMLSerializer().serializeToString(xmlDoc));
+}
+
+// Get all <w:p> elements (including inside tables) in document order
+function getAllDocxParagraphs(xmlDoc) {
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  return Array.from(xmlDoc.getElementsByTagNameNS(ns, 'p'));
+}
+
+// Get full text of a <w:p> element by concatenating all <w:t> content
+function getParaText(wp) {
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const texts = wp.getElementsByTagNameNS(ns, 't');
+  let result = '';
+  for (let i = 0; i < texts.length; i++) result += texts[i].textContent;
+  return result;
+}
+
+// Map a character offset within a paragraph to a specific run index and offset within that run
+function mapOffsetToRun(wp, charOffset) {
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const runs = Array.from(wp.children).filter(el => el.localName === 'r' && el.namespaceURI === ns);
+  let pos = 0;
+  for (let i = 0; i < runs.length; i++) {
+    const t = runs[i].getElementsByTagNameNS(ns, 't')[0];
+    if (!t) continue;
+    const len = t.textContent.length;
+    if (pos + len >= charOffset) {
+      return { runIndex: i, runOffset: charOffset - pos, run: runs[i], tElem: t };
+    }
+    pos += len;
+  }
+  // Past end — return last run, end position
+  if (runs.length > 0) {
+    const lastRun = runs[runs.length - 1];
+    const lastT = lastRun.getElementsByTagNameNS(ns, 't')[0];
+    return { runIndex: runs.length - 1, runOffset: lastT ? lastT.textContent.length : 0, run: lastRun, tElem: lastT };
+  }
+  return null;
+}
+
+// Split a text run and insert merge field text
+function splitRunAndInsert(wp, runInfo, fieldText) {
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const { run, tElem, runOffset } = runInfo;
+  if (!tElem) return;
+  const text = tElem.textContent;
+  const before = text.substring(0, runOffset);
+  const after = text.substring(runOffset);
+  const xmlDoc = wp.ownerDocument;
+
+  // Clone run properties
+  const rPr = run.getElementsByTagNameNS(ns, 'rPr')[0];
+  function makeRun(content) {
+    const newR = xmlDoc.createElementNS(ns, 'w:r');
+    if (rPr) newR.appendChild(rPr.cloneNode(true));
+    const newT = xmlDoc.createElementNS(ns, 'w:t');
+    newT.setAttribute('xml:space', 'preserve');
+    newT.textContent = content;
+    newR.appendChild(newT);
+    return newR;
+  }
+
+  const parent = run.parentNode;
+  const nextSibling = run.nextSibling;
+
+  // Remove original run
+  parent.removeChild(run);
+
+  // Insert: before-run, field-run, after-run (skip empty)
+  const toInsert = [];
+  if (before) toInsert.push(makeRun(before));
+  toInsert.push(makeRun(fieldText));
+  if (after) toInsert.push(makeRun(after));
+
+  for (const r of toInsert) {
+    if (nextSibling) parent.insertBefore(r, nextSibling);
+    else parent.appendChild(r);
+  }
+}
+
+// Re-render the preview from current zip state
+async function reRenderPreview() {
   const editor = document.getElementById('te-editor');
-  const sel = window.getSelection();
+  // Remove old click handler to avoid duplicates
+  editor.removeEventListener('click', handlePreviewClick);
+  editor.innerHTML = '';
+  await docx.renderAsync(window._currentDocxBytes.buffer, editor, null, {
+    className: 'docx', inWrapper: true, ignoreWidth: false, ignoreHeight: false,
+    ignoreFonts: false, breakPages: true, ignoreLastRenderedPageBreak: false,
+    experimental: true, renderHeaders: true, renderFooters: true,
+    renderFootnotes: true, renderEndnotes: true
+  });
+  highlightMergeTags(editor);
+  editor.addEventListener('click', handlePreviewClick);
+  // Remove visual cursor
+  const oldCursor = document.querySelector('.te-insert-cursor');
+  if (oldCursor) oldCursor.remove();
+  window._insertionPoint = null;
+}
+
+// Handle click on the read-only preview to set insertion point
+function handlePreviewClick(event) {
+  const editor = document.getElementById('te-editor');
+  // Find the clicked text position using browser caret API
   let range;
-  // Use the saved cursor position if available
-  if (_teLastRange && editor.contains(_teLastRange.commonAncestorContainer)) {
-    range = _teLastRange;
-  } else if (sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-    range = sel.getRangeAt(0);
-  } else {
-    // Fallback: place at end of editor
-    editor.focus();
-    range = document.createRange();
-    range.selectNodeContents(editor);
-    range.collapse(false);
+  if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(event.clientX, event.clientY);
+  } else if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(event.clientX, event.clientY);
+    if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); }
   }
-  sel.removeAllRanges();
-  sel.addRange(range);
-  // Create merge tag span
-  const span = document.createElement('span');
-  span.className = 'merge-tag';
-  span.contentEditable = 'false';
-  span.textContent = '{' + tag + '}';
-  range.deleteContents();
-  range.insertNode(span);
-  // Move cursor after the span with a zero-width space so cursor can land there
-  const spacer = document.createTextNode('\u200B');
-  range.setStartAfter(span);
-  range.collapse(true);
-  range.insertNode(spacer);
-  range.setStartAfter(spacer);
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
+  if (!range || !range.startContainer) return;
+
+  // Find the paragraph-level element in docx-preview DOM
+  let paraEl = range.startContainer;
+  if (paraEl.nodeType === 3) paraEl = paraEl.parentElement;
+  // Walk up to find the paragraph element rendered by docx-preview
+  while (paraEl && paraEl !== editor) {
+    if (paraEl.matches && paraEl.matches('p, h1, h2, h3, h4, h5, h6, li')) break;
+    paraEl = paraEl.parentElement;
+  }
+  if (!paraEl || paraEl === editor) return;
+
+  // Get the paragraph's full text and the offset within it
+  const paraText = paraEl.textContent;
+  let clickOffset = 0;
+  // Walk text nodes in the paragraph to compute offset up to click position
+  const tw = document.createTreeWalker(paraEl, NodeFilter.SHOW_TEXT, null, false);
+  let node;
+  while ((node = tw.nextNode())) {
+    if (node === range.startContainer) {
+      clickOffset += range.startOffset;
+      break;
+    }
+    clickOffset += node.textContent.length;
+  }
+
+  // Find the matching paragraph index in the rendered DOM
+  const allRenderedParas = editor.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li');
+  let paraIndex = -1;
+  for (let i = 0; i < allRenderedParas.length; i++) {
+    if (allRenderedParas[i] === paraEl) { paraIndex = i; break; }
+  }
+  if (paraIndex < 0) return;
+
+  // Store insertion point
+  window._insertionPoint = { paraIndex, charOffset: clickOffset, paraText };
+
+  // Show visual cursor indicator
+  let cursor = document.querySelector('.te-insert-cursor');
+  if (!cursor) {
+    cursor = document.createElement('div');
+    cursor.className = 'te-insert-cursor';
+    document.body.appendChild(cursor);
+  }
+  const rng = range.cloneRange();
+  rng.collapse(true);
+  const rect = rng.getClientRects()[0] || paraEl.getBoundingClientRect();
+  cursor.style.left = rect.left + 'px';
+  cursor.style.top = rect.top + 'px';
+  cursor.style.height = (rect.height || 16) + 'px';
+  cursor.style.display = 'block';
+
+  // Also update ruler target paragraph
+  window._rulerParaIndex = paraIndex;
+  if (typeof updateRulerFromXml === 'function') updateRulerFromXml(paraIndex);
 }
 
-// Formatting toolbar functions
-function teFmt(cmd) { document.execCommand(cmd, false, null); }
-function teFmtFontSize(val) { if (val) document.execCommand('fontSize', false, val); }
-function teFmtLineHeight(val) {
-  if (!val) return;
-  const sel = window.getSelection();
-  if (!sel.rangeCount) return;
-  // Apply line-height to the selected block element(s)
-  let node = sel.getRangeAt(0).commonAncestorContainer;
-  if (node.nodeType === 3) node = node.parentElement;
-  const block = node.closest('p,div,li,h1,h2,h3,h4,h5,h6,td') || node;
-  block.style.lineHeight = val;
-}
-function teInsertLogo() {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*';
-  input.onchange = () => {
-    const f = input.files[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const editor = document.getElementById('te-editor');
-      const sel = window.getSelection();
-      let range = _teLastRange && editor.contains(_teLastRange.commonAncestorContainer) ? _teLastRange : null;
-      if (!range && sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) range = sel.getRangeAt(0);
-      if (!range) { range = document.createRange(); range.selectNodeContents(editor); range.collapse(true); }
-      sel.removeAllRanges(); sel.addRange(range);
-      const img = document.createElement('img');
-      img.src = reader.result;
-      img.style.maxWidth = '300px';
-      img.style.height = 'auto';
-      img.style.display = 'block';
-      img.style.margin = '8px 0';
-      range.deleteContents();
-      range.insertNode(img);
-      range.setStartAfter(img); range.collapse(true);
-      sel.removeAllRanges(); sel.addRange(range);
-    };
-    reader.readAsDataURL(f);
-  };
-  input.click();
-}
-function teInsertPageBreak() {
-  const editor = document.getElementById('te-editor');
-  const sel = window.getSelection();
-  let range = _teLastRange && editor.contains(_teLastRange.commonAncestorContainer) ? _teLastRange : null;
-  if (!range && sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) range = sel.getRangeAt(0);
-  if (!range) { range = document.createRange(); range.selectNodeContents(editor); range.collapse(false); }
-  sel.removeAllRanges(); sel.addRange(range);
-  const hr = document.createElement('hr');
-  hr.className = 'page-break';
-  range.deleteContents();
-  range.insertNode(hr);
-  range.setStartAfter(hr); range.collapse(true);
-  sel.removeAllRanges(); sel.addRange(range);
+// Insert merge field at the current insertion point in the XML
+function insertMergeField(tag) {
+  if (!window._insertionPoint) {
+    showToast('Click in the document first to choose where to insert the field.', 'error');
+    return;
+  }
+  if (!window._currentDocxZip) return;
+
+  const { paraIndex, charOffset } = window._insertionPoint;
+  const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
+  if (!xmlStr) return;
+
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+  const allParas = getAllDocxParagraphs(xmlDoc);
+
+  if (paraIndex >= allParas.length) {
+    showToast('Could not find target paragraph in document', 'error');
+    return;
+  }
+
+  const wp = allParas[paraIndex];
+  const runInfo = mapOffsetToRun(wp, charOffset);
+  if (!runInfo) {
+    // Empty paragraph — create a new run with the field
+    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const newR = xmlDoc.createElementNS(ns, 'w:r');
+    const newT = xmlDoc.createElementNS(ns, 'w:t');
+    newT.textContent = '{' + tag + '}';
+    newR.appendChild(newT);
+    wp.appendChild(newR);
+  } else {
+    splitRunAndInsert(wp, runInfo, '{' + tag + '}');
+  }
+
+  // Write back to zip and re-render
+  const serialized = new XMLSerializer().serializeToString(xmlDoc);
+  window._currentDocxZip.file('word/document.xml', serialized);
+  window._currentDocxBytes = new Uint8Array(window._currentDocxZip.generate({ type: 'arraybuffer' }));
+  reRenderPreview();
 }
 
 // ============================================================
@@ -3220,10 +3327,8 @@ function initRuler() {
   const pxPerInch = rulerW / totalInches;
   ruler.style.setProperty('--ru', pxPerInch + 'px');
 
-  // Page margins: 72px CSS ≈ ~1 inch each side, so content = 6.5 inches (from 1" to 7.5")
-  const marginL = pxPerInch * 1;    // 1 inch left margin
-  const marginR = pxPerInch * 1;    // 1 inch right margin
-  const contentW = rulerW - marginL - marginR;
+  const marginL = pxPerInch * 1;
+  const marginR = pxPerInch * 1;
 
   // Draw margin shading
   const lmDiv = document.createElement('div');
@@ -3240,7 +3345,6 @@ function initRuler() {
     const inch = q / 4;
     const px = inch * pxPerInch;
     if (q % 4 === 0) {
-      // Major tick + label
       const tick = document.createElement('div');
       tick.className = 'te-ruler-tick major';
       tick.style.left = px + 'px';
@@ -3265,59 +3369,90 @@ function initRuler() {
     }
   }
 
-  // State
-  let curPara = null;
+  // Read indentation from XML for a given paragraph index
+  function readXmlIndent(paraIndex) {
+    if (!window._currentDocxZip) return { left: 0, firstLine: 0, right: 0 };
+    const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
+    if (!xmlStr) return { left: 0, firstLine: 0, right: 0 };
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const allParas = xmlDoc.getElementsByTagNameNS(ns, 'p');
+    if (paraIndex >= allParas.length) return { left: 0, firstLine: 0, right: 0 };
+    const wp = allParas[paraIndex];
+    const pPr = wp.getElementsByTagNameNS(ns, 'pPr')[0];
+    if (!pPr) return { left: 0, firstLine: 0, right: 0 };
+    const ind = pPr.getElementsByTagNameNS(ns, 'ind')[0];
+    if (!ind) return { left: 0, firstLine: 0, right: 0 };
+    return {
+      left: parseInt(ind.getAttribute('w:left') || '0', 10),
+      firstLine: parseInt(ind.getAttribute('w:firstLine') || '0', 10),
+      right: parseInt(ind.getAttribute('w:right') || '0', 10)
+    };
+  }
 
-  function getSelectedParagraph() {
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return null;
-    let node = sel.anchorNode;
-    while (node && node !== editor) {
-      if (node.nodeType === 1 && /^(P|DIV|LI|H[1-6])$/i.test(node.tagName) && editor.contains(node)) return node;
-      node = node.parentNode;
+  // Apply indentation to XML (values in twips)
+  function applyXmlIndent(paraIndex, leftTwips, firstLineTwips, rightTwips) {
+    if (!window._currentDocxZip) return;
+    const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
+    if (!xmlStr) return;
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const allParas = xmlDoc.getElementsByTagNameNS(ns, 'p');
+    if (paraIndex >= allParas.length) return;
+    const wp = allParas[paraIndex];
+    let pPr = wp.getElementsByTagNameNS(ns, 'pPr')[0];
+    if (!pPr) {
+      pPr = xmlDoc.createElementNS(ns, 'w:pPr');
+      wp.insertBefore(pPr, wp.firstChild);
     }
-    return null;
+    let ind = pPr.getElementsByTagNameNS(ns, 'ind')[0];
+    if (!ind) {
+      ind = xmlDoc.createElementNS(ns, 'w:ind');
+      pPr.appendChild(ind);
+    }
+    ind.setAttribute('w:left', Math.round(Math.max(0, leftTwips)).toString());
+    ind.setAttribute('w:firstLine', Math.round(Math.max(0, firstLineTwips)).toString());
+    ind.setAttribute('w:right', Math.round(Math.max(0, rightTwips)).toString());
+    // Remove hanging if we're setting firstLine
+    ind.removeAttribute('w:hanging');
+
+    const serialized = new XMLSerializer().serializeToString(xmlDoc);
+    window._currentDocxZip.file('word/document.xml', serialized);
+    window._currentDocxBytes = new Uint8Array(window._currentDocxZip.generate({ type: 'arraybuffer' }));
   }
 
-  function pxToRulerPx(cssPx) {
-    // Convert CSS px of content margin to ruler position (offset from left margin)
-    return marginL + (cssPx / 72 * pxPerInch); // 72 CSS px ≈ 1 inch
+  function twipsToRulerPx(twips) {
+    return marginL + (twips / 1440) * pxPerInch;
   }
 
-  function rulerPxToCss(rulerPx) {
-    return Math.max(0, (rulerPx - marginL) / pxPerInch * 72);
+  function rulerPxToTwips(rulerPx) {
+    return Math.max(0, ((rulerPx - marginL) / pxPerInch) * 1440);
   }
 
   function updateHandles() {
-    const p = curPara;
-    if (!p) {
+    const pi = window._rulerParaIndex;
+    if (pi == null || pi < 0) {
       flH.style.left = marginL + 'px';
       liH.style.left = marginL + 'px';
       riH.style.left = (rulerW - marginR) + 'px';
       return;
     }
-    const cs = window.getComputedStyle(p);
-    const ml = parseFloat(cs.marginLeft) || 0;
-    const ti = parseFloat(cs.textIndent) || 0;
-    const mr = parseFloat(cs.marginRight) || 0;
-
-    liH.style.left = (marginL + ml / 72 * pxPerInch) + 'px';
-    flH.style.left = (marginL + (ml + ti) / 72 * pxPerInch) + 'px';
-    riH.style.left = (rulerW - marginR - mr / 72 * pxPerInch) + 'px';
+    const indent = readXmlIndent(pi);
+    liH.style.left = twipsToRulerPx(indent.left) + 'px';
+    flH.style.left = twipsToRulerPx(indent.left + indent.firstLine) + 'px';
+    riH.style.left = (rulerW - marginR - (indent.right / 1440) * pxPerInch) + 'px';
   }
 
-  function onSelChange() {
-    const p = getSelectedParagraph();
-    if (p !== curPara) {
-      curPara = p;
-      updateHandles();
-    }
-  }
-
-  document.addEventListener('selectionchange', onSelChange);
+  // Expose for handlePreviewClick
+  window.updateRulerFromXml = function(paraIndex) {
+    window._rulerParaIndex = paraIndex;
+    updateHandles();
+  };
 
   // Drag logic
-  function makeDraggable(handle, apply) {
+  function makeDraggable(handle, onDragEnd) {
     let startX, startLeft;
     function onDown(e) {
       e.preventDefault();
@@ -3334,11 +3469,9 @@ function initRuler() {
       const cx = e.clientX || e.touches?.[0]?.clientX;
       const dx = cx - startX;
       let newLeft = Math.max(0, Math.min(rulerW, startLeft + dx));
-      // Snap to quarter inches
       const snapPx = pxPerInch / 4;
       newLeft = Math.round(newLeft / snapPx) * snapPx;
       handle.style.left = newLeft + 'px';
-      apply(newLeft);
     }
     function onUp() {
       handle.classList.remove('dragging');
@@ -3346,30 +3479,48 @@ function initRuler() {
       document.removeEventListener('mouseup', onUp);
       document.removeEventListener('touchmove', onMove);
       document.removeEventListener('touchend', onUp);
+      onDragEnd();
     }
     handle.addEventListener('mousedown', onDown);
     handle.addEventListener('touchstart', onDown, { passive: false });
   }
 
-  makeDraggable(liH, (px) => {
-    if (!curPara) return;
-    const cssPx = rulerPxToCss(px);
-    curPara.style.marginLeft = cssPx + 'px';
-    // Keep first-line indent relative
+  makeDraggable(liH, () => {
+    const pi = window._rulerParaIndex;
+    if (pi == null) return;
+    const leftTwips = rulerPxToTwips(parseFloat(liH.style.left) || marginL);
     const flPx = parseFloat(flH.style.left) || marginL;
-    curPara.style.textIndent = ((flPx - px) / pxPerInch * 72) + 'px';
+    const firstLineTwips = Math.max(0, rulerPxToTwips(flPx) - leftTwips);
+    const riPx = parseFloat(riH.style.left) || (rulerW - marginR);
+    const rightTwips = Math.max(0, ((rulerW - marginR - riPx) / pxPerInch) * 1440);
+    applyXmlIndent(pi, leftTwips, firstLineTwips, rightTwips);
+    reRenderPreview();
   });
 
-  makeDraggable(flH, (px) => {
-    if (!curPara) return;
+  makeDraggable(flH, () => {
+    const pi = window._rulerParaIndex;
+    if (pi == null) return;
     const liPx = parseFloat(liH.style.left) || marginL;
-    curPara.style.textIndent = ((px - liPx) / pxPerInch * 72) + 'px';
+    const leftTwips = rulerPxToTwips(liPx);
+    const flPx = parseFloat(flH.style.left) || marginL;
+    const firstLineTwips = Math.max(0, rulerPxToTwips(flPx) - leftTwips);
+    const riPx = parseFloat(riH.style.left) || (rulerW - marginR);
+    const rightTwips = Math.max(0, ((rulerW - marginR - riPx) / pxPerInch) * 1440);
+    applyXmlIndent(pi, leftTwips, firstLineTwips, rightTwips);
+    reRenderPreview();
   });
 
-  makeDraggable(riH, (px) => {
-    if (!curPara) return;
-    const cssPx = Math.max(0, (rulerW - marginR - px) / pxPerInch * 72);
-    curPara.style.marginRight = cssPx + 'px';
+  makeDraggable(riH, () => {
+    const pi = window._rulerParaIndex;
+    if (pi == null) return;
+    const liPx = parseFloat(liH.style.left) || marginL;
+    const leftTwips = rulerPxToTwips(liPx);
+    const flPx = parseFloat(flH.style.left) || marginL;
+    const firstLineTwips = Math.max(0, rulerPxToTwips(flPx) - leftTwips);
+    const riPx = parseFloat(riH.style.left) || (rulerW - marginR);
+    const rightTwips = Math.max(0, ((rulerW - marginR - riPx) / pxPerInch) * 1440);
+    applyXmlIndent(pi, leftTwips, firstLineTwips, rightTwips);
+    reRenderPreview();
   });
 
   // Set initial positions
@@ -3377,17 +3528,26 @@ function initRuler() {
 
   // Cleanup function
   window._rulerCleanup = () => {
-    document.removeEventListener('selectionchange', onSelChange);
+    window.updateRulerFromXml = null;
+    window._rulerParaIndex = null;
     window._rulerCleanup = null;
   };
 }
 
 function closeTemplateEditor() {
   document.getElementById('templateEditorOverlay').classList.remove('open');
-  document.getElementById('te-editor').innerHTML = '';
+  const editor = document.getElementById('te-editor');
+  editor.removeEventListener('click', handlePreviewClick);
+  editor.innerHTML = '';
   document.getElementById('te-ruler-wrap').style.display = 'none';
+  // Remove visual cursor
+  const cursor = document.querySelector('.te-insert-cursor');
+  if (cursor) cursor.remove();
   window._editingTemplateId = null;
-  window._originalDocxBytes = null;
+  window._currentDocxZip = null;
+  window._currentDocxBytes = null;
+  window._insertionPoint = null;
+  window._rulerParaIndex = null;
   window._rulerCleanup?.();
 }
 
@@ -3395,118 +3555,14 @@ async function saveTemplateEditor() {
   const templateId = window._editingTemplateId;
   const t = vaultFiles.find(f => f.id === templateId);
   if (!t) return showToast('Template not found', 'error');
+  if (!window._currentDocxZip) return showToast('No document loaded', 'error');
   showToast('Saving template…');
   try {
-    // Extract merge fields from the editor HTML
-    const div = document.createElement('div');
-    div.innerHTML = document.getElementById('te-editor').innerHTML;
-    const editorText = div.textContent.replace(/\u200B/g, '');
-    // Collect all {field} tags from the edited content
-    const fieldMatches = editorText.match(/\{[a-zA-Z0-9_]+\}/g) || [];
-
-    // Use the stored ORIGINAL .docx bytes (not the rendered HTML)
-    const bytes = window._originalDocxBytes || await getTemplateBytes(t);
-    const zip = new PizZip(bytes.buffer);
-
-    // Get the document.xml content
-    const xmlFiles = ['word/document.xml', 'word/header1.xml', 'word/header2.xml', 'word/footer1.xml', 'word/footer2.xml'];
-
-    // For each field found in the editor, ensure it exists in the .docx XML
-    // The editor is used to PLACE fields — we scan the editor to build a mapping
-    // of what text was replaced with merge fields, then patch the original XML
-
-    // Simpler approach: extract the full text with merge fields from the editor,
-    // and for each paragraph, find the corresponding paragraph in the XML and
-    // inject any new {field} tags that weren't there before
-
-    // Simplest reliable approach: directly modify document.xml to insert merge fields
-    // by finding text runs and replacing literal text with {field} tags
-    // This works because the user places {field} in the HTML editor at the right spots
-
-    // Build a list of new fields to inject by comparing editor content to original
-    const docXml = zip.file('word/document.xml')?.asText();
-    if (!docXml) throw new Error('Cannot read document.xml');
-
-    // Extract text content from editor, paragraph by paragraph
-    const editorParas = [];
-    div.querySelectorAll('p').forEach(p => {
-      editorParas.push(p.textContent.replace(/\u200B/g, '').trim());
+    // All edits already live in _currentDocxZip — just generate and upload
+    const blob = window._currentDocxZip.generate({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     });
-    // If no <p> tags (plain text), split by line
-    if (!editorParas.length) {
-      editorText.split('\n').forEach(line => editorParas.push(line.trim()));
-    }
-
-    // Find all {field} patterns that the user added in the editor
-    const newFields = new Set(fieldMatches);
-
-    // Check which fields already exist in the original XML
-    const existingFields = new Set();
-    const existingMatches = docXml.match(/\{[a-zA-Z0-9_]+\}/g) || [];
-    existingMatches.forEach(f => existingFields.add(f));
-
-    // Fields that need to be added to the document
-    const fieldsToAdd = [...newFields].filter(f => !existingFields.has(f));
-
-    if (fieldsToAdd.length === 0 && newFields.size > 0) {
-      // All fields already exist in the original — nothing to patch
-      closeTemplateEditor();
-      showToast('Template already has all merge fields!', 'success');
-      return;
-    }
-
-    if (fieldsToAdd.length === 0 && newFields.size === 0) {
-      closeTemplateEditor();
-      showToast('No merge fields found to save. Insert fields using the palette.', 'error');
-      return;
-    }
-
-    // For fields that need adding: scan editor paragraphs to find where each field
-    // was placed, identify the surrounding text context, then find and patch the XML
-    let patchedXml = docXml;
-    for (const field of fieldsToAdd) {
-      // Find the paragraph in the editor that contains this field
-      for (const para of editorParas) {
-        if (!para.includes(field)) continue;
-        // Get the text before and after the field in the editor paragraph
-        const fieldIdx = para.indexOf(field);
-        const before = para.substring(Math.max(0, fieldIdx - 40), fieldIdx).trim();
-        const after = para.substring(fieldIdx + field.length, fieldIdx + field.length + 40).trim();
-
-        // Try to find this context in the XML and insert the field
-        // XML text runs look like: <w:t>some text</w:t>
-        // We need to find the <w:t> that contains the text near where the field should go
-
-        if (before.length > 3) {
-          // Find the "before" text in XML (may be split across runs)
-          // Look for the last few words before the field
-          const searchText = before.slice(-20);
-          const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          // Try to find and append the field after the matching text
-          const regex = new RegExp('(' + escapedSearch + ')', 'g');
-          if (regex.test(patchedXml)) {
-            patchedXml = patchedXml.replace(regex, '$1' + field);
-            break;
-          }
-        }
-        if (after.length > 3) {
-          // Insert field before the "after" text
-          const searchText = after.slice(0, 20);
-          const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const regex = new RegExp('(' + escapedSearch + ')', 'g');
-          if (regex.test(patchedXml)) {
-            patchedXml = patchedXml.replace(regex, field + '$1');
-            break;
-          }
-        }
-      }
-    }
-
-    // Write patched XML back to the zip
-    zip.file('word/document.xml', patchedXml);
-
-    // Generate the patched .docx as a blob
-    const blob = zip.generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 
     // Upload to Supabase Storage
     let storagePath;
@@ -3530,7 +3586,7 @@ async function saveTemplateEditor() {
 
     renderTemplates();
     closeTemplateEditor();
-    showToast('Template saved — ' + fieldsToAdd.length + ' new field(s) added!', 'success');
+    showToast('Template saved!', 'success');
   } catch (e) {
     console.error('Save template error:', e);
     showToast('Save failed: ' + (e.message || 'Unknown error'), 'error');
