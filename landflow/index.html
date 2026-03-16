@@ -12,7 +12,8 @@
 <script src="https://unpkg.com/pizzip@3.2.0/dist/pizzip.js"></script>
 <script src="https://unpkg.com/docxtemplater@3.68.3/build/docxtemplater.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
+<script src="docx-editor-bundle.js"></script>
+<link rel="stylesheet" href="docx-editor-styles.css">
 <style>
 :root {
   /* ── Light theme (main area) ── */
@@ -288,14 +289,9 @@ textarea.form-input{resize:vertical;min-height:80px}
 .template-editor-overlay.open{display:flex}
 .template-editor{width:100%;height:100%;display:flex;flex-direction:column;background:var(--s1)}
 .te-toolbar{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--s2);flex-shrink:0}
-.te-insert-cursor{position:absolute;width:2px;height:1.2em;background:var(--gold);animation:te-blink 1s step-end infinite;pointer-events:none;z-index:10}
-@keyframes te-blink{0%,100%{opacity:1}50%{opacity:0}}
 .te-body{flex:1;display:flex;overflow:hidden}
-.te-editor-pane{flex:1;overflow-y:auto;padding:40px;background:#f8f6f3}
-.te-editor{max-width:860px;margin:0 auto;min-height:600px;outline:none;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid var(--border);overflow:hidden}
-.te-editor .docx-wrapper{background:#fff !important;padding:0 !important}
-.te-editor .docx-wrapper>section.docx{margin:0 auto !important;padding:60px 72px !important;box-shadow:none !important;min-height:auto !important;margin-bottom:20px !important;border-bottom:2px dashed var(--border) !important}
-.te-editor .docx-wrapper>section.docx:last-child{border-bottom:none !important;margin-bottom:0 !important}
+.te-editor-pane{flex:1;overflow:hidden;background:#f8f6f3}
+.te-editor{width:100%;height:100%}
 .te-loading{display:flex;align-items:center;justify-content:center;flex:1;color:var(--text3);font-size:15px}
 .te-palette{width:280px;flex-shrink:0;border-left:1px solid var(--border);background:var(--s2);overflow-y:auto;padding:16px}
 .te-section-title{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);font-weight:700;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
@@ -303,23 +299,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .te-field-btn{display:inline-block;font-family:'DM Sans',sans-serif;font-size:11px;background:var(--golddim);color:var(--gold2);border:1px solid rgba(201,147,58,0.25);border-radius:4px;padding:3px 8px;margin:2px;cursor:pointer;transition:all .15s}
 .te-field-btn:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
 .merge-tag{background:rgba(201,147,58,0.15);color:var(--gold2);border:1px solid rgba(201,147,58,0.3);border-radius:3px;padding:1px 5px;font-family:'DM Sans',sans-serif;font-size:11px;display:inline;white-space:nowrap;user-select:all;font-weight:600}
-/* ── RULER ── */
-.te-ruler-wrap{max-width:860px;margin:0 auto 0;position:sticky;top:0;z-index:10;padding:0}
-.te-ruler{position:relative;height:28px;background:#e8e4de;border:1px solid var(--border);border-bottom:2px solid #c0bbb4;overflow:visible;user-select:none;
-  background-image:repeating-linear-gradient(90deg,transparent,transparent calc(var(--ru) * 0.125 - 0.5px),#ccc8c0 calc(var(--ru) * 0.125 - 0.5px),#ccc8c0 calc(var(--ru) * 0.125 + 0.5px));
-}
-.te-ruler-tick{position:absolute;bottom:0;width:1px;background:#999}
-.te-ruler-tick.major{height:14px;background:#666}
-.te-ruler-tick.half{height:9px}
-.te-ruler-tick.quarter{height:5px;background:#aaa}
-.te-ruler-label{position:absolute;top:2px;font-size:9px;color:#555;font-family:'DM Sans',sans-serif;transform:translateX(-50%);pointer-events:none}
-.te-ruler-handle{position:absolute;cursor:ew-resize;font-size:10px;line-height:1;color:#555;z-index:2;user-select:none;transition:color .15s}
-.te-ruler-handle:hover,.te-ruler-handle.dragging{color:var(--gold)}
-.te-ruler-fl{top:0;transform:translateX(-50%)}
-.te-ruler-li{bottom:0;transform:translateX(-50%)}
-.te-ruler-ri{bottom:0;transform:translateX(-50%)}
-.te-ruler-margin{position:absolute;top:0;bottom:0;background:rgba(0,0,0,0.06)}
-@media(max-width:767px){.te-palette{width:100%;border-left:none;border-top:1px solid var(--border);max-height:200px}.te-body{flex-direction:column}.te-editor-pane{padding:16px}.te-editor{padding:24px}.te-ruler-wrap{display:none !important}}
+@media(max-width:767px){.te-palette{width:100%;border-left:none;border-top:1px solid var(--border);max-height:200px}.te-body{flex-direction:column}}
 
 /* ── EMPTY STATES ── */
 .empty-state{text-align:center;padding:40px 20px;color:var(--text3)}
@@ -877,25 +857,14 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div style="font-size:11px;color:var(--text3);margin-top:2px" id="te-subtitle"></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <span style="font-size:11px;color:var(--text3);margin-right:8px">Headers/footers preserved but not shown here</span>
-        <button class="btn btn-ghost" id="te-undo-btn" onclick="templateUndo()" disabled title="Undo last change">↩ Undo</button>
-        <button class="btn btn-ghost" id="te-delete-btn" onclick="templateDeleteSelected()" disabled title="Delete highlighted text">✕ Delete</button>
         <button class="btn btn-ghost" onclick="closeTemplateEditor()">Close</button>
         <button class="btn btn-gold" onclick="saveTemplateEditor()">💾 Save</button>
       </div>
     </div>
-    <!-- Formatting toolbar removed: all edits now go through Word XML directly -->
     <div class="te-body">
       <div class="te-editor-pane">
-        <div class="te-ruler-wrap" id="te-ruler-wrap" style="display:none">
-          <div class="te-ruler" id="te-ruler">
-            <div class="te-ruler-handle te-ruler-fl" id="rulerFL" title="First Line Indent">▼</div>
-            <div class="te-ruler-handle te-ruler-li" id="rulerLI" title="Left Indent">▲</div>
-            <div class="te-ruler-handle te-ruler-ri" id="rulerRI" title="Right Indent">▲</div>
-          </div>
-        </div>
         <div class="te-loading" id="te-loading">Loading document…</div>
-        <div id="te-editor" class="te-editor" style="display:none;cursor:text"></div>
+        <div id="te-editor" class="te-editor" style="display:none"></div>
       </div>
       <div class="te-palette">
         <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Click where you want the field in the document, then click a field below to insert it.</div>
@@ -2979,37 +2948,11 @@ function showMergeFieldReference() {
 // TEMPLATE EDITOR (in-browser .docx editing with merge fields)
 // ============================================================
 
-// --- Undo stack for template editor ---
-window._teUndoStack = [];
-const TE_MAX_UNDO = 20;
-
-function tePushUndo() {
-  if (!window._currentDocxZip) return;
-  const snapshot = window._currentDocxZip.generate({ type: 'uint8array' });
-  window._teUndoStack.push(snapshot);
-  if (window._teUndoStack.length > TE_MAX_UNDO) window._teUndoStack.shift();
-  const btn = document.getElementById('te-undo-btn');
-  if (btn) btn.disabled = false;
-}
-
-async function templateUndo() {
-  if (!window._teUndoStack.length) return;
-  const prev = window._teUndoStack.pop();
-  window._currentDocxZip = new PizZip(prev.buffer);
-  window._currentDocxBytes = prev;
-  // Re-render preview
-  const editor = document.getElementById('te-editor');
-  editor.innerHTML = '';
-  await docx.renderAsync(prev.buffer, editor, null, {
-    className: 'docx', inWrapper: true, ignoreWidth: false, ignoreHeight: false,
-    ignoreFonts: false, breakPages: true, ignoreLastRenderedPageBreak: false
-  });
-  highlightMergeTags(editor);
-  editor.addEventListener('mouseup', handlePreviewSelection);
-  editor.addEventListener('click', handlePreviewClick);
-  showToast('Undo successful', 'success');
-  const btn = document.getElementById('te-undo-btn');
-  if (btn) btn.disabled = window._teUndoStack.length === 0;
+// --- DocxEditor (real Word editor via docx-js-editor) ---
+// Uses pre-built bundle loaded via <script> tag (window.DocxEditorBundle)
+function getDocxEditorModules() {
+  const { React, createRoot, DocxEditor } = window.DocxEditorBundle;
+  return { React, createRoot, DocxEditor };
 }
 
 async function openTemplateEditor(templateId) {
@@ -3022,72 +2965,42 @@ async function openTemplateEditor(templateId) {
   document.getElementById('te-loading').style.display = 'flex';
   document.getElementById('templateEditorOverlay').classList.add('open');
   renderFieldPalette();
-  window._teUndoStack = [];
-  const undoBtn = document.getElementById('te-undo-btn');
-  if (undoBtn) undoBtn.disabled = true;
   try {
     const bytes = await getTemplateBytes(t);
-    // Initialize XML-first editing state
-    window._currentDocxZip = new PizZip(bytes.buffer);
+    const { React, createRoot, DocxEditor } = getDocxEditorModules();
+
+    // Store original bytes for reference
     window._currentDocxBytes = bytes;
-    window._insertionPoint = null;
-    // Consolidate runs for cleaner XML
-    consolidateDocxRuns(window._currentDocxZip);
-    window._currentDocxBytes = new Uint8Array(window._currentDocxZip.generate({ type: 'arraybuffer' }));
-    const editor = document.getElementById('te-editor');
-    editor.innerHTML = '';
-    // Render read-only with docx-preview for pixel-perfect Word fidelity
-    await docx.renderAsync(window._currentDocxBytes.buffer, editor, null, {
-      className: 'docx',
-      inWrapper: true,
-      ignoreWidth: false,
-      ignoreHeight: false,
-      ignoreFonts: false,
-      breakPages: true,
-      ignoreLastRenderedPageBreak: false,
-      experimental: true,
-      renderHeaders: true,
-      renderFooters: true,
-      renderFootnotes: true,
-      renderEndnotes: true
+
+    const editorEl = document.getElementById('te-editor');
+    editorEl.innerHTML = '';
+
+    // Create React root and mount DocxEditor
+    window._teReactRoot = createRoot(editorEl);
+    window._teEditorRef = React.createRef();
+
+    const editorComponent = React.createElement(DocxEditor, {
+      ref: window._teEditorRef,
+      documentBuffer: bytes.buffer,
+      mode: 'editing',
+      showToolbar: true,
+      showRuler: true,
+      showZoomControl: true,
+      onError: (err) => {
+        console.error('DocxEditor error:', err);
+        showToast('Editor error: ' + (err.message || ''), 'error');
+      }
     });
-    // Preview stays read-only — edits go through XML
-    highlightMergeTags(editor);
-    editor.addEventListener('click', handlePreviewClick);
-    editor.addEventListener('mouseup', handlePreviewSelection);
+
+    window._teReactRoot.render(editorComponent);
+
     document.getElementById('te-loading').style.display = 'none';
-    editor.style.display = 'block';
-    initRuler();
+    editorEl.style.display = 'block';
   } catch (e) {
     console.error('Template editor error:', e);
     showToast('Failed to load template: ' + (e.message || ''), 'error');
     closeTemplateEditor();
   }
-}
-
-function highlightMergeTags(container) {
-  // Walk all text nodes and wrap {field} patterns in merge-tag spans
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-  const textNodes = [];
-  while (walker.nextNode()) textNodes.push(walker.currentNode);
-  textNodes.forEach(node => {
-    if (/\{[a-zA-Z0-9_]+\}/.test(node.textContent)) {
-      const frag = document.createDocumentFragment();
-      const parts = node.textContent.split(/(\{[a-zA-Z0-9_]+\})/);
-      parts.forEach(part => {
-        if (/^\{[a-zA-Z0-9_]+\}$/.test(part)) {
-          const span = document.createElement('span');
-          span.className = 'merge-tag';
-          span.contentEditable = 'false';
-          span.textContent = part;
-          frag.appendChild(span);
-        } else if (part) {
-          frag.appendChild(document.createTextNode(part));
-        }
-      });
-      node.parentNode.replaceChild(frag, node);
-    }
-  });
 }
 
 function renderFieldPalette() {
@@ -3103,658 +3016,46 @@ function renderFieldPalette() {
   `).join('');
 }
 
-// ---- XML-First Template Editing Helpers ----
-
-// Consolidate adjacent runs with identical formatting in document.xml
-function consolidateDocxRuns(zip) {
-  const xmlStr = zip.file('word/document.xml')?.asText();
-  if (!xmlStr) return;
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
-  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-  const paras = xmlDoc.getElementsByTagNameNS(ns, 'p');
-  for (let i = 0; i < paras.length; i++) {
-    const runs = Array.from(paras[i].children).filter(el => el.localName === 'r' && el.namespaceURI === ns);
-    for (let j = runs.length - 1; j > 0; j--) {
-      const prev = runs[j - 1], cur = runs[j];
-      const prevRpr = prev.getElementsByTagNameNS(ns, 'rPr')[0];
-      const curRpr = cur.getElementsByTagNameNS(ns, 'rPr')[0];
-      const prevXml = prevRpr ? prevRpr.outerHTML || new XMLSerializer().serializeToString(prevRpr) : '';
-      const curXml = curRpr ? curRpr.outerHTML || new XMLSerializer().serializeToString(curRpr) : '';
-      if (prevXml === curXml) {
-        // Merge text content
-        const prevT = prev.getElementsByTagNameNS(ns, 't')[0];
-        const curT = cur.getElementsByTagNameNS(ns, 't')[0];
-        if (prevT && curT) {
-          prevT.textContent += curT.textContent;
-          prevT.setAttribute('xml:space', 'preserve');
-          paras[i].removeChild(cur);
-          runs.splice(j, 1);
-        }
-      }
-    }
-  }
-  zip.file('word/document.xml', new XMLSerializer().serializeToString(xmlDoc));
-}
-
-// Get all <w:p> elements (including inside tables) in document order
-function getAllDocxParagraphs(xmlDoc) {
-  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-  return Array.from(xmlDoc.getElementsByTagNameNS(ns, 'p'));
-}
-
-// Get full text of a <w:p> element by concatenating all <w:t> content
-function getParaText(wp) {
-  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-  const texts = wp.getElementsByTagNameNS(ns, 't');
-  let result = '';
-  for (let i = 0; i < texts.length; i++) result += texts[i].textContent;
-  return result;
-}
-
-// Map a character offset within a paragraph to a specific run index and offset within that run
-function mapOffsetToRun(wp, charOffset) {
-  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-  const runs = Array.from(wp.children).filter(el => el.localName === 'r' && el.namespaceURI === ns);
-  let pos = 0;
-  for (let i = 0; i < runs.length; i++) {
-    const t = runs[i].getElementsByTagNameNS(ns, 't')[0];
-    if (!t) continue;
-    const len = t.textContent.length;
-    if (pos + len >= charOffset) {
-      return { runIndex: i, runOffset: charOffset - pos, run: runs[i], tElem: t };
-    }
-    pos += len;
-  }
-  // Past end — return last run, end position
-  if (runs.length > 0) {
-    const lastRun = runs[runs.length - 1];
-    const lastT = lastRun.getElementsByTagNameNS(ns, 't')[0];
-    return { runIndex: runs.length - 1, runOffset: lastT ? lastT.textContent.length : 0, run: lastRun, tElem: lastT };
-  }
-  return null;
-}
-
-// Split a text run and insert merge field text
-function splitRunAndInsert(wp, runInfo, fieldText) {
-  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-  const { run, tElem, runOffset } = runInfo;
-  if (!tElem) return;
-  const text = tElem.textContent;
-  const before = text.substring(0, runOffset);
-  const after = text.substring(runOffset);
-  const xmlDoc = wp.ownerDocument;
-
-  // Clone run properties
-  const rPr = run.getElementsByTagNameNS(ns, 'rPr')[0];
-  function makeRun(content) {
-    const newR = xmlDoc.createElementNS(ns, 'w:r');
-    if (rPr) newR.appendChild(rPr.cloneNode(true));
-    const newT = xmlDoc.createElementNS(ns, 'w:t');
-    newT.setAttribute('xml:space', 'preserve');
-    newT.textContent = content;
-    newR.appendChild(newT);
-    return newR;
-  }
-
-  const parent = run.parentNode;
-  const nextSibling = run.nextSibling;
-
-  // Remove original run
-  parent.removeChild(run);
-
-  // Insert: before-run, field-run, after-run (skip empty)
-  const toInsert = [];
-  if (before) toInsert.push(makeRun(before));
-  toInsert.push(makeRun(fieldText));
-  if (after) toInsert.push(makeRun(after));
-
-  for (const r of toInsert) {
-    if (nextSibling) parent.insertBefore(r, nextSibling);
-    else parent.appendChild(r);
-  }
-}
-
-// Re-render the preview from current zip state
-async function reRenderPreview() {
-  const editor = document.getElementById('te-editor');
-  // Remove old handlers to avoid duplicates
-  editor.removeEventListener('click', handlePreviewClick);
-  editor.removeEventListener('mouseup', handlePreviewSelection);
-  editor.innerHTML = '';
-  await docx.renderAsync(window._currentDocxBytes.buffer, editor, null, {
-    className: 'docx', inWrapper: true, ignoreWidth: false, ignoreHeight: false,
-    ignoreFonts: false, breakPages: true, ignoreLastRenderedPageBreak: false,
-    experimental: true, renderHeaders: true, renderFooters: true,
-    renderFootnotes: true, renderEndnotes: true
-  });
-  highlightMergeTags(editor);
-  editor.addEventListener('click', handlePreviewClick);
-  editor.addEventListener('mouseup', handlePreviewSelection);
-  // Remove visual cursor
-  const oldCursor = document.querySelector('.te-insert-cursor');
-  if (oldCursor) oldCursor.remove();
-  window._insertionPoint = null;
-}
-
-// Handle click on the read-only preview to set insertion point
-function handlePreviewClick(event) {
-  const editor = document.getElementById('te-editor');
-  // Find the clicked text position using browser caret API
-  let range;
-  if (document.caretRangeFromPoint) {
-    range = document.caretRangeFromPoint(event.clientX, event.clientY);
-  } else if (document.caretPositionFromPoint) {
-    const pos = document.caretPositionFromPoint(event.clientX, event.clientY);
-    if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); }
-  }
-  if (!range || !range.startContainer) return;
-
-  // Find the paragraph-level element in docx-preview DOM
-  let paraEl = range.startContainer;
-  if (paraEl.nodeType === 3) paraEl = paraEl.parentElement;
-  // Walk up to find the paragraph element rendered by docx-preview
-  while (paraEl && paraEl !== editor) {
-    if (paraEl.matches && paraEl.matches('p, h1, h2, h3, h4, h5, h6, li')) break;
-    paraEl = paraEl.parentElement;
-  }
-  if (!paraEl || paraEl === editor) return;
-
-  // Get the paragraph's full text and the offset within it
-  const paraText = paraEl.textContent;
-  let clickOffset = 0;
-  // Walk text nodes in the paragraph to compute offset up to click position
-  const tw = document.createTreeWalker(paraEl, NodeFilter.SHOW_TEXT, null, false);
-  let node;
-  while ((node = tw.nextNode())) {
-    if (node === range.startContainer) {
-      clickOffset += range.startOffset;
-      break;
-    }
-    clickOffset += node.textContent.length;
-  }
-
-  // Find the matching paragraph index in the rendered DOM
-  const allRenderedParas = editor.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li');
-  let paraIndex = -1;
-  for (let i = 0; i < allRenderedParas.length; i++) {
-    if (allRenderedParas[i] === paraEl) { paraIndex = i; break; }
-  }
-  if (paraIndex < 0) return;
-
-  // Store insertion point
-  window._insertionPoint = { paraIndex, charOffset: clickOffset, paraText };
-
-  // Show visual cursor indicator
-  let cursor = document.querySelector('.te-insert-cursor');
-  if (!cursor) {
-    cursor = document.createElement('div');
-    cursor.className = 'te-insert-cursor';
-    document.body.appendChild(cursor);
-  }
-  const rng = range.cloneRange();
-  rng.collapse(true);
-  const rect = rng.getClientRects()[0] || paraEl.getBoundingClientRect();
-  cursor.style.left = rect.left + 'px';
-  cursor.style.top = rect.top + 'px';
-  cursor.style.height = (rect.height || 16) + 'px';
-  cursor.style.display = 'block';
-
-  // Also update ruler target paragraph
-  window._rulerParaIndex = paraIndex;
-  if (typeof updateRulerFromXml === 'function') updateRulerFromXml(paraIndex);
-}
-
-// Handle text selection (highlight) in the read-only preview
-function handlePreviewSelection(event) {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || !sel.rangeCount) {
-    window._selectionRange = null;
-    const btn = document.getElementById('te-delete-btn');
-    if (btn) btn.disabled = true;
-    return;
-  }
-  const editor = document.getElementById('te-editor');
-  const range = sel.getRangeAt(0);
-
-  // Find start paragraph
-  let startParaEl = range.startContainer;
-  if (startParaEl.nodeType === 3) startParaEl = startParaEl.parentElement;
-  while (startParaEl && startParaEl !== editor) {
-    if (startParaEl.matches && startParaEl.matches('p, h1, h2, h3, h4, h5, h6, li')) break;
-    startParaEl = startParaEl.parentElement;
-  }
-  if (!startParaEl || startParaEl === editor) return;
-
-  // Compute start offset within paragraph
-  let startOffset = 0;
-  const tw1 = document.createTreeWalker(startParaEl, NodeFilter.SHOW_TEXT, null, false);
-  let node1;
-  while ((node1 = tw1.nextNode())) {
-    if (node1 === range.startContainer) { startOffset += range.startOffset; break; }
-    startOffset += node1.textContent.length;
-  }
-
-  // Find end paragraph and offset
-  let endParaEl = range.endContainer;
-  if (endParaEl.nodeType === 3) endParaEl = endParaEl.parentElement;
-  while (endParaEl && endParaEl !== editor) {
-    if (endParaEl.matches && endParaEl.matches('p, h1, h2, h3, h4, h5, h6, li')) break;
-    endParaEl = endParaEl.parentElement;
-  }
-  if (!endParaEl || endParaEl === editor) return;
-
-  let endOffset = 0;
-  const tw2 = document.createTreeWalker(endParaEl, NodeFilter.SHOW_TEXT, null, false);
-  let node2;
-  while ((node2 = tw2.nextNode())) {
-    if (node2 === range.endContainer) { endOffset += range.endOffset; break; }
-    endOffset += node2.textContent.length;
-  }
-
-  // Map to paragraph indices
-  const allParas = editor.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li');
-  let startParaIndex = -1, endParaIndex = -1;
-  for (let i = 0; i < allParas.length; i++) {
-    if (allParas[i] === startParaEl) startParaIndex = i;
-    if (allParas[i] === endParaEl) endParaIndex = i;
-  }
-
-  if (startParaIndex < 0) return;
-
-  // Only support single-paragraph selections for now
-  if (startParaIndex !== endParaIndex) {
-    window._selectionRange = null;
-    const btn = document.getElementById('te-delete-btn');
-    if (btn) btn.disabled = true;
-    return;
-  }
-
-  window._selectionRange = { paraIndex: startParaIndex, startOffset, endOffset };
-  // Also set insertion point to start of selection
-  window._insertionPoint = { paraIndex: startParaIndex, charOffset: startOffset, paraText: startParaEl.textContent };
-
-  const btn = document.getElementById('te-delete-btn');
-  if (btn) btn.disabled = false;
-}
-
-// Delete text in the selected range from XML
-function deleteXmlRange(paraIndex, startOff, endOff) {
-  if (!window._currentDocxZip) return;
-  const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
-  if (!xmlStr) return;
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
-  const allParas = getAllDocxParagraphs(xmlDoc);
-  if (paraIndex >= allParas.length) return;
-  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-  const wp = allParas[paraIndex];
-  const runs = Array.from(wp.children).filter(el => el.localName === 'r' && el.namespaceURI === ns);
-
-  // Walk runs and remove characters between startOff and endOff
-  let pos = 0;
-  for (const run of runs) {
-    const t = run.getElementsByTagNameNS(ns, 't')[0];
-    if (!t) continue;
-    const text = t.textContent;
-    const runStart = pos;
-    const runEnd = pos + text.length;
-
-    if (runEnd <= startOff || runStart >= endOff) {
-      // Outside selection — keep as-is
-      pos += text.length;
-      continue;
-    }
-
-    // This run overlaps the selection
-    const keepBefore = text.substring(0, Math.max(0, startOff - runStart));
-    const keepAfter = text.substring(Math.min(text.length, endOff - runStart));
-    const newText = keepBefore + keepAfter;
-
-    if (newText.length === 0) {
-      wp.removeChild(run);
-    } else {
-      t.textContent = newText;
-      t.setAttribute('xml:space', 'preserve');
-    }
-    pos += text.length;
-  }
-
-  const serialized = new XMLSerializer().serializeToString(xmlDoc);
-  window._currentDocxZip.file('word/document.xml', serialized);
-  window._currentDocxBytes = new Uint8Array(window._currentDocxZip.generate({ type: 'arraybuffer' }));
-}
-
-// Delete the currently highlighted text
-async function templateDeleteSelected() {
-  if (!window._selectionRange) {
-    showToast('Highlight text in the document first', 'error');
-    return;
-  }
-  const { paraIndex, startOffset, endOffset } = window._selectionRange;
-  if (startOffset === endOffset) return;
-  tePushUndo();
-  deleteXmlRange(paraIndex, startOffset, endOffset);
-  window._selectionRange = null;
-  window._insertionPoint = null;
-  const btn = document.getElementById('te-delete-btn');
-  if (btn) btn.disabled = true;
-  await reRenderPreview();
-  showToast('Deleted selected text', 'success');
-}
-
-// Insert merge field at the current insertion point in the XML
+// Insert merge field text at current cursor position in the editor
 function insertMergeField(tag) {
-  if (!window._insertionPoint) {
-    showToast('Click in the document first to choose where to insert the field.', 'error');
+  const editorEl = document.getElementById('te-editor');
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !editorEl.contains(sel.anchorNode)) {
+    showToast('Click in the document first to set cursor position.', 'error');
     return;
   }
-  if (!window._currentDocxZip) return;
-  tePushUndo();
-
-  // If text is selected, delete it first so the field replaces it
-  if (window._selectionRange) {
-    const { paraIndex: sp, startOffset, endOffset } = window._selectionRange;
-    if (startOffset !== endOffset) {
-      deleteXmlRange(sp, startOffset, endOffset);
-    }
-    window._selectionRange = null;
-    const delBtn = document.getElementById('te-delete-btn');
-    if (delBtn) delBtn.disabled = true;
-  }
-
-  const { paraIndex, charOffset } = window._insertionPoint;
-  const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
-  if (!xmlStr) return;
-
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
-  const allParas = getAllDocxParagraphs(xmlDoc);
-
-  if (paraIndex >= allParas.length) {
-    showToast('Could not find target paragraph in document', 'error');
-    return;
-  }
-
-  const wp = allParas[paraIndex];
-  const runInfo = mapOffsetToRun(wp, charOffset);
-  if (!runInfo) {
-    // Empty paragraph — create a new run with the field
-    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-    const newR = xmlDoc.createElementNS(ns, 'w:r');
-    const newT = xmlDoc.createElementNS(ns, 'w:t');
-    newT.textContent = '{' + tag + '}';
-    newR.appendChild(newT);
-    wp.appendChild(newR);
-  } else {
-    splitRunAndInsert(wp, runInfo, '{' + tag + '}');
-  }
-
-  // Write back to zip and re-render
-  const serialized = new XMLSerializer().serializeToString(xmlDoc);
-  window._currentDocxZip.file('word/document.xml', serialized);
-  window._currentDocxBytes = new Uint8Array(window._currentDocxZip.generate({ type: 'arraybuffer' }));
-  reRenderPreview();
-}
-
-// ============================================================
-// RULER (Word-style indentation ruler)
-// ============================================================
-function initRuler() {
-  const ruler = document.getElementById('te-ruler');
-  const wrap = document.getElementById('te-ruler-wrap');
-  const editor = document.getElementById('te-editor');
-  const flH = document.getElementById('rulerFL');
-  const liH = document.getElementById('rulerLI');
-  const riH = document.getElementById('rulerRI');
-
-  wrap.style.display = 'block';
-
-  // Build tick marks — 8.5 inches for letter page
-  ruler.innerHTML = '';
-  ruler.appendChild(flH); ruler.appendChild(liH); ruler.appendChild(riH);
-
-  const totalInches = 8.5;
-  const rulerW = ruler.offsetWidth || 858;
-  const pxPerInch = rulerW / totalInches;
-  ruler.style.setProperty('--ru', pxPerInch + 'px');
-
-  const marginL = pxPerInch * 1;
-  const marginR = pxPerInch * 1;
-
-  // Draw margin shading
-  const lmDiv = document.createElement('div');
-  lmDiv.className = 'te-ruler-margin';
-  lmDiv.style.left = '0'; lmDiv.style.width = marginL + 'px';
-  ruler.appendChild(lmDiv);
-  const rmDiv = document.createElement('div');
-  rmDiv.className = 'te-ruler-margin';
-  rmDiv.style.right = '0'; rmDiv.style.width = marginR + 'px';
-  ruler.appendChild(rmDiv);
-
-  // Draw ticks and labels
-  for (let q = 0; q <= totalInches * 4; q++) {
-    const inch = q / 4;
-    const px = inch * pxPerInch;
-    if (q % 4 === 0) {
-      const tick = document.createElement('div');
-      tick.className = 'te-ruler-tick major';
-      tick.style.left = px + 'px';
-      ruler.appendChild(tick);
-      if (inch > 0 && inch < totalInches) {
-        const lbl = document.createElement('div');
-        lbl.className = 'te-ruler-label';
-        lbl.style.left = px + 'px';
-        lbl.textContent = inch;
-        ruler.appendChild(lbl);
-      }
-    } else if (q % 2 === 0) {
-      const tick = document.createElement('div');
-      tick.className = 'te-ruler-tick half';
-      tick.style.left = px + 'px';
-      ruler.appendChild(tick);
-    } else {
-      const tick = document.createElement('div');
-      tick.className = 'te-ruler-tick quarter';
-      tick.style.left = px + 'px';
-      ruler.appendChild(tick);
-    }
-  }
-
-  // Read indentation from XML for a given paragraph index
-  function readXmlIndent(paraIndex) {
-    if (!window._currentDocxZip) return { left: 0, firstLine: 0, right: 0 };
-    const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
-    if (!xmlStr) return { left: 0, firstLine: 0, right: 0 };
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
-    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-    const allParas = xmlDoc.getElementsByTagNameNS(ns, 'p');
-    if (paraIndex >= allParas.length) return { left: 0, firstLine: 0, right: 0 };
-    const wp = allParas[paraIndex];
-    const pPr = wp.getElementsByTagNameNS(ns, 'pPr')[0];
-    if (!pPr) return { left: 0, firstLine: 0, right: 0 };
-    const ind = pPr.getElementsByTagNameNS(ns, 'ind')[0];
-    if (!ind) return { left: 0, firstLine: 0, right: 0 };
-    return {
-      left: parseInt(ind.getAttribute('w:left') || '0', 10),
-      firstLine: parseInt(ind.getAttribute('w:firstLine') || '0', 10),
-      right: parseInt(ind.getAttribute('w:right') || '0', 10)
-    };
-  }
-
-  // Apply indentation to XML (values in twips)
-  function applyXmlIndent(paraIndex, leftTwips, firstLineTwips, rightTwips) {
-    if (!window._currentDocxZip) return;
-    tePushUndo();
-    const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
-    if (!xmlStr) return;
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
-    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-    const allParas = xmlDoc.getElementsByTagNameNS(ns, 'p');
-    if (paraIndex >= allParas.length) return;
-    const wp = allParas[paraIndex];
-    let pPr = wp.getElementsByTagNameNS(ns, 'pPr')[0];
-    if (!pPr) {
-      pPr = xmlDoc.createElementNS(ns, 'w:pPr');
-      wp.insertBefore(pPr, wp.firstChild);
-    }
-    let ind = pPr.getElementsByTagNameNS(ns, 'ind')[0];
-    if (!ind) {
-      ind = xmlDoc.createElementNS(ns, 'w:ind');
-      pPr.appendChild(ind);
-    }
-    ind.setAttribute('w:left', Math.round(Math.max(0, leftTwips)).toString());
-    ind.setAttribute('w:firstLine', Math.round(Math.max(0, firstLineTwips)).toString());
-    ind.setAttribute('w:right', Math.round(Math.max(0, rightTwips)).toString());
-    // Remove hanging if we're setting firstLine
-    ind.removeAttribute('w:hanging');
-
-    const serialized = new XMLSerializer().serializeToString(xmlDoc);
-    window._currentDocxZip.file('word/document.xml', serialized);
-    window._currentDocxBytes = new Uint8Array(window._currentDocxZip.generate({ type: 'arraybuffer' }));
-  }
-
-  function twipsToRulerPx(twips) {
-    return marginL + (twips / 1440) * pxPerInch;
-  }
-
-  function rulerPxToTwips(rulerPx) {
-    return Math.max(0, ((rulerPx - marginL) / pxPerInch) * 1440);
-  }
-
-  function updateHandles() {
-    const pi = window._rulerParaIndex;
-    if (pi == null || pi < 0) {
-      flH.style.left = marginL + 'px';
-      liH.style.left = marginL + 'px';
-      riH.style.left = (rulerW - marginR) + 'px';
-      return;
-    }
-    const indent = readXmlIndent(pi);
-    liH.style.left = twipsToRulerPx(indent.left) + 'px';
-    flH.style.left = twipsToRulerPx(indent.left + indent.firstLine) + 'px';
-    riH.style.left = (rulerW - marginR - (indent.right / 1440) * pxPerInch) + 'px';
-  }
-
-  // Expose for handlePreviewClick
-  window.updateRulerFromXml = function(paraIndex) {
-    window._rulerParaIndex = paraIndex;
-    updateHandles();
-  };
-
-  // Drag logic
-  function makeDraggable(handle, onDragEnd) {
-    let startX, startLeft;
-    function onDown(e) {
-      e.preventDefault();
-      handle.classList.add('dragging');
-      startX = e.clientX || e.touches?.[0]?.clientX;
-      startLeft = parseFloat(handle.style.left) || 0;
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-      document.addEventListener('touchmove', onMove, { passive: false });
-      document.addEventListener('touchend', onUp);
-    }
-    function onMove(e) {
-      e.preventDefault();
-      const cx = e.clientX || e.touches?.[0]?.clientX;
-      const dx = cx - startX;
-      let newLeft = Math.max(0, Math.min(rulerW, startLeft + dx));
-      const snapPx = pxPerInch / 4;
-      newLeft = Math.round(newLeft / snapPx) * snapPx;
-      handle.style.left = newLeft + 'px';
-    }
-    function onUp() {
-      handle.classList.remove('dragging');
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', onUp);
-      onDragEnd();
-    }
-    handle.addEventListener('mousedown', onDown);
-    handle.addEventListener('touchstart', onDown, { passive: false });
-  }
-
-  makeDraggable(liH, () => {
-    const pi = window._rulerParaIndex;
-    if (pi == null) return;
-    const leftTwips = rulerPxToTwips(parseFloat(liH.style.left) || marginL);
-    const flPx = parseFloat(flH.style.left) || marginL;
-    const firstLineTwips = Math.max(0, rulerPxToTwips(flPx) - leftTwips);
-    const riPx = parseFloat(riH.style.left) || (rulerW - marginR);
-    const rightTwips = Math.max(0, ((rulerW - marginR - riPx) / pxPerInch) * 1440);
-    applyXmlIndent(pi, leftTwips, firstLineTwips, rightTwips);
-    reRenderPreview();
-  });
-
-  makeDraggable(flH, () => {
-    const pi = window._rulerParaIndex;
-    if (pi == null) return;
-    const liPx = parseFloat(liH.style.left) || marginL;
-    const leftTwips = rulerPxToTwips(liPx);
-    const flPx = parseFloat(flH.style.left) || marginL;
-    const firstLineTwips = Math.max(0, rulerPxToTwips(flPx) - leftTwips);
-    const riPx = parseFloat(riH.style.left) || (rulerW - marginR);
-    const rightTwips = Math.max(0, ((rulerW - marginR - riPx) / pxPerInch) * 1440);
-    applyXmlIndent(pi, leftTwips, firstLineTwips, rightTwips);
-    reRenderPreview();
-  });
-
-  makeDraggable(riH, () => {
-    const pi = window._rulerParaIndex;
-    if (pi == null) return;
-    const liPx = parseFloat(liH.style.left) || marginL;
-    const leftTwips = rulerPxToTwips(liPx);
-    const flPx = parseFloat(flH.style.left) || marginL;
-    const firstLineTwips = Math.max(0, rulerPxToTwips(flPx) - leftTwips);
-    const riPx = parseFloat(riH.style.left) || (rulerW - marginR);
-    const rightTwips = Math.max(0, ((rulerW - marginR - riPx) / pxPerInch) * 1440);
-    applyXmlIndent(pi, leftTwips, firstLineTwips, rightTwips);
-    reRenderPreview();
-  });
-
-  // Set initial positions
-  updateHandles();
-
-  // Cleanup function
-  window._rulerCleanup = () => {
-    window.updateRulerFromXml = null;
-    window._rulerParaIndex = null;
-    window._rulerCleanup = null;
-  };
+  const fieldName = tag.replace(/[{}]/g, '');
+  const fieldText = '{' + fieldName + '}';
+  // Use execCommand which works with ProseMirror's contenteditable
+  document.execCommand('insertText', false, fieldText);
 }
 
 function closeTemplateEditor() {
   document.getElementById('templateEditorOverlay').classList.remove('open');
-  const editor = document.getElementById('te-editor');
-  editor.removeEventListener('click', handlePreviewClick);
-  editor.innerHTML = '';
-  document.getElementById('te-ruler-wrap').style.display = 'none';
-  // Remove visual cursor
-  const cursor = document.querySelector('.te-insert-cursor');
-  if (cursor) cursor.remove();
+  // Unmount React component
+  if (window._teReactRoot) {
+    window._teReactRoot.unmount();
+    window._teReactRoot = null;
+  }
+  window._teEditorRef = null;
+  const editorEl = document.getElementById('te-editor');
+  editorEl.innerHTML = '';
   window._editingTemplateId = null;
-  window._currentDocxZip = null;
   window._currentDocxBytes = null;
-  window._insertionPoint = null;
-  window._rulerParaIndex = null;
-  window._rulerCleanup?.();
 }
 
 async function saveTemplateEditor() {
   const templateId = window._editingTemplateId;
   const t = vaultFiles.find(f => f.id === templateId);
   if (!t) return showToast('Template not found', 'error');
-  if (!window._currentDocxZip) return showToast('No document loaded', 'error');
+  if (!window._teEditorRef?.current) return showToast('No document loaded', 'error');
   showToast('Saving template…');
   try {
-    // All edits already live in _currentDocxZip — just generate and upload
-    const blob = window._currentDocxZip.generate({
-      type: 'blob',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    // Use the editor's save method — returns the edited DOCX as ArrayBuffer
+    const buffer = await window._teEditorRef.current.save();
+    if (!buffer) throw new Error('Save returned empty buffer');
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     });
 
     // Upload to Supabase Storage
@@ -3776,6 +3077,9 @@ async function saveTemplateEditor() {
     await dbUpdateVaultFile(templateId, updates);
     const idx = vaultFiles.findIndex(f => f.id === templateId);
     if (idx >= 0) { vaultFiles[idx].size = blob.size; if (updates.data) vaultFiles[idx].data = updates.data; }
+
+    // Update stored bytes
+    window._currentDocxBytes = new Uint8Array(buffer);
 
     renderTemplates();
     showToast('Template saved!', 'success');

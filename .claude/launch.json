@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "landflow",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["serve.js", "3456"],
+      "cwd": "C:\\Users\\Elk Ceek Group\\Desktop\\landFlow\\.claude\\worktrees\\hardcore-wilbur\\landflow",
+      "port": 3456
+    }
+  ]
+}
