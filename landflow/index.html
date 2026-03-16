@@ -2303,15 +2303,22 @@ async function vaultOpen(loanId, fileId) {
   const f = vaultFiles.find(x => x.id === fileId);
   if (!f) return;
   try {
-    let url;
+    let blob;
     if (f.data && f.data.startsWith('storage:')) {
       const path = f.data.replace('storage:', '');
       const { data, error } = await sb.storage.from('vault-files').download(path);
       if (error) return showToast('Open failed: ' + error.message, 'error');
-      url = URL.createObjectURL(data);
+      blob = data;
+    } else if (f.data && f.data.startsWith('data:')) {
+      const res = await fetch(f.data);
+      blob = await res.blob();
     } else {
-      url = f.data;
+      window.open(f.data, '_blank');
+      return;
     }
+    const type = f.type || blob.type || 'application/octet-stream';
+    const viewBlob = new Blob([blob], { type });
+    const url = URL.createObjectURL(viewBlob);
     window.open(url, '_blank');
   } catch (e) {
     showToast('Open error: ' + (e.message || ''), 'error');
