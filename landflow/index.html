@@ -879,6 +879,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div style="display:flex;gap:8px;align-items:center">
         <span style="font-size:11px;color:var(--text3);margin-right:8px">Headers/footers preserved but not shown here</span>
         <button class="btn btn-ghost" id="te-undo-btn" onclick="templateUndo()" disabled title="Undo last change">↩ Undo</button>
+        <button class="btn btn-ghost" id="te-delete-btn" onclick="templateDeleteSelected()" disabled title="Delete highlighted text">✕ Delete</button>
         <button class="btn btn-ghost" onclick="closeTemplateEditor()">Close</button>
         <button class="btn btn-gold" onclick="saveTemplateEditor()">💾 Save</button>
       </div>
@@ -3003,7 +3004,9 @@ async function templateUndo() {
     className: 'docx', inWrapper: true, ignoreWidth: false, ignoreHeight: false,
     ignoreFonts: false, breakPages: true, ignoreLastRenderedPageBreak: false
   });
-  setupClickToPosition(editor);
+  highlightMergeTags(editor);
+  editor.addEventListener('mouseup', handlePreviewSelection);
+  editor.addEventListener('click', handlePreviewClick);
   showToast('Undo successful', 'success');
   const btn = document.getElementById('te-undo-btn');
   if (btn) btn.disabled = window._teUndoStack.length === 0;
@@ -3051,6 +3054,7 @@ async function openTemplateEditor(templateId) {
     // Preview stays read-only — edits go through XML
     highlightMergeTags(editor);
     editor.addEventListener('click', handlePreviewClick);
+    editor.addEventListener('mouseup', handlePreviewSelection);
     document.getElementById('te-loading').style.display = 'none';
     editor.style.display = 'block';
     initRuler();
@@ -3214,8 +3218,9 @@ function splitRunAndInsert(wp, runInfo, fieldText) {
 // Re-render the preview from current zip state
 async function reRenderPreview() {
   const editor = document.getElementById('te-editor');
-  // Remove old click handler to avoid duplicates
+  // Remove old handlers to avoid duplicates
   editor.removeEventListener('click', handlePreviewClick);
+  editor.removeEventListener('mouseup', handlePreviewSelection);
   editor.innerHTML = '';
   await docx.renderAsync(window._currentDocxBytes.buffer, editor, null, {
     className: 'docx', inWrapper: true, ignoreWidth: false, ignoreHeight: false,
@@ -3225,6 +3230,7 @@ async function reRenderPreview() {
   });
   highlightMergeTags(editor);
   editor.addEventListener('click', handlePreviewClick);
+  editor.addEventListener('mouseup', handlePreviewSelection);
   // Remove visual cursor
   const oldCursor = document.querySelector('.te-insert-cursor');
   if (oldCursor) oldCursor.remove();
@@ -3299,6 +3305,144 @@ function handlePreviewClick(event) {
   if (typeof updateRulerFromXml === 'function') updateRulerFromXml(paraIndex);
 }
 
+// Handle text selection (highlight) in the read-only preview
+function handlePreviewSelection(event) {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) {
+    window._selectionRange = null;
+    const btn = document.getElementById('te-delete-btn');
+    if (btn) btn.disabled = true;
+    return;
+  }
+  const editor = document.getElementById('te-editor');
+  const range = sel.getRangeAt(0);
+
+  // Find start paragraph
+  let startParaEl = range.startContainer;
+  if (startParaEl.nodeType === 3) startParaEl = startParaEl.parentElement;
+  while (startParaEl && startParaEl !== editor) {
+    if (startParaEl.matches && startParaEl.matches('p, h1, h2, h3, h4, h5, h6, li')) break;
+    startParaEl = startParaEl.parentElement;
+  }
+  if (!startParaEl || startParaEl === editor) return;
+
+  // Compute start offset within paragraph
+  let startOffset = 0;
+  const tw1 = document.createTreeWalker(startParaEl, NodeFilter.SHOW_TEXT, null, false);
+  let node1;
+  while ((node1 = tw1.nextNode())) {
+    if (node1 === range.startContainer) { startOffset += range.startOffset; break; }
+    startOffset += node1.textContent.length;
+  }
+
+  // Find end paragraph and offset
+  let endParaEl = range.endContainer;
+  if (endParaEl.nodeType === 3) endParaEl = endParaEl.parentElement;
+  while (endParaEl && endParaEl !== editor) {
+    if (endParaEl.matches && endParaEl.matches('p, h1, h2, h3, h4, h5, h6, li')) break;
+    endParaEl = endParaEl.parentElement;
+  }
+  if (!endParaEl || endParaEl === editor) return;
+
+  let endOffset = 0;
+  const tw2 = document.createTreeWalker(endParaEl, NodeFilter.SHOW_TEXT, null, false);
+  let node2;
+  while ((node2 = tw2.nextNode())) {
+    if (node2 === range.endContainer) { endOffset += range.endOffset; break; }
+    endOffset += node2.textContent.length;
+  }
+
+  // Map to paragraph indices
+  const allParas = editor.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li');
+  let startParaIndex = -1, endParaIndex = -1;
+  for (let i = 0; i < allParas.length; i++) {
+    if (allParas[i] === startParaEl) startParaIndex = i;
+    if (allParas[i] === endParaEl) endParaIndex = i;
+  }
+
+  if (startParaIndex < 0) return;
+
+  // Only support single-paragraph selections for now
+  if (startParaIndex !== endParaIndex) {
+    window._selectionRange = null;
+    const btn = document.getElementById('te-delete-btn');
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  window._selectionRange = { paraIndex: startParaIndex, startOffset, endOffset };
+  // Also set insertion point to start of selection
+  window._insertionPoint = { paraIndex: startParaIndex, charOffset: startOffset, paraText: startParaEl.textContent };
+
+  const btn = document.getElementById('te-delete-btn');
+  if (btn) btn.disabled = false;
+}
+
+// Delete text in the selected range from XML
+function deleteXmlRange(paraIndex, startOff, endOff) {
+  if (!window._currentDocxZip) return;
+  const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
+  if (!xmlStr) return;
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+  const allParas = getAllDocxParagraphs(xmlDoc);
+  if (paraIndex >= allParas.length) return;
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const wp = allParas[paraIndex];
+  const runs = Array.from(wp.children).filter(el => el.localName === 'r' && el.namespaceURI === ns);
+
+  // Walk runs and remove characters between startOff and endOff
+  let pos = 0;
+  for (const run of runs) {
+    const t = run.getElementsByTagNameNS(ns, 't')[0];
+    if (!t) continue;
+    const text = t.textContent;
+    const runStart = pos;
+    const runEnd = pos + text.length;
+
+    if (runEnd <= startOff || runStart >= endOff) {
+      // Outside selection — keep as-is
+      pos += text.length;
+      continue;
+    }
+
+    // This run overlaps the selection
+    const keepBefore = text.substring(0, Math.max(0, startOff - runStart));
+    const keepAfter = text.substring(Math.min(text.length, endOff - runStart));
+    const newText = keepBefore + keepAfter;
+
+    if (newText.length === 0) {
+      wp.removeChild(run);
+    } else {
+      t.textContent = newText;
+      t.setAttribute('xml:space', 'preserve');
+    }
+    pos += text.length;
+  }
+
+  const serialized = new XMLSerializer().serializeToString(xmlDoc);
+  window._currentDocxZip.file('word/document.xml', serialized);
+  window._currentDocxBytes = new Uint8Array(window._currentDocxZip.generate({ type: 'arraybuffer' }));
+}
+
+// Delete the currently highlighted text
+async function templateDeleteSelected() {
+  if (!window._selectionRange) {
+    showToast('Highlight text in the document first', 'error');
+    return;
+  }
+  const { paraIndex, startOffset, endOffset } = window._selectionRange;
+  if (startOffset === endOffset) return;
+  tePushUndo();
+  deleteXmlRange(paraIndex, startOffset, endOffset);
+  window._selectionRange = null;
+  window._insertionPoint = null;
+  const btn = document.getElementById('te-delete-btn');
+  if (btn) btn.disabled = true;
+  await reRenderPreview();
+  showToast('Deleted selected text', 'success');
+}
+
 // Insert merge field at the current insertion point in the XML
 function insertMergeField(tag) {
   if (!window._insertionPoint) {
@@ -3307,6 +3451,17 @@ function insertMergeField(tag) {
   }
   if (!window._currentDocxZip) return;
   tePushUndo();
+
+  // If text is selected, delete it first so the field replaces it
+  if (window._selectionRange) {
+    const { paraIndex: sp, startOffset, endOffset } = window._selectionRange;
+    if (startOffset !== endOffset) {
+      deleteXmlRange(sp, startOffset, endOffset);
+    }
+    window._selectionRange = null;
+    const delBtn = document.getElementById('te-delete-btn');
+    if (delBtn) delBtn.disabled = true;
+  }
 
   const { paraIndex, charOffset } = window._insertionPoint;
   const xmlStr = window._currentDocxZip.file('word/document.xml')?.asText();
