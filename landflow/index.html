@@ -2259,6 +2259,7 @@ const FILE_CATEGORIES = [
   { id:'plats', icon:'🗺', label:'Plats & Maps' },
   { id:'county', icon:'🏢', label:'County Information' },
   { id:'photos', icon:'📸', label:'Photos' },
+  { id:'generated', icon:'📄', label:'Generated Documents' },
   { id:'other', icon:'📎', label:'Other Documents' },
 ];
 
@@ -2842,13 +2843,33 @@ async function executeTemplateGenerate() {
     const data = buildMergeData(loan);
     doc.render(data);
     const output = doc.getZip().generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-    const name = t.name.replace('.docx', '') + '_' + (loan.borrower || 'document').replace(/\s+/g, '_') + '.docx';
+    const borrowerPart = (loan.borrower || 'document').replace(/\s+/g, '_');
+    const parcelPart = (loan.parcel || '').replace(/\s+/g, '_');
+    const name = t.name.replace('.docx', '') + '_' + borrowerPart + (parcelPart ? '_' + parcelPart : '') + '.docx';
+    // Download to local drive
     const a = document.createElement('a');
     a.href = URL.createObjectURL(output);
     a.download = name; a.click();
     URL.revokeObjectURL(a.href);
+    // Also save a copy to the loan's files in the CRM
+    try {
+      const storagePath = `${currentUser.id}/generated/${Date.now()}_${name}`;
+      await sb.storage.from('vault-files').upload(storagePath, output, {
+        upsert: true,
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+      const saved = await dbSaveVaultFile({
+        loan_id: loan.id,
+        cat_id: 'generated',
+        name: name, size: output.size, type: output.type,
+        data: 'storage:' + storagePath, book_page: '', notes: 'Generated from template: ' + t.name,
+      });
+      if (saved) vaultFiles.push(saved);
+    } catch (uploadErr) {
+      console.error('Auto-save to CRM failed:', uploadErr);
+    }
     closeModal('templateGenModal');
-    showToast('Document generated!', 'success');
+    showToast('Document generated & saved to loan files!', 'success');
   } catch (e) {
     console.error('Template generation error:', e);
     showToast('Error: ' + (e.message || 'Template generation failed'), 'error');
