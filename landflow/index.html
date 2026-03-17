@@ -13,8 +13,6 @@
 <script src="https://unpkg.com/docxtemplater@3.68.3/build/docxtemplater.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
-<script src="docx-editor-bundle.js"></script>
-<link rel="stylesheet" href="docx-editor-styles.css">
 <style>
 :root {
   /* ── Light theme (main area) ── */
@@ -285,22 +283,8 @@ textarea.form-input{resize:vertical;min-height:80px}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(min-width:768px){.toast{bottom:30px}}
 
-/* ── TEMPLATE EDITOR ── */
-.template-editor-overlay{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px)}
-.template-editor-overlay.open{display:flex}
-.template-editor{width:100%;height:100%;display:flex;flex-direction:column;background:var(--s1)}
-.te-toolbar{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--s2);flex-shrink:0}
-.te-body{flex:1;display:flex;overflow:hidden}
-.te-editor-pane{flex:1;overflow:hidden;background:#f8f6f3}
-.te-editor{width:100%;height:100%}
-.te-loading{display:flex;align-items:center;justify-content:center;flex:1;color:var(--text3);font-size:15px}
-.te-palette{width:280px;flex-shrink:0;border-left:1px solid var(--border);background:var(--s2);overflow-y:auto;padding:16px}
-.te-section-title{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);font-weight:700;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
-.te-section-title:first-child{margin-top:0}
-.te-field-btn{display:inline-block;font-family:'DM Sans',sans-serif;font-size:11px;background:var(--golddim);color:var(--gold2);border:1px solid rgba(201,147,58,0.25);border-radius:4px;padding:3px 8px;margin:2px;cursor:pointer;transition:all .15s}
-.te-field-btn:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
+/* ── MERGE TAG ── */
 .merge-tag{background:rgba(201,147,58,0.15);color:var(--gold2);border:1px solid rgba(201,147,58,0.3);border-radius:3px;padding:1px 5px;font-family:'DM Sans',sans-serif;font-size:11px;display:inline;white-space:nowrap;user-select:all;font-weight:600}
-@media(max-width:767px){.te-palette{width:100%;border-left:none;border-top:1px solid var(--border);max-height:200px}.te-body{flex-direction:column}}
 
 /* ── EMPTY STATES ── */
 .empty-state{text-align:center;padding:40px 20px;color:var(--text3)}
@@ -850,31 +834,6 @@ textarea.form-input{resize:vertical;min-height:80px}
 </div>
 
 <!-- TEMPLATE EDITOR -->
-<div class="template-editor-overlay" id="templateEditorOverlay">
-  <div class="template-editor">
-    <div class="te-toolbar">
-      <div>
-        <div class="modal-title" id="te-title">Edit Template</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px" id="te-subtitle"></div>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn btn-ghost" onclick="closeTemplateEditor()">Close</button>
-        <button class="btn btn-gold" onclick="saveTemplateEditor()">💾 Save</button>
-      </div>
-    </div>
-    <div class="te-body">
-      <div class="te-editor-pane">
-        <div class="te-loading" id="te-loading">Loading document…</div>
-        <div id="te-editor" class="te-editor" style="display:none"></div>
-      </div>
-      <div class="te-palette">
-        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Click where you want the field in the document, then click a field below to insert it.</div>
-        <div id="te-fields"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- DETAIL PANEL -->
 <div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
 <div class="detail-panel" id="detailPanel">
@@ -2345,6 +2304,7 @@ async function vaultOpen(loanId, fileId) {
       toolbar.innerHTML = `<span style="color:#fff;font-size:14px;font-weight:600">${f.name}</span>
         <div style="display:flex;gap:8px;">
           <button onclick="printViewerContent()" style="background:#3b7be0;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print</button>
+          <button onclick="printFileViewer()" style="background:var(--blue);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print</button>
           <button onclick="vaultDownload('${loanId}','${fileId}')" style="background:var(--gold);color:#000;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">⬇ Download</button>
           <button onclick="document.getElementById('file-viewer-overlay').remove()" style="background:#555;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">✕ Close</button>
         </div>`;
@@ -2401,6 +2361,29 @@ async function vaultOpen(loanId, fileId) {
     }
   } catch (e) {
     showToast('Open error: ' + (e.message || ''), 'error');
+  }
+}
+
+function printFileViewer() {
+  const overlay = document.getElementById('file-viewer-overlay');
+  if (!overlay) return;
+  const iframe = overlay.querySelector('iframe');
+  const docxView = overlay.querySelector('.docx-view');
+  const img = overlay.querySelector('img');
+  if (iframe) {
+    // PDF in iframe — use iframe's print
+    try { iframe.contentWindow.print(); } catch(e) { window.print(); }
+  } else if (docxView) {
+    // DOCX rendered as HTML — open print window
+    const pw = window.open('', '_blank');
+    pw.document.write(`<html><head><title>Print</title><style>body{font-family:Arial,sans-serif;margin:40px 60px;} table{border-collapse:collapse;width:100%} td,th{border:1px solid #ccc;padding:6px 10px} p{margin:0 0 8px;line-height:1.5} img{max-width:100%} @page{margin:0.75in}</style></head><body>${docxView.innerHTML}</body></html>`);
+    pw.document.close();
+    pw.onload = () => { pw.print(); pw.close(); };
+  } else if (img) {
+    const pw = window.open('', '_blank');
+    pw.document.write(`<html><head><title>Print</title><style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh} img{max-width:100%;max-height:100vh}</style></head><body><img src="${img.src}"></body></html>`);
+    pw.document.close();
+    pw.onload = () => { pw.print(); pw.close(); };
   }
 }
 
@@ -2809,7 +2792,6 @@ function renderTemplates() {
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;flex-wrap:wrap">
-      <button class="btn btn-gold btn-sm" onclick="openTemplateEditor('${t.id}')">✏️ Edit Fields</button>
       <button class="btn btn-gold btn-sm" onclick="openTemplateGenerate('${t.id}')">📄 Generate</button>
       <button class="btn btn-ghost btn-sm" onclick="previewTemplateFields('${t.id}')">🔍 Preview Fields</button>
       <button class="btn btn-ghost btn-sm" onclick="vaultDownload(null,'${t.id}')">📥 Download</button>
@@ -3124,146 +3106,6 @@ function showMergeFieldReference() {
 // TEMPLATE EDITOR (in-browser .docx editing with merge fields)
 // ============================================================
 
-// --- DocxEditor (real Word editor via docx-js-editor) ---
-// Uses pre-built bundle loaded via <script> tag (window.DocxEditorBundle)
-function getDocxEditorModules() {
-  const { React, createRoot, DocxEditor } = window.DocxEditorBundle;
-  return { React, createRoot, DocxEditor };
-}
-
-async function openTemplateEditor(templateId) {
-  const t = vaultFiles.find(f => f.id === templateId);
-  if (!t) return showToast('Template not found', 'error');
-  window._editingTemplateId = templateId;
-  document.getElementById('te-title').textContent = 'Edit Template';
-  document.getElementById('te-subtitle').textContent = t.name;
-  document.getElementById('te-editor').style.display = 'none';
-  document.getElementById('te-loading').style.display = 'flex';
-  document.getElementById('templateEditorOverlay').classList.add('open');
-  renderFieldPalette();
-  try {
-    const bytes = await getTemplateBytes(t);
-    const { React, createRoot, DocxEditor } = getDocxEditorModules();
-
-    // Store original bytes for reference
-    window._currentDocxBytes = bytes;
-
-    const editorEl = document.getElementById('te-editor');
-    editorEl.innerHTML = '';
-
-    // Create React root and mount DocxEditor
-    window._teReactRoot = createRoot(editorEl);
-    window._teEditorRef = React.createRef();
-
-    const editorComponent = React.createElement(DocxEditor, {
-      ref: window._teEditorRef,
-      documentBuffer: bytes.buffer,
-      mode: 'editing',
-      showToolbar: true,
-      showRuler: true,
-      showZoomControl: true,
-      onError: (err) => {
-        console.error('DocxEditor error:', err);
-        showToast('Editor error: ' + (err.message || ''), 'error');
-      }
-    });
-
-    window._teReactRoot.render(editorComponent);
-
-    document.getElementById('te-loading').style.display = 'none';
-    editorEl.style.display = 'block';
-  } catch (e) {
-    console.error('Template editor error:', e);
-    showToast('Failed to load template: ' + (e.message || ''), 'error');
-    closeTemplateEditor();
-  }
-}
-
-function renderFieldPalette() {
-  document.getElementById('te-fields').innerHTML = MERGE_FIELDS.map(section => `
-    <div>
-      <div class="te-section-title">${section.section}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px">
-        ${section.fields.map(([tag, desc]) =>
-          `<span class="te-field-btn" title="${desc}" onmousedown="event.preventDefault();insertMergeField('${tag}')">${tag}</span>`
-        ).join('')}
-      </div>
-    </div>
-  `).join('');
-}
-
-// Insert merge field text at current cursor position in the editor
-function insertMergeField(tag) {
-  const editorEl = document.getElementById('te-editor');
-  const sel = window.getSelection();
-  if (!sel || !sel.rangeCount || !editorEl.contains(sel.anchorNode)) {
-    showToast('Click in the document first to set cursor position.', 'error');
-    return;
-  }
-  const fieldName = tag.replace(/[{}]/g, '');
-  const fieldText = '{' + fieldName + '}';
-  // Use execCommand which works with ProseMirror's contenteditable
-  document.execCommand('insertText', false, fieldText);
-}
-
-function closeTemplateEditor() {
-  document.getElementById('templateEditorOverlay').classList.remove('open');
-  // Unmount React component
-  if (window._teReactRoot) {
-    window._teReactRoot.unmount();
-    window._teReactRoot = null;
-  }
-  window._teEditorRef = null;
-  const editorEl = document.getElementById('te-editor');
-  editorEl.innerHTML = '';
-  window._editingTemplateId = null;
-  window._currentDocxBytes = null;
-}
-
-async function saveTemplateEditor() {
-  const templateId = window._editingTemplateId;
-  const t = vaultFiles.find(f => f.id === templateId);
-  if (!t) return showToast('Template not found', 'error');
-  if (!window._teEditorRef?.current) return showToast('No document loaded', 'error');
-  showToast('Saving template…');
-  try {
-    // Use the editor's save method — returns the edited DOCX as ArrayBuffer
-    const buffer = await window._teEditorRef.current.save();
-    if (!buffer) throw new Error('Save returned empty buffer');
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    });
-
-    // Upload to Supabase Storage
-    let storagePath;
-    if (t.data && t.data.startsWith('storage:')) {
-      storagePath = t.data.replace('storage:', '');
-    } else {
-      storagePath = currentUser.id + '/templates/' + Date.now() + '_' + t.name;
-    }
-    const { error: uploadErr } = await sb.storage.from('vault-files').upload(storagePath, blob, {
-      upsert: true,
-      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    });
-    if (uploadErr) throw uploadErr;
-
-    // Update metadata
-    const updates = { size: blob.size };
-    if (!t.data || !t.data.startsWith('storage:')) updates.data = 'storage:' + storagePath;
-    await dbUpdateVaultFile(templateId, updates);
-    const idx = vaultFiles.findIndex(f => f.id === templateId);
-    if (idx >= 0) { vaultFiles[idx].size = blob.size; if (updates.data) vaultFiles[idx].data = updates.data; }
-
-    // Update stored bytes
-    window._currentDocxBytes = new Uint8Array(buffer);
-
-    renderTemplates();
-    showToast('Template saved!', 'success');
-  } catch (e) {
-    console.error('Save template error:', e);
-    showToast('Save failed: ' + (e.message || 'Unknown error'), 'error');
-  }
-}
 
 // ============================================================
 // PDF GENERATION
