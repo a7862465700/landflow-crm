@@ -2878,16 +2878,17 @@ function buildMergeData(loan) {
     firstPayDate = fpd.toISOString();
   }
 
-  // Maturity date: term years from the FIRST PAYMENT date, not contract date
+  // Maturity/last payment date: term (in years) × 12 months from the FIRST PAYMENT date
   const fpForMat = firstPayDate ? new Date(firstPayDate) : (loan.orig_date ? new Date(loan.orig_date) : new Date());
+  const termMonths = parseInt(loan.term || 0) * 12;
   const matDate = new Date(fpForMat);
-  matDate.setFullYear(matDate.getFullYear() + parseInt(loan.term || 0));
+  matDate.setMonth(matDate.getMonth() + termMonths - 1); // last payment is (termMonths - 1) months after first
 
-  // Balloon date: balloon years from the first payment date
+  // Balloon date: balloon years × 12 months from the first payment date
   let balloonDate = '';
   if (loan.balloon) {
     const bDate = new Date(fpForMat);
-    bDate.setFullYear(bDate.getFullYear() + parseInt(loan.balloon));
+    bDate.setMonth(bDate.getMonth() + (parseInt(loan.balloon) * 12) - 1);
     balloonDate = fmtDate(bDate.toISOString());
   }
 
@@ -2934,6 +2935,8 @@ function buildMergeData(loan) {
     monthly_payment: fmtD(pmt), monthly_payment_words: numberToWords(pmt),
     current_balance: fmtD(realBal.balance), current_balance_words: numberToWords(realBal.balance),
     maturity_date: fmtDate(matDate.toISOString()),
+    last_payment_date: fmtDate(matDate.toISOString()),
+    term_months: termMonths.toString(),
     total_interest: fmtD(totalInterest), total_interest_words: numberToWords(totalInterest),
     // Company / Lender
     company_name: s.company_name || '', company_address: s.company_address || '',
@@ -3100,7 +3103,8 @@ const MERGE_FIELDS = [
     ['{down_payment}', 'Down payment (digits)'], ['{down_payment_fmt}', 'Down payment ($)'],
     ['{down_payment_words}', 'Down payment (written out)'],
     ['{rate}', 'Interest rate (number)'], ['{rate_fmt}', 'Interest rate (%)'],
-    ['{term}', 'Loan term (years)'], ['{balloon}', 'Balloon (years)'], ['{balloon_date}', 'Balloon maturity date'],
+    ['{term}', 'Loan term (years)'], ['{term_months}', 'Loan term (months)'],
+    ['{balloon}', 'Balloon (years)'], ['{balloon_date}', 'Balloon maturity date'],
     ['{orig_date}', 'Origination/contract date'], ['{contract_date}', 'Same as orig_date'], ['{date}', 'Contract date'],
     ['{first_pay_date}', 'First payment date (1st of next month)'],
     ['{payment_due_day}', 'Due day of month'], ['{status}', 'Loan status'], ['{notes}', 'Notes'],
@@ -3108,7 +3112,8 @@ const MERGE_FIELDS = [
   { section: 'Computed Values', fields: [
     ['{monthly_payment}', 'Monthly payment ($)'], ['{monthly_payment_words}', 'Monthly payment (written out)'],
     ['{current_balance}', 'Current balance ($)'], ['{current_balance_words}', 'Current balance (written out)'],
-    ['{maturity_date}', 'Maturity date (from 1st payment)'], ['{total_interest}', 'Total interest ($)'],
+    ['{maturity_date}', 'Last payment date'], ['{last_payment_date}', 'Last payment date (same)'],
+    ['{total_interest}', 'Total interest ($)'],
     ['{total_interest_words}', 'Total interest (written out)'],
     ['{account_number}', 'Account # (parcel or loan ID)'],
   ]},
