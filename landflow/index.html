@@ -12,6 +12,7 @@
 <script src="https://unpkg.com/pizzip@3.2.0/dist/pizzip.js"></script>
 <script src="https://unpkg.com/docxtemplater@3.68.3/build/docxtemplater.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
 <script src="docx-editor-bundle.js"></script>
 <link rel="stylesheet" href="docx-editor-styles.css">
 <style>
@@ -2328,10 +2329,14 @@ async function vaultOpen(loanId, fileId) {
       return;
     }
     const type = f.type || blob.type || 'application/octet-stream';
+    const isDocx = type.includes('wordprocessingml') || f.name?.endsWith('.docx');
     const viewBlob = new Blob([blob], { type });
     const url = URL.createObjectURL(viewBlob);
-    // Use an iframe overlay for PDFs and images so popup blockers don't interfere
-    if (type === 'application/pdf' || type.startsWith('image/')) {
+    // Use an inline overlay viewer for PDFs, images, and DOCX files
+    if (type === 'application/pdf' || type.startsWith('image/') || isDocx) {
+      // Remove any existing viewer
+      const existing = document.getElementById('file-viewer-overlay');
+      if (existing) existing.remove();
       const overlay = document.createElement('div');
       overlay.id = 'file-viewer-overlay';
       overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:10000;display:flex;flex-direction:column;align-items:center;padding:20px;';
@@ -2348,6 +2353,18 @@ async function vaultOpen(loanId, fileId) {
         iframe.src = url;
         iframe.style.cssText = 'flex:1;width:100%;max-width:1100px;border:none;border-radius:8px;background:#fff;';
         overlay.appendChild(iframe);
+      } else if (isDocx) {
+        const contentDiv = document.createElement('div');
+        contentDiv.style.cssText = 'flex:1;width:100%;max-width:1100px;overflow-y:auto;background:#fff;border-radius:8px;padding:40px 60px;';
+        contentDiv.innerHTML = '<div style="text-align:center;padding:40px;color:#888;">Loading document…</div>';
+        overlay.appendChild(contentDiv);
+        // Convert DOCX to HTML using mammoth.js
+        const arrayBuf = await viewBlob.arrayBuffer();
+        mammoth.convertToHtml({ arrayBuffer: arrayBuf }).then(result => {
+          contentDiv.innerHTML = `<style>.docx-view img{max-width:100%} .docx-view table{border-collapse:collapse;width:100%} .docx-view td,.docx-view th{border:1px solid #ccc;padding:6px 10px} .docx-view p{margin:0 0 8px;line-height:1.5}</style><div class="docx-view">${result.value}</div>`;
+        }).catch(err => {
+          contentDiv.innerHTML = `<div style="padding:40px;color:#c00;">Could not render document: ${err.message}</div>`;
+        });
       } else {
         const img = document.createElement('img');
         img.src = url;
