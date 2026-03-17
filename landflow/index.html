@@ -2870,12 +2870,14 @@ function buildMergeData(loan) {
   const totalInterest = (pmt * n) - parseFloat(loan.loan_amount);
   const today = new Date();
 
-  // Calculate first payment date: 1st of the month following the contract date
-  let firstPayDate = loan.first_pay_date;
-  if (!firstPayDate && loan.orig_date) {
+  // Calculate first payment date: always 1st of the month following the contract date
+  let firstPayDate;
+  if (loan.orig_date) {
     const origD = new Date(loan.orig_date);
     const fpd = new Date(origD.getFullYear(), origD.getMonth() + 1, 1);
     firstPayDate = fpd.toISOString();
+  } else {
+    firstPayDate = loan.first_pay_date || '';
   }
 
   // Maturity/last payment date: term (in years) × 12 months from the FIRST PAYMENT date
