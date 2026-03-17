@@ -2303,8 +2303,7 @@ async function vaultOpen(loanId, fileId) {
       toolbar.style.cssText = 'display:flex;justify-content:space-between;align-items:center;width:100%;max-width:1100px;margin-bottom:10px;';
       toolbar.innerHTML = `<span style="color:#fff;font-size:14px;font-weight:600">${f.name}</span>
         <div style="display:flex;gap:8px;">
-          <button onclick="printViewerContent()" style="background:#3b7be0;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print</button>
-          <button onclick="printFileViewer()" style="background:var(--blue);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print</button>
+          <button onclick="printViewerContent()" style="background:var(--blue);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print</button>
           <button onclick="vaultDownload('${loanId}','${fileId}')" style="background:var(--gold);color:#000;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">⬇ Download</button>
           <button onclick="document.getElementById('file-viewer-overlay').remove()" style="background:#555;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">✕ Close</button>
         </div>`;
@@ -2364,28 +2363,6 @@ async function vaultOpen(loanId, fileId) {
   }
 }
 
-function printFileViewer() {
-  const overlay = document.getElementById('file-viewer-overlay');
-  if (!overlay) return;
-  const iframe = overlay.querySelector('iframe');
-  const docxView = overlay.querySelector('.docx-view');
-  const img = overlay.querySelector('img');
-  if (iframe) {
-    // PDF in iframe — use iframe's print
-    try { iframe.contentWindow.print(); } catch(e) { window.print(); }
-  } else if (docxView) {
-    // DOCX rendered as HTML — open print window
-    const pw = window.open('', '_blank');
-    pw.document.write(`<html><head><title>Print</title><style>body{font-family:Arial,sans-serif;margin:40px 60px;} table{border-collapse:collapse;width:100%} td,th{border:1px solid #ccc;padding:6px 10px} p{margin:0 0 8px;line-height:1.5} img{max-width:100%} @page{margin:0.75in}</style></head><body>${docxView.innerHTML}</body></html>`);
-    pw.document.close();
-    pw.onload = () => { pw.print(); pw.close(); };
-  } else if (img) {
-    const pw = window.open('', '_blank');
-    pw.document.write(`<html><head><title>Print</title><style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh} img{max-width:100%;max-height:100vh}</style></head><body><img src="${img.src}"></body></html>`);
-    pw.document.close();
-    pw.onload = () => { pw.print(); pw.close(); };
-  }
-}
 
 async function vaultDownload(loanId, fileId) {
   const f = vaultFiles.find(x => x.id === fileId);
