@@ -1469,19 +1469,27 @@ async function saveLoan() {
     showToast('✅ Loan created!', 'success');
     setTimeout(() => openDetail(saved.id), 400);
 
-    // Save deed PDF reference to vault (metadata only, no large base64)
+    // Save deed PDF to Supabase Storage and vault
     if (pendingImportPDF) {
       try {
+        // Convert data URL to blob for storage upload
+        const pdfRes = await fetch(pendingImportPDF.dataUrl);
+        const pdfBlob = await pdfRes.blob();
+        const storagePath = `${currentUser.id}/recorded/${Date.now()}_${pendingImportPDF.name}`;
+        await sb.storage.from('vault-files').upload(storagePath, pdfBlob, {
+          upsert: true,
+          contentType: pendingImportPDF.type || 'application/pdf'
+        });
         const vaultData = {
           loan_id: saved.id, cat_id: 'recorded',
           name: pendingImportPDF.name, size: pendingImportPDF.size,
-          type: pendingImportPDF.type, data: '',
-          book_page: '', notes: 'Auto-imported deed — re-upload file via Files tab to store',
+          type: pendingImportPDF.type, data: 'storage:' + storagePath,
+          book_page: '', notes: 'Auto-imported deed',
         };
         const vaultSaved = await dbSaveVaultFile(vaultData);
         if (vaultSaved) {
           vaultFiles.push(vaultSaved);
-          showToast('📄 Deed recorded in vault', 'success');
+          showToast('📄 Deed saved to vault', 'success');
         }
       } catch (err) {
         console.error('Vault save error:', err);
@@ -1641,7 +1649,7 @@ function openDetail(id) {
   const bal = realBal.balance;
   const paid = realBal.totalPayments || 0;
   document.getElementById('dp-id').textContent = (l.id?.slice(0,8).toUpperCase()||'') + (l.parcel ? ' · Parcel ' + l.parcel : '') + ' · ' + fmtDate(l.orig_date);
-  document.getElementById('dp-name').textContent = l.borrower || 'Unnamed';
+  document.getElementById('dp-name').textContent = l.buyer_company || l.borrower || 'Unnamed';
   document.getElementById('dp-addr').textContent = '📍 ' + (l.address||'—') + (l.county ? ' · ' + l.county + ' County' : '');
   document.getElementById('dp-badge').innerHTML = getBadge(l);
   document.getElementById('dp-payment').textContent = fmtD(pmt);
