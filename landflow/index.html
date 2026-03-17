@@ -2963,9 +2963,23 @@ async function executeTemplateGenerate() {
     const doc = new window.docxtemplater(zip, {
       paragraphLoop: true, linebreaks: true,
       nullGetter: () => '',
+      errorLogging: false,
     });
     const data = buildMergeData(loan);
-    doc.render(data);
+    try {
+      doc.render(data);
+    } catch (renderErr) {
+      // Extract useful details from Multi error
+      if (renderErr.properties && renderErr.properties.errors) {
+        const details = renderErr.properties.errors.map(e =>
+          `• ${e.properties?.explanation || e.message || 'Unknown field error'}`
+        ).join('\n');
+        console.error('Template errors:\n' + details);
+        showToast('Template error — check field names in your Word doc:\n' + details, 'error');
+        return;
+      }
+      throw renderErr;
+    }
     const output = doc.getZip().generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
     const borrowerPart = (loan.borrower || 'document').replace(/\s+/g, '_');
     const parcelPart = (loan.parcel || '').replace(/\s+/g, '_');
