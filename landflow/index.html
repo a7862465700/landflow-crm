@@ -2853,6 +2853,37 @@ async function deleteTemplate(id) {
   showToast('Template deleted', 'success');
 }
 
+// Convert a number to written-out dollar form: "Eleven Thousand Five Hundred Fifty Dollars 00/100"
+function numberToWords(num) {
+  const n = Math.abs(parseFloat(num));
+  if (isNaN(n)) return '';
+  const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+    'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  const scales = ['','Thousand','Million','Billion'];
+  if (n === 0) return 'Zero Dollars 00/100';
+  const dollars = Math.floor(n);
+  const cents = Math.round((n - dollars) * 100);
+  function convertChunk(num) {
+    if (num === 0) return '';
+    if (num < 20) return ones[num];
+    if (num < 100) return tens[Math.floor(num/10)] + (num%10 ? ' ' + ones[num%10] : '');
+    return ones[Math.floor(num/100)] + ' Hundred' + (num%100 ? ' ' + convertChunk(num%100) : '');
+  }
+  let words = '';
+  let remaining = dollars;
+  for (let i = 0; remaining > 0 && i < scales.length; i++) {
+    const chunk = remaining % 1000;
+    if (chunk > 0) {
+      const chunkWords = convertChunk(chunk) + (scales[i] ? ' ' + scales[i] : '');
+      words = chunkWords + (words ? ' ' + words : '');
+    }
+    remaining = Math.floor(remaining / 1000);
+  }
+  const centsStr = cents.toString().padStart(2, '0');
+  return words + ' Dollars ' + centsStr + '/100';
+}
+
 function buildMergeData(loan) {
   const s = APP.settings || {};
   const pmt = calcPayment(parseFloat(loan.loan_amount), parseFloat(loan.rate), parseInt(loan.term));
@@ -2860,8 +2891,6 @@ function buildMergeData(loan) {
   const mr = parseFloat(loan.rate) / 100 / 12;
   const n = parseInt(loan.term) * 12;
   const totalInterest = (pmt * n) - parseFloat(loan.loan_amount);
-  const matDate = loan.orig_date ? new Date(loan.orig_date) : new Date();
-  matDate.setFullYear(matDate.getFullYear() + parseInt(loan.term || 0));
   const today = new Date();
 
   // Calculate first payment date: 1st of the month following the contract date
@@ -2870,6 +2899,19 @@ function buildMergeData(loan) {
     const origD = new Date(loan.orig_date);
     const fpd = new Date(origD.getFullYear(), origD.getMonth() + 1, 1);
     firstPayDate = fpd.toISOString();
+  }
+
+  // Maturity date: term years from the FIRST PAYMENT date, not contract date
+  const fpForMat = firstPayDate ? new Date(firstPayDate) : (loan.orig_date ? new Date(loan.orig_date) : new Date());
+  const matDate = new Date(fpForMat);
+  matDate.setFullYear(matDate.getFullYear() + parseInt(loan.term || 0));
+
+  // Balloon date: balloon years from the first payment date
+  let balloonDate = '';
+  if (loan.balloon) {
+    const bDate = new Date(fpForMat);
+    bDate.setFullYear(bDate.getFullYear() + parseInt(loan.balloon));
+    balloonDate = fmtDate(bDate.toISOString());
   }
 
   // Helper: format raw number with commas (no $ sign) e.g. 125,000
@@ -2885,15 +2927,20 @@ function buildMergeData(loan) {
     seller: loan.seller || '', seller_phone: fmtPhone(loan.seller_phone) || '',
     seller_address: loan.seller_address || '', price_paid: fmtNum(loan.price_paid),
     price_paid_fmt: fmt(loan.price_paid || 0),
+    price_paid_words: numberToWords(loan.price_paid),
     // Property
     county: loan.county || '', parcel: loan.parcel || '',
     address: loan.address || '', legal_desc: loan.legal_desc || '',
     // Loan Terms
     sale_price: fmtNum(loan.sale_price), sale_price_fmt: fmt(loan.sale_price || 0),
+    sale_price_words: numberToWords(loan.sale_price),
     loan_amount: fmtNum(loan.loan_amount), loan_amount_fmt: fmt(loan.loan_amount || 0),
+    loan_amount_words: numberToWords(loan.loan_amount),
     down_payment: fmtNum(loan.down_payment), down_payment_fmt: fmt(loan.down_payment || 0),
+    down_payment_words: numberToWords(loan.down_payment),
     rate: loan.rate || '', rate_fmt: (loan.rate || 0) + '%',
     term: loan.term || '', balloon: loan.balloon || '',
+    balloon_date: balloonDate,
     orig_date: fmtDate(loan.orig_date), contract_date: fmtDate(loan.orig_date), date: fmtDate(loan.orig_date),
     first_pay_date: fmtDate(firstPayDate),
     payment_due_day: loan.payment_due_day || '1', status: loan.status || '',
@@ -2902,13 +2949,15 @@ function buildMergeData(loan) {
     investor: loan.investor || '', inv_contact: loan.inv_contact || '',
     inv_date: fmtDate(loan.inv_date), inv_price: fmtNum(loan.inv_price),
     inv_price_fmt: fmt(loan.inv_price || 0),
+    inv_price_words: numberToWords(loan.inv_price),
     nb_name: loan.nb_name || '', nb_business: loan.nb_business || '',
     nb_phone: fmtPhone(loan.nb_phone) || '', nb_email: loan.nb_email || '',
     nb_address: loan.nb_address || '',
     // Computed
-    monthly_payment: fmtD(pmt), current_balance: fmtD(realBal.balance),
+    monthly_payment: fmtD(pmt), monthly_payment_words: numberToWords(pmt),
+    current_balance: fmtD(realBal.balance), current_balance_words: numberToWords(realBal.balance),
     maturity_date: fmtDate(matDate.toISOString()),
-    total_interest: fmtD(totalInterest),
+    total_interest: fmtD(totalInterest), total_interest_words: numberToWords(totalInterest),
     // Company / Lender
     company_name: s.company_name || '', company_address: s.company_address || '',
     company_phone: fmtPhone(s.company_phone) || '', company_email: s.company_email || '',
@@ -3059,30 +3108,37 @@ const MERGE_FIELDS = [
   ]},
   { section: 'Seller', fields: [
     ['{seller}', 'Full name'], ['{seller_phone}', 'Phone (formatted)'],
-    ['{seller_address}', 'Address'], ['{price_paid}', 'Price paid (raw)'], ['{price_paid_fmt}', 'Price paid ($)'],
+    ['{seller_address}', 'Address'], ['{price_paid}', 'Price paid (digits)'], ['{price_paid_fmt}', 'Price paid ($)'],
+    ['{price_paid_words}', 'Price paid (written out)'],
   ]},
   { section: 'Property', fields: [
     ['{address}', 'Property address'], ['{county}', 'County'], ['{parcel}', 'Parcel number'],
     ['{legal_desc}', 'Legal description'],
   ]},
   { section: 'Loan Terms', fields: [
-    ['{loan_amount}', 'Amount (raw)'], ['{loan_amount_fmt}', 'Amount ($)'],
-    ['{sale_price}', 'Sale price (raw)'], ['{sale_price_fmt}', 'Sale price ($)'],
-    ['{down_payment}', 'Down payment (raw)'], ['{down_payment_fmt}', 'Down payment ($)'],
+    ['{sale_price}', 'Sale price (digits)'], ['{sale_price_fmt}', 'Sale price ($)'],
+    ['{sale_price_words}', 'Sale price (written out)'],
+    ['{loan_amount}', 'Loan amount (digits)'], ['{loan_amount_fmt}', 'Loan amount ($)'],
+    ['{loan_amount_words}', 'Loan amount (written out)'],
+    ['{down_payment}', 'Down payment (digits)'], ['{down_payment_fmt}', 'Down payment ($)'],
+    ['{down_payment_words}', 'Down payment (written out)'],
     ['{rate}', 'Interest rate (number)'], ['{rate_fmt}', 'Interest rate (%)'],
-    ['{term}', 'Loan term (years)'], ['{balloon}', 'Balloon (years)'],
+    ['{term}', 'Loan term (years)'], ['{balloon}', 'Balloon (years)'], ['{balloon_date}', 'Balloon maturity date'],
     ['{orig_date}', 'Origination/contract date'], ['{contract_date}', 'Same as orig_date'], ['{date}', 'Contract date'],
-    ['{first_pay_date}', 'First payment date'],
+    ['{first_pay_date}', 'First payment date (1st of next month)'],
     ['{payment_due_day}', 'Due day of month'], ['{status}', 'Loan status'], ['{notes}', 'Notes'],
   ]},
   { section: 'Computed Values', fields: [
-    ['{monthly_payment}', 'Monthly payment ($)'], ['{current_balance}', 'Current balance ($)'],
-    ['{maturity_date}', 'Maturity date'], ['{total_interest}', 'Total interest over life ($)'],
+    ['{monthly_payment}', 'Monthly payment ($)'], ['{monthly_payment_words}', 'Monthly payment (written out)'],
+    ['{current_balance}', 'Current balance ($)'], ['{current_balance_words}', 'Current balance (written out)'],
+    ['{maturity_date}', 'Maturity date (from 1st payment)'], ['{total_interest}', 'Total interest ($)'],
+    ['{total_interest_words}', 'Total interest (written out)'],
     ['{account_number}', 'Account # (parcel or loan ID)'],
   ]},
   { section: 'Investor / Note Buyer', fields: [
     ['{investor}', 'Investor name'], ['{inv_contact}', 'Investor contact'],
-    ['{inv_date}', 'Assignment date'], ['{inv_price}', 'Purchase price (raw)'], ['{inv_price_fmt}', 'Purchase price ($)'],
+    ['{inv_date}', 'Assignment date'], ['{inv_price}', 'Purchase price (digits)'], ['{inv_price_fmt}', 'Purchase price ($)'],
+    ['{inv_price_words}', 'Purchase price (written out)'],
     ['{nb_name}', 'Note buyer name'], ['{nb_business}', 'Business name'],
     ['{nb_phone}', 'Phone'], ['{nb_email}', 'Email'], ['{nb_address}', 'Address'],
   ]},
