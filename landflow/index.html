@@ -2344,6 +2344,7 @@ async function vaultOpen(loanId, fileId) {
       toolbar.style.cssText = 'display:flex;justify-content:space-between;align-items:center;width:100%;max-width:1100px;margin-bottom:10px;';
       toolbar.innerHTML = `<span style="color:#fff;font-size:14px;font-weight:600">${f.name}</span>
         <div style="display:flex;gap:8px;">
+          <button onclick="printViewerContent()" style="background:#3b7be0;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print</button>
           <button onclick="vaultDownload('${loanId}','${fileId}')" style="background:var(--gold);color:#000;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">⬇ Download</button>
           <button onclick="document.getElementById('file-viewer-overlay').remove()" style="background:#555;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">✕ Close</button>
         </div>`;
@@ -2355,13 +2356,35 @@ async function vaultOpen(loanId, fileId) {
         overlay.appendChild(iframe);
       } else if (isDocx) {
         const contentDiv = document.createElement('div');
+        contentDiv.id = 'docx-viewer-content';
         contentDiv.style.cssText = 'flex:1;width:100%;max-width:1100px;overflow-y:auto;background:#fff;border-radius:8px;padding:40px 60px;';
         contentDiv.innerHTML = '<div style="text-align:center;padding:40px;color:#888;">Loading document…</div>';
         overlay.appendChild(contentDiv);
-        // Convert DOCX to HTML using mammoth.js
+        // Convert DOCX to HTML using mammoth.js with style mapping
         const arrayBuf = await viewBlob.arrayBuffer();
-        mammoth.convertToHtml({ arrayBuffer: arrayBuf }).then(result => {
-          contentDiv.innerHTML = `<style>.docx-view img{max-width:100%} .docx-view table{border-collapse:collapse;width:100%} .docx-view td,.docx-view th{border:1px solid #ccc;padding:6px 10px} .docx-view p{margin:0 0 8px;line-height:1.5}</style><div class="docx-view">${result.value}</div>`;
+        mammoth.convertToHtml({
+          arrayBuffer: arrayBuf,
+          styleMap: [
+            "p[style-name='Heading 1'] => h1:fresh",
+            "p[style-name='Heading 2'] => h2:fresh",
+            "p[style-name='Heading 3'] => h3:fresh",
+          ],
+          includeDefaultStyleMap: true,
+        }).then(result => {
+          contentDiv.innerHTML = `<style>
+            .docx-view { font-family: 'Times New Roman', Georgia, serif; font-size: 12pt; line-height: 1.5; color: #000; }
+            .docx-view img { max-width:100% }
+            .docx-view table { border-collapse:collapse; width:100% }
+            .docx-view td, .docx-view th { border:1px solid #999; padding:6px 10px }
+            .docx-view p { margin:0 0 8px; line-height:1.5 }
+            .docx-view h1 { font-size:18pt; font-weight:bold; margin:16px 0 8px }
+            .docx-view h2 { font-size:15pt; font-weight:bold; margin:12px 0 6px }
+            .docx-view h3 { font-size:13pt; font-weight:bold; margin:10px 0 4px }
+            .docx-view ul, .docx-view ol { margin:0 0 8px 24px }
+            @media print {
+              .docx-view { font-size: 12pt; }
+            }
+          </style><div class="docx-view">${result.value}</div>`;
         }).catch(err => {
           contentDiv.innerHTML = `<div style="padding:40px;color:#c00;">Could not render document: ${err.message}</div>`;
         });
@@ -2407,6 +2430,31 @@ async function vaultSaveNote(loanId, fileId, field, val) {
   await dbUpdateVaultFile(fileId, updates);
   const f = vaultFiles.find(x => x.id === fileId);
   if (f) f[field] = val;
+}
+
+function printViewerContent() {
+  const content = document.getElementById('docx-viewer-content');
+  if (!content) {
+    // For PDFs/images, try printing the iframe
+    const iframe = document.querySelector('#file-viewer-overlay iframe');
+    if (iframe) { iframe.contentWindow.print(); return; }
+    showToast('Nothing to print', 'error'); return;
+  }
+  const printWin = window.open('', '_blank', 'width=800,height=1000');
+  printWin.document.write(`<!DOCTYPE html><html><head><title>Print Document</title>
+    <style>
+      body { margin:0; padding:40px 60px; font-family:'Times New Roman',Georgia,serif; font-size:12pt; color:#000; }
+      img { max-width:100% }
+      table { border-collapse:collapse; width:100% }
+      td, th { border:1px solid #999; padding:6px 10px }
+      p { margin:0 0 8px; line-height:1.5 }
+      h1 { font-size:18pt; font-weight:bold; margin:16px 0 8px }
+      h2 { font-size:15pt; font-weight:bold; margin:12px 0 6px }
+      h3 { font-size:13pt; font-weight:bold; margin:10px 0 4px }
+      @page { margin: 1in; }
+    </style></head><body>${content.querySelector('.docx-view')?.innerHTML || content.innerHTML}</body></html>`);
+  printWin.document.close();
+  printWin.onload = () => { printWin.print(); printWin.close(); };
 }
 
 function fmtFileSize(b) {
@@ -2834,30 +2882,43 @@ function buildMergeData(loan) {
   matDate.setFullYear(matDate.getFullYear() + parseInt(loan.term || 0));
   const today = new Date();
 
+  // Calculate first payment date: 1st of the month following the contract date
+  let firstPayDate = loan.first_pay_date;
+  if (!firstPayDate && loan.orig_date) {
+    const origD = new Date(loan.orig_date);
+    const fpd = new Date(origD.getFullYear(), origD.getMonth() + 1, 1);
+    firstPayDate = fpd.toISOString();
+  }
+
+  // Helper: format raw number with commas (no $ sign) e.g. 125,000
+  const fmtNum = v => { const n = parseFloat(v); return isNaN(n) ? '' : n.toLocaleString('en-US'); };
+  // Helper: format raw number with commas and 2 decimals (no $ sign) e.g. 125,000.00
+  const fmtNum2 = v => { const n = parseFloat(v); return isNaN(n) ? '' : n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); };
+
   return {
     // Borrower / Buyer
     borrower: loan.borrower || '', buyer_company: loan.buyer_company || '', buyer_address: loan.buyer_address || '',
     phone: fmtPhone(loan.phone) || '', email: loan.email || '', ssn: loan.ssn || '',
     // Seller
     seller: loan.seller || '', seller_phone: fmtPhone(loan.seller_phone) || '',
-    seller_address: loan.seller_address || '', price_paid: loan.price_paid || '',
+    seller_address: loan.seller_address || '', price_paid: fmtNum(loan.price_paid),
     price_paid_fmt: fmt(loan.price_paid || 0),
     // Property
     county: loan.county || '', parcel: loan.parcel || '',
     address: loan.address || '', legal_desc: loan.legal_desc || '',
     // Loan Terms
-    sale_price: loan.sale_price || '', sale_price_fmt: fmt(loan.sale_price || 0),
-    loan_amount: loan.loan_amount || '', loan_amount_fmt: fmt(loan.loan_amount || 0),
-    down_payment: loan.down_payment || '', down_payment_fmt: fmt(loan.down_payment || 0),
+    sale_price: fmtNum(loan.sale_price), sale_price_fmt: fmt(loan.sale_price || 0),
+    loan_amount: fmtNum(loan.loan_amount), loan_amount_fmt: fmt(loan.loan_amount || 0),
+    down_payment: fmtNum(loan.down_payment), down_payment_fmt: fmt(loan.down_payment || 0),
     rate: loan.rate || '', rate_fmt: (loan.rate || 0) + '%',
     term: loan.term || '', balloon: loan.balloon || '',
     orig_date: fmtDate(loan.orig_date), contract_date: fmtDate(loan.orig_date), date: fmtDate(loan.orig_date),
-    first_pay_date: fmtDate(loan.first_pay_date),
-    payment_due_day: loan.payment_due_day || '', status: loan.status || '',
+    first_pay_date: fmtDate(firstPayDate),
+    payment_due_day: loan.payment_due_day || '1', status: loan.status || '',
     notes: loan.notes || '',
     // Investor / Note Buyer
     investor: loan.investor || '', inv_contact: loan.inv_contact || '',
-    inv_date: fmtDate(loan.inv_date), inv_price: loan.inv_price || '',
+    inv_date: fmtDate(loan.inv_date), inv_price: fmtNum(loan.inv_price),
     inv_price_fmt: fmt(loan.inv_price || 0),
     nb_name: loan.nb_name || '', nb_business: loan.nb_business || '',
     nb_phone: fmtPhone(loan.nb_phone) || '', nb_email: loan.nb_email || '',
