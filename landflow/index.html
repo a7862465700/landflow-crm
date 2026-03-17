@@ -3100,12 +3100,20 @@ const MERGE_FIELDS = [
   ]},
 ];
 
+function copyMergeField(tag, btn) {
+  navigator.clipboard.writeText(tag).then(() => {
+    btn.textContent = '✓';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = '📋'; btn.style.color = ''; }, 1200);
+  });
+}
+
 function showMergeFieldReference() {
-  const html = `<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Use these fields in your Word (.docx) templates. Type the field name exactly as shown (with curly braces) and it will be replaced with the loan data when you generate.</div>` +
+  const html = `<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Click 📋 to copy a field, then paste it into your Word template. When you generate a document, each <code style="background:var(--golddim);padding:1px 4px;border-radius:3px">{field}</code> gets replaced with the real loan data.</div>` +
     MERGE_FIELDS.map(s => `<div style="margin-bottom:16px">
       <div style="font-weight:700;color:var(--gold);font-size:13px;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">${s.section}</div>
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:12px">
-        ${s.fields.map(([tag, desc]) => `<div style="font-family:'JetBrains Mono',monospace;color:var(--text);font-weight:600">${tag}</div><div style="color:var(--text2)">${desc}</div>`).join('')}
+      <div style="display:grid;grid-template-columns:auto auto 1fr;gap:4px 8px;font-size:12px;align-items:center">
+        ${s.fields.map(([tag, desc]) => `<button onclick="copyMergeField('${tag}', this)" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:13px;border-radius:4px" title="Copy ${tag}">📋</button><div style="font-family:'JetBrains Mono',monospace;color:var(--text);font-weight:600;user-select:all;cursor:pointer" onclick="copyMergeField('${tag}', this.previousElementSibling)">${tag}</div><div style="color:var(--text2)">${desc}</div>`).join('')}
       </div>
     </div>`).join('');
   document.getElementById('mergeFieldContent').innerHTML = html;
