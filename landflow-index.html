@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>LandFlow CRM</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg:#0a0c10; --s1:#111318; --s2:#181b22; --s3:#1e2230;
+  --border:#252a38; --border2:#2e3548;
+  --gold:#c9933a; --gold2:#e8b455; --golddim:rgba(201,147,58,0.13);
+  --green:#2ecc8a; --greendim:rgba(46,204,138,0.1);
+  --red:#e05555; --reddim:rgba(224,85,85,0.1);
+  --blue:#4f8ef5; --bluedim:rgba(79,142,245,0.1);
+  --amber:#e09832; --amberdim:rgba(224,152,50,0.1);
+  --text:#dde1ef; --text2:#8892aa; --text3:#4a5268;
+  --shadow:0 4px 24px rgba(0,0,0,0.5);
+  --r:10px; --r-sm:7px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+/* ── SCROLLBARS ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* ── AUTH SCREEN ── */
+#authScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.auth-card{width:100%;max-width:380px;background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:36px 32px;text-align:center}
+.auth-logo{font-family:'DM Serif Display',serif;font-size:32px;color:var(--gold2);margin-bottom:4px;letter-spacing:-1px}
+.auth-sub{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:2.5px;margin-bottom:32px;font-weight:600}
+.auth-label{display:block;text-align:left;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px}
+.auth-input{width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:var(--r-sm);padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;margin-bottom:16px;outline:none;transition:border-color .2s}
+.auth-input:focus{border-color:var(--gold)}
+.auth-btn{width:100%;background:var(--gold);color:#0a0c10;border:none;border-radius:var(--r-sm);padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:4px}
+.auth-btn:hover{background:var(--gold2)}
+.auth-err{color:var(--red);font-size:12px;margin-top:10px;min-height:18px}
+
+/* ── APP SHELL ── */
+#app{display:none;height:100vh;flex-direction:column}
+#app.visible{display:flex}
+
+/* ── TOP NAV (mobile) ── */
+.topnav{height:56px;background:var(--s1);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0;position:relative;z-index:50}
+.topnav-logo{font-family:'DM Serif Display',serif;font-size:20px;color:var(--gold2);letter-spacing:-0.5px}
+.topnav-right{display:flex;align-items:center;gap:8px}
+.burger{background:none;border:none;color:var(--text2);cursor:pointer;padding:8px;font-size:20px;line-height:1}
+.logout-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:11px;padding:6px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;border:1px solid var(--text3)}
+.topnav-title{font-size:13px;color:var(--text2);font-weight:600;position:absolute;left:50%;transform:translateX(-50%)}
+
+/* ── SIDEBAR DRAWER ── */
+.drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;backdrop-filter:blur(2px)}
+.drawer-overlay.open{display:block}
+.drawer{position:fixed;left:-280px;top:0;bottom:0;width:280px;background:var(--s1);border-right:1px solid var(--border);z-index:201;transition:left .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;overflow-y:auto}
+.drawer.open{left:0}
+.drawer-head{padding:20px 18px 16px;border-bottom:1px solid var(--border)}
+.drawer-logo{font-family:'DM Serif Display',serif;font-size:24px;color:var(--gold2);letter-spacing:-0.5px}
+.drawer-sub{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:2px;font-weight:700;margin-top:2px}
+.nav-section{padding:10px 0}
+.nav-label{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);font-weight:700;padding:8px 18px 4px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:11px 18px;cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;border-left:3px solid transparent;transition:all .15s;-webkit-user-select:none}
+.nav-item:active{background:rgba(255,255,255,.04)}
+.nav-item.active{color:var(--gold2);background:var(--golddim);border-left-color:var(--gold)}
+.nav-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
+.drawer-stats{padding:14px 18px;border-top:1px solid var(--border);margin-top:auto}
+.ds-row{display:flex;justify-content:space-between;margin-bottom:5px}
+.ds-label{font-size:11px;color:var(--text3)}
+.ds-val{font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-weight:500}
+
+/* ── DESKTOP SIDEBAR (≥768px) ── */
+@media(min-width:768px){
+  .burger{display:none}
+  .drawer-overlay{display:none!important}
+  .drawer{left:0!important;position:fixed;width:230px;transition:none}
+  #app{flex-direction:row}
+  .topnav{display:none}
+  .main-area{margin-left:230px;height:100vh;overflow-y:auto;flex:1;flex-direction:column}
+  .desktop-topbar{display:flex!important}
+}
+
+/* ── DESKTOP TOPBAR ── */
+.desktop-topbar{display:none;height:56px;background:var(--s1);border-bottom:1px solid var(--border);align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0;position:sticky;top:0;z-index:50}
+.desktop-title{font-family:'DM Serif Display',serif;font-size:18px;color:var(--text);letter-spacing:-0.3px}
+.topbar-right{display:flex;align-items:center;gap:10px}
+
+/* ── MAIN AREA ── */
+.main-area{flex:1;overflow-y:auto;height:calc(100vh - 56px);display:flex;flex-direction:column}
+@media(min-width:768px){.main-area{height:100vh}}
+.content{padding:16px;flex:1}
+@media(min-width:768px){.content{padding:24px 28px}}
+.view{display:none}
+.view.active{display:block}
+
+/* ── BOTTOM NAV (mobile) ── */
+.bottom-nav{display:flex;background:var(--s1);border-top:1px solid var(--border);flex-shrink:0;safe-area-inset-bottom:env(safe-area-inset-bottom)}
+@media(min-width:768px){.bottom-nav{display:none}}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px 10px;cursor:pointer;color:var(--text3);font-size:10px;font-weight:600;gap:3px;-webkit-user-select:none;transition:color .15s;position:relative}
+.bn-item.active{color:var(--gold2)}
+.bn-icon{font-size:18px;line-height:1}
+.bn-dot{position:absolute;top:6px;right:calc(50% - 16px);width:6px;height:6px;background:var(--red);border-radius:50%;display:none}
+.bn-dot.show{display:block}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;-webkit-user-select:none}
+.btn-gold{background:var(--gold);color:#0a0c10}
+.btn-gold:active{background:var(--gold2)}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
+.btn-ghost:active{background:var(--s3)}
+.btn-green{background:var(--greendim);color:var(--green);border:1px solid rgba(46,204,138,.2)}
+.btn-danger{background:var(--reddim);color:var(--red);border:1px solid rgba(224,85,85,.2)}
+.btn-sm{padding:5px 11px;font-size:12px}
+.btn-block{width:100%;justify-content:center}
+.fab{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));right:16px;width:52px;height:52px;border-radius:50%;background:var(--gold);border:none;color:#0a0c10;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(201,147,58,.4);z-index:40;-webkit-user-select:none}
+@media(min-width:768px){.fab{display:none}}
+
+/* ── STATS GRID ── */
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px}
+@media(min-width:600px){.stats-grid{grid-template-columns:repeat(4,1fr)}}
+.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden}
+.stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
+.sc-gold::after{background:linear-gradient(90deg,var(--gold),transparent)}
+.sc-green::after{background:linear-gradient(90deg,var(--green),transparent)}
+.sc-red::after{background:linear-gradient(90deg,var(--red),transparent)}
+.sc-blue::after{background:linear-gradient(90deg,var(--blue),transparent)}
+.stat-icon{font-size:18px;margin-bottom:6px}
+.stat-label{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);font-weight:700;margin-bottom:4px}
+.stat-val{font-family:'DM Serif Display',serif;font-size:22px;color:var(--text);letter-spacing:-0.5px;line-height:1.1}
+@media(min-width:768px){.stat-val{font-size:26px}}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:3px}
+
+/* ── SECTION HEADER ── */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.section-title{font-family:'DM Serif Display',serif;font-size:16px;color:var(--text)}
+@media(min-width:768px){.section-title{font-size:18px}}
+
+/* ── LOAN CARDS ── */
+.loans-grid{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:600px){.loans-grid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1100px){.loans-grid{grid-template-columns:repeat(3,1fr)}}
+.loan-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:all .2s;-webkit-user-select:none}
+.loan-card:active{border-color:var(--border2);background:var(--s2)}
+@media(min-width:768px){.loan-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:var(--shadow)}}
+.lc-head{padding:13px 14px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start}
+.lc-id{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);margin-bottom:2px}
+.lc-name{font-weight:700;font-size:14px;color:var(--text)}
+.lc-addr{font-size:11px;color:var(--text2);margin-top:1px}
+.lc-body{padding:10px 14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lc-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);font-weight:700;margin-bottom:1px}
+.lc-val{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);font-weight:500}
+.lc-val.gold{color:var(--gold)}.lc-val.green{color:var(--green)}.lc-val.red{color:var(--red)}
+.lc-foot{padding:8px 14px;background:var(--s2);border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:11px;color:var(--text3)}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.badge::before{content:'●';font-size:6px}
+.badge-current{background:var(--greendim);color:var(--green)}
+.badge-late{background:var(--reddim);color:var(--red)}
+.badge-balloon{background:var(--amberdim);color:var(--amber)}
+.badge-assigned{background:var(--bluedim);color:var(--blue)}
+
+/* ── SEARCH BAR ── */
+.search-bar{display:flex;gap:10px;margin-bottom:14px;align-items:center}
+.search-input{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;min-width:0}
+.search-input:focus{border-color:var(--gold)}
+.search-input::placeholder{color:var(--text3)}
+
+/* ── MODALS ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:14px;width:100%;max-width:580px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+.modal-head{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-family:'DM Serif Display',serif;font-size:17px;color:var(--text)}
+.modal-close{background:none;border:none;color:var(--text3);cursor:pointer;font-size:20px;line-height:1;padding:4px;border-radius:6px}
+.modal-body{padding:18px 20px;max-height:70vh;overflow-y:auto}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+
+/* ── FORMS ── */
+.form-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:480px){.form-grid{grid-template-columns:repeat(2,1fr)}}
+.form-full{grid-column:1/-1}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px}
+.form-input{background:var(--s2);border:1px solid var(--border2);border-radius:var(--r-sm);padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;width:100%;transition:border-color .2s;-webkit-appearance:none}
+.form-input:focus{border-color:var(--gold)}
+select.form-input{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%234a5268'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+textarea.form-input{resize:vertical;min-height:80px}
+.form-section{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);font-weight:700;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);margin-top:6px}
+.preview-box{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-top:4px}
+.preview-title{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);font-weight:700;margin-bottom:8px}
+.preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pv-label{font-size:10px;color:var(--text3);margin-bottom:1px}
+.pv-val{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--gold);font-weight:500}
+
+/* ── DETAIL PANEL ── */
+.detail-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;backdrop-filter:blur(2px)}
+.detail-overlay.open{display:block}
+.detail-panel{position:fixed;right:-100%;top:0;bottom:0;width:100%;max-width:520px;background:var(--s1);border-left:1px solid var(--border);z-index:201;transition:right .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;overflow:hidden}
+.detail-panel.open{right:0}
+@media(min-width:768px){.detail-panel{max-width:480px}}
+.dp-head{background:var(--s2);border-bottom:1px solid var(--border);padding:14px 16px;flex-shrink:0}
+.dp-close{background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;float:right;padding:2px 4px;margin:-2px -4px 0 0;border-radius:6px}
+.dp-id{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);margin-bottom:2px}
+.dp-name{font-family:'DM Serif Display',serif;font-size:20px;color:var(--text);margin-bottom:2px}
+.dp-addr{font-size:12px;color:var(--text2);margin-bottom:8px}
+.dp-actions{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.dp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-top:6px}
+.dp-stat-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);font-weight:700;margin-bottom:2px}
+.dp-stat-val{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600}
+.dp-body{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.tab-bar{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;scrollbar-width:none}
+.tab-bar::-webkit-scrollbar{display:none}
+.tab-btn{padding:10px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;font-family:'DM Sans',sans-serif;-webkit-user-select:none;transition:all .15s}
+.tab-btn.active{color:var(--gold2);border-bottom-color:var(--gold)}
+.dp-section{padding:14px 16px;border-bottom:1px solid var(--border)}
+.dp-section-title{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);font-weight:700;margin-bottom:10px}
+.dp-fields{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.dp-field-label{font-size:10px;color:var(--text3);margin-bottom:1px}
+.dp-field-val{font-size:13px;font-weight:600;color:var(--text)}
+.dp-field-val.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.dp-field-val.gold{color:var(--gold)}
+.dp-field-val.green{color:var(--green)}
+.progress-wrap{margin-top:8px}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px}
+.progress-bar{height:4px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:4px;transition:width .4s}
+
+/* ── PAYMENT ITEMS ── */
+.payment-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.payment-item:last-child{border-bottom:none}
+.pay-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:2px}
+.pay-left{display:flex;gap:10px;align-items:flex-start}
+.pay-date{font-size:12px;font-weight:600;color:var(--text)}
+.pay-note{font-size:11px;color:var(--text3);margin-top:1px}
+.pay-amt{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700}
+
+/* ── AMORT TABLE ── */
+.amort-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.amort-table{width:100%;border-collapse:collapse;font-size:11px;min-width:400px}
+.amort-table th{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);font-weight:700;padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);background:var(--bg)}
+.amort-table th:first-child,.amort-table td:first-child{text-align:left}
+.amort-table td{padding:5px 8px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border)}
+.amort-table .p{color:var(--green)}.amort-table .i{color:var(--red)}.amort-table .b{color:var(--text)}
+
+/* ── FILE VAULT ── */
+.vault-cat{margin-bottom:16px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.vault-cat-head{padding:10px 14px;background:var(--s2);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.vault-cat-title{font-size:13px;font-weight:600}
+.vault-file-row{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start}
+.vault-file-row:last-child{border-bottom:none}
+.vault-file-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.vault-file-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.vault-file-meta{font-size:11px;color:var(--text3);margin-top:1px}
+
+/* ── INVOICE CARDS ── */
+.invoice-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
+.inv-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.inv-id{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)}
+.inv-borrower{font-weight:700;font-size:14px;margin-top:2px}
+.inv-amount{font-family:'DM Serif Display',serif;font-size:20px;color:var(--gold)}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:var(--s3);border:1px solid var(--border2);border-radius:10px;padding:10px 18px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;z-index:999;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(min-width:768px){.toast{bottom:30px}}
+
+/* ── EMPTY STATES ── */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text3)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty-title{font-family:'DM Serif Display',serif;font-size:17px;color:var(--text2);margin-bottom:6px}
+.empty-sub{font-size:13px;margin-bottom:18px}
+
+/* ── DATA TABLE ── */
+.data-table{width:100%;border-collapse:collapse;font-size:12px;min-width:500px}
+.data-table th{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);font-weight:700;padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg);white-space:nowrap}
+.data-table td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text2)}
+.data-table tr:last-child td{border-bottom:none}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:var(--r);background:var(--s1)}
+
+/* ── ALERTS ── */
+.alert-item{padding:12px 14px;border-radius:var(--r);margin-bottom:8px;cursor:pointer;display:flex;align-items:flex-start;gap:12px;border:1px solid}
+.alert-item.urgent{background:var(--reddim);border-color:rgba(224,85,85,.2)}
+.alert-item.warning{background:var(--amberdim);border-color:rgba(224,152,50,.2)}
+.alert-item.info{background:var(--bluedim);border-color:rgba(79,142,245,.2)}
+.alert-icon{font-size:18px;flex-shrink:0}
+.alert-title{font-size:13px;font-weight:700;color:var(--text)}
+.alert-sub{font-size:11px;color:var(--text3);margin-top:1px}
+
+/* ── LOADING ── */
+#loadingScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:16px}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadingScreen">
+  <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--gold2)">LandFlow</div>
+  <div class="spinner"></div>
+</div>
+
+<!-- AUTH -->
+<div id="authScreen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-logo">LandFlow</div>
+    <div class="auth-sub">Seller Finance CRM</div>
+    <label class="auth-label">Email</label>
+    <input class="auth-input" id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
+    <label class="auth-label">Password</label>
+    <input class="auth-input" id="authPass" type="password" placeholder="••••••••" autocomplete="current-password">
+    <button class="auth-btn" onclick="signIn()">Sign In</button>
+    <div class="auth-err" id="authErr"></div>
+    <div style="margin-top:20px;font-size:11px;color:var(--text3)">First time? <span style="color:var(--gold);cursor:pointer" onclick="signUp()">Create account</span></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- MOBILE TOPNAV -->
+  <div class="topnav">
+    <button class="burger" onclick="toggleDrawer()">☰</button>
+    <span class="topnav-title" id="topnavTitle">Portfolio</span>
+    <button class="logout-btn" onclick="signOut()">Sign Out</button>
+  </div>
+
+  <!-- DRAWER OVERLAY -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+
+  <!-- SIDEBAR DRAWER -->
+  <div class="drawer" id="drawer">
+    <div class="drawer-head">
+      <div class="drawer-logo">LandFlow</div>
+      <div class="drawer-sub">Seller Finance CRM</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Portfolio</div>
+      <div class="nav-item active" onclick="nav('portfolio',this)" data-title="Portfolio">
+        <span class="nav-icon">🏡</span>Active Loans
+      </div>
+      <div class="nav-item" onclick="nav('buyers',this)" data-title="Buyers">
+        <span class="nav-icon">👤</span>Buyer Directory
+      </div>
+      <div class="nav-item" onclick="nav('investors',this)" data-title="Investors">
+        <span class="nav-icon">💼</span>Investors
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Finance</div>
+      <div class="nav-item" onclick="nav('payments',this)" data-title="Payments">
+        <span class="nav-icon">💳</span>Payment Ledger
+      </div>
+      <div class="nav-item" onclick="nav('invoices',this)" data-title="Invoices">
+        <span class="nav-icon">🧾</span>Invoices
+      </div>
+      <div class="nav-item" onclick="nav('alerts',this)" data-title="Alerts">
+        <span class="nav-icon">🔔</span>Alerts
+        <span class="nav-badge" id="alertBadge" style="display:none">0</span>
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Documents</div>
+      <div class="nav-item" onclick="nav('vault',this)" data-title="Doc Vault">
+        <span class="nav-icon">🗄</span>Document Vault
+      </div>
+    </div>
+    <div class="drawer-stats">
+      <div class="ds-row"><span class="ds-label">Loans</span><span class="ds-val" id="ss-loans">0</span></div>
+      <div class="ds-row"><span class="ds-label">Portfolio</span><span class="ds-val" id="ss-portfolio">$0</span></div>
+      <div class="ds-row"><span class="ds-label">Monthly</span><span class="ds-val" id="ss-monthly">$0</span></div>
+    </div>
+  </div>
+
+  <!-- MAIN AREA -->
+  <div class="main-area">
+    <div class="desktop-topbar">
+      <div class="desktop-title" id="desktopTitle">Portfolio</div>
+      <div class="topbar-right">
+        <button class="btn btn-gold btn-sm" onclick="openLoanModal()">＋ New Loan</button>
+        <button class="logout-btn" onclick="signOut()">Sign Out</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- PORTFOLIO -->
+      <div class="view active" id="view-portfolio">
+        <div class="stats-grid">
+          <div class="stat-card sc-gold">
+            <div class="stat-icon">🏡</div>
+            <div class="stat-label">Portfolio Value</div>
+            <div class="stat-val" id="st-portfolio">$0</div>
+            <div class="stat-sub" id="st-portfolio-sub">0 notes</div>
+          </div>
+          <div class="stat-card sc-green">
+            <div class="stat-icon">💵</div>
+            <div class="stat-label">Monthly Income</div>
+            <div class="stat-val" id="st-monthly">$0</div>
+          </div>
+          <div class="stat-card sc-blue">
+            <div class="stat-icon">🏦</div>
+            <div class="stat-label">Assigned Notes</div>
+            <div class="stat-val" id="st-assigned">$0</div>
+            <div class="stat-sub" id="st-assigned-sub">0 notes</div>
+          </div>
+          <div class="stat-card sc-red">
+            <div class="stat-icon">🔔</div>
+            <div class="stat-label">Open Alerts</div>
+            <div class="stat-val" id="st-alerts">0</div>
+          </div>
+        </div>
+        <div class="section-header">
+          <div class="section-title">Active Loans</div>
+          <button class="btn btn-gold btn-sm" onclick="openLoanModal()">＋ New Loan</button>
+        </div>
+        <div class="search-bar">
+          <input class="search-input" id="loanSearch" placeholder="🔍  Search by buyer, seller, parcel, county..." oninput="renderLoans()">
+        </div>
+        <div id="loansGrid"><div class="empty-state"><div class="empty-icon">🏡</div><div class="empty-title">No loans yet</div><div class="empty-sub">Add your first seller-financed loan</div><button class="btn btn-gold" onclick="openLoanModal()">＋ Add Loan</button></div></div>
+      </div>
+
+      <!-- PAYMENTS -->
+      <div class="view" id="view-payments">
+        <div class="section-header">
+          <div class="section-title">Payment Ledger</div>
+          <button class="btn btn-green btn-sm" onclick="openPaymentModal()">＋ Record Payment</button>
+        </div>
+        <div id="paymentLedger"></div>
+      </div>
+
+      <!-- BUYERS -->
+      <div class="view" id="view-buyers">
+        <div class="section-header"><div class="section-title">Buyer Directory</div></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px" id="buyersGrid"></div>
+      </div>
+
+      <!-- INVESTORS -->
+      <div class="view" id="view-investors">
+        <div class="section-header">
+          <div class="section-title">Investors & Note Buyers</div>
+          <button class="btn btn-ghost btn-sm" onclick="openInvestorModal()">＋ Add Investor</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px" id="investorsGrid"></div>
+      </div>
+
+      <!-- VAULT -->
+      <div class="view" id="view-vault">
+        <div class="section-header"><div class="section-title">Document Vault</div></div>
+        <div id="vaultContent"></div>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="view" id="view-alerts">
+        <div class="section-header"><div class="section-title">Alerts & Action Items</div></div>
+        <div id="alertsContent"></div>
+      </div>
+
+      <!-- INVOICES -->
+      <div class="view" id="view-invoices">
+        <div class="section-header">
+          <div class="section-title">Invoice Queue</div>
+          <button class="btn btn-gold btn-sm" onclick="openInvoiceModal()">＋ Create Invoice</button>
+        </div>
+        <div id="invoicesContent"></div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main-area -->
+
+  <!-- BOTTOM NAV (mobile) -->
+  <div class="bottom-nav">
+    <div class="bn-item active" onclick="nav('portfolio',this)" data-title="Portfolio">
+      <span class="bn-icon">🏡</span>Loans
+    </div>
+    <div class="bn-item" onclick="nav('payments',this)" data-title="Payments">
+      <span class="bn-icon">💳</span>Payments
+    </div>
+    <div class="bn-item" onclick="nav('invoices',this)" data-title="Invoices">
+      <span class="bn-icon">🧾</span>Invoices
+    </div>
+    <div class="bn-item" onclick="nav('vault',this)" data-title="Doc Vault">
+      <span class="bn-icon">🗄</span>Vault
+    </div>
+    <div class="bn-item" onclick="nav('alerts',this)" data-title="Alerts">
+      <span class="bn-icon">🔔</span>Alerts
+      <span class="bn-dot" id="alertDot"></span>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" onclick="openLoanModal()">＋</button>
+
+</div><!-- /app -->
+
+<!-- ─── MODALS ─── -->
+
+<!-- LOAN MODAL -->
+<div class="modal-overlay" id="loanModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="loanModalTitle">New Loan</div>
+      <button class="modal-close" onclick="closeModal('loanModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="f-edit-id">
+      <div class="form-section">🏷️ Seller Info</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Seller Full Name</label><input class="form-input" id="f-seller" placeholder="John Smith"></div>
+        <div class="form-group"><label class="form-label">Seller Phone</label><input class="form-input" id="f-seller-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group form-full"><label class="form-label">Seller Address</label><input class="form-input" id="f-seller-address" placeholder="123 Main St, Atlanta GA 30301"></div>
+        <div class="form-group"><label class="form-label">Price Paid to Seller</label><input class="form-input" id="f-price-paid" type="number" placeholder="8000"></div>
+      </div>
+      <div class="form-section">👤 Buyer Info</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Buyer Full Name *</label><input class="form-input" id="f-borrower" placeholder="John & Jane Smith"></div>
+        <div class="form-group"><label class="form-label">Buyer Phone</label><input class="form-input" id="f-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label class="form-label">Buyer Email</label><input class="form-input" id="f-email" type="email" placeholder="buyer@email.com"></div>
+        <div class="form-group form-full"><label class="form-label">Buyer Address</label><input class="form-input" id="f-buyer-address" placeholder="123 Main St, Atlanta GA 30301"></div>
+        <div class="form-group"><label class="form-label">SSN / EIN (last 4)</label><input class="form-input" id="f-ssn" placeholder="••••" maxlength="4"></div>
+      </div>
+      <div class="form-section">📍 Property Info</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">County</label><input class="form-input" id="f-county" placeholder="Hancock"></div>
+        <div class="form-group"><label class="form-label">Parcel #</label><input class="form-input" id="f-parcel" placeholder="013B048"></div>
+        <div class="form-group form-full"><label class="form-label">Property Address</label><input class="form-input" id="f-address" placeholder="123 Main St, Atlanta GA 30301"></div>
+        <div class="form-group form-full"><label class="form-label">Legal Description</label><textarea class="form-input" id="f-legaldesc" rows="3" placeholder="Full legal description — no character limit"></textarea></div>
+      </div>
+      <div class="form-section" style="margin-top:16px">📋 Loan Terms</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Sale Price</label><input class="form-input" id="f-saleprice" type="number" placeholder="15000" oninput="updatePreview()"></div>
+        <div class="form-group"><label class="form-label">Down Payment</label><input class="form-input" id="f-down" type="number" placeholder="2500" oninput="autoCalcLoan()"></div>
+        <div class="form-group"><label class="form-label">Loan Amount *</label><input class="form-input" id="f-loanamt" type="number" placeholder="12500" oninput="updatePreview()" style="color:var(--gold)"></div>
+        <div class="form-group"><label class="form-label">Interest Rate (%) *</label><input class="form-input" id="f-rate" type="number" step="0.125" placeholder="10" oninput="updatePreview()"></div>
+        <div class="form-group"><label class="form-label">Term (Years) *</label>
+          <select class="form-input" id="f-term" onchange="updatePreview()">
+            <option value="3">3 yr</option><option value="5">5 yr</option><option value="6">6 yr</option><option value="7">7 yr</option><option value="10">10 yr</option><option value="15">15 yr</option><option value="20">20 yr</option><option value="25">25 yr</option><option value="30" selected>30 yr</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Balloon (Years)</label>
+          <select class="form-input" id="f-balloon">
+            <option value="">None</option><option value="3">3 yr</option><option value="5">5 yr</option><option value="7">7 yr</option><option value="10">10 yr</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Origination Date *</label><input class="form-input" id="f-origdate" type="date" oninput="updatePreview()"></div>
+        <div class="form-group"><label class="form-label">First Payment Date</label><input class="form-input" id="f-firstpay" type="date"></div>
+        <div class="form-group"><label class="form-label">Status</label>
+          <select class="form-input" id="f-status">
+            <option value="current">Current</option><option value="late">Late</option><option value="default">Default</option>
+          </select>
+        </div>
+      </div>
+      <div class="preview-box" style="margin-top:12px">
+        <div class="preview-title">⚡ Live Calculation</div>
+        <div class="preview-grid">
+          <div><div class="pv-label">Monthly Pmt</div><div class="pv-val" id="pv-payment">—</div></div>
+          <div><div class="pv-label">Total Interest</div><div class="pv-val" id="pv-totalint">—</div></div>
+          <div><div class="pv-label">Maturity</div><div class="pv-val" id="pv-maturity">—</div></div>
+        </div>
+      </div>
+      <div class="form-section" style="margin-top:16px">💼 Note Assignment (Optional)</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Assign To Investor</label><input class="form-input" id="f-investor" placeholder="First Capital LLC" list="investorList"><datalist id="investorList"></datalist></div>
+        <div class="form-group"><label class="form-label">Investor Contact</label><input class="form-input" id="f-inv-contact" placeholder="Robert Kline"></div>
+        <div class="form-group"><label class="form-label">Assignment Date</label><input class="form-input" id="f-inv-date" type="date"></div>
+        <div class="form-group"><label class="form-label">Note Purchase Price</label><input class="form-input" id="f-inv-price" type="number" placeholder="12000"></div>
+      </div>
+      <div class="form-section" style="margin-top:16px">🤝 Note Buyer (Optional)</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Note Buyer Name</label><input class="form-input" id="f-nb-name" placeholder="Jane Doe"></div>
+        <div class="form-group"><label class="form-label">Business Name</label><input class="form-input" id="f-nb-business" placeholder="Horizon Capital LLC"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="f-nb-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="f-nb-email" type="email" placeholder="buyer@notefund.com"></div>
+        <div class="form-group form-full"><label class="form-label">Mailing Address</label><input class="form-input" id="f-nb-address" placeholder="100 Capital Way, Atlanta GA 30301"></div>
+      </div>
+      <div class="form-section" style="margin-top:16px">📝 Notes</div>
+      <div class="form-group form-full"><textarea class="form-input" id="f-notes" rows="2" placeholder="Internal notes..."></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('loanModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveLoan()">💾 Save Loan</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAYMENT MODAL -->
+<div class="modal-overlay" id="paymentModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Record Payment</div>
+      <button class="modal-close" onclick="closeModal('paymentModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full"><label class="form-label">Loan *</label>
+          <select class="form-input" id="pay-loan" onchange="populatePaymentDefaults()"></select>
+        </div>
+        <div id="payPreviewBox" style="display:none;grid-column:1/-1;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div><div class="pv-label">Expected</div><div class="pv-val" id="pay-expected">—</div></div>
+            <div><div class="pv-label">Principal</div><div class="pv-val" id="pay-principal-split">—</div></div>
+            <div><div class="pv-label">Interest</div><div class="pv-val" id="pay-interest-split">—</div></div>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Date *</label><input class="form-input" id="pay-date" type="date"></div>
+        <div class="form-group"><label class="form-label">Amount *</label><input class="form-input" id="pay-amount" type="number" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label class="form-label">Type</label>
+          <select class="form-input" id="pay-type">
+            <option value="regular">Regular</option><option value="late">Late</option><option value="partial">Partial</option><option value="extra">Extra Principal</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Check / Ref #</label><input class="form-input" id="pay-ref" placeholder="1042"></div>
+        <div class="form-group form-full"><label class="form-label">Notes</label><input class="form-input" id="pay-notes" placeholder="Optional notes"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('paymentModal')">Cancel</button>
+      <button class="btn btn-green" onclick="savePayment()">💳 Record Payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- INVOICE MODAL -->
+<div class="modal-overlay" id="invoiceModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Create Invoice</div>
+      <button class="modal-close" onclick="closeModal('invoiceModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full"><label class="form-label">Loan *</label>
+          <select class="form-input" id="inv-loan" onchange="populateInvoiceDefaults()"></select>
+        </div>
+        <div class="form-group"><label class="form-label">Invoice Period</label><input class="form-input" id="inv-period" placeholder="April 2026"></div>
+        <div class="form-group"><label class="form-label">Due Date *</label><input class="form-input" id="inv-due" type="date"></div>
+        <div class="form-group"><label class="form-label">Amount Due</label><input class="form-input" id="inv-amount" type="number" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label class="form-label">Borrower Email *</label><input class="form-input" id="inv-email" type="email" placeholder="buyer@email.com"></div>
+        <div class="form-group form-full"><label class="form-label">Notes (shown on invoice)</label><input class="form-input" id="inv-notes" placeholder="Please remit by check or wire"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('invoiceModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveInvoice()">🧾 Create Invoice</button>
+    </div>
+  </div>
+</div>
+
+<!-- INVESTOR MODAL -->
+<div class="modal-overlay" id="investorModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Add Investor</div>
+      <button class="modal-close" onclick="closeModal('investorModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Company / Name *</label><input class="form-input" id="inv2-name" placeholder="First Capital LLC"></div>
+        <div class="form-group"><label class="form-label">Contact Person</label><input class="form-input" id="inv2-contact" placeholder="Robert Kline"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="inv2-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="inv2-email" type="email" placeholder="contact@fund.com"></div>
+        <div class="form-group form-full"><label class="form-label">Notes</label><textarea class="form-input" id="inv2-notes" rows="2" placeholder="Preferred note types, criteria..."></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('investorModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveInvestor()">💾 Save Investor</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="dp-head">
+    <button class="dp-close" onclick="closeDetail()">✕</button>
+    <div class="dp-id" id="dp-id"></div>
+    <div class="dp-name" id="dp-name"></div>
+    <div class="dp-addr" id="dp-addr"></div>
+    <div class="dp-actions">
+      <span id="dp-badge"></span>
+      <button class="btn btn-ghost btn-sm" onclick="editLoan()">✏️ Edit</button>
+      <button class="btn btn-green btn-sm" onclick="quickPayment()">💳 Pay</button>
+      <button class="btn btn-gold btn-sm" onclick="quickInvoice()">🧾 Invoice</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteLoan()">🗑</button>
+    </div>
+    <div class="dp-stats">
+      <div><div class="dp-stat-label">Monthly</div><div class="dp-stat-val gold" id="dp-payment"></div></div>
+      <div><div class="dp-stat-label">Balance</div><div class="dp-stat-val" id="dp-balance"></div></div>
+      <div><div class="dp-stat-label">Rate</div><div class="dp-stat-val" id="dp-rate"></div></div>
+    </div>
+  </div>
+  <div class="dp-body">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="dpTab('details',this)">Details</button>
+      <button class="tab-btn" onclick="dpTab('schedule',this)">Schedule</button>
+      <button class="tab-btn" onclick="dpTab('history',this)">Payments</button>
+      <button class="tab-btn" onclick="dpTab('docs',this)">Docs</button>
+      <button class="tab-btn" onclick="dpTab('files',this)">📁 Files</button>
+    </div>
+    <div id="dp-tab-details" style="overflow-y:auto">
+      <div class="dp-section">
+        <div class="dp-section-title">Loan Terms</div>
+        <div class="dp-fields" id="dp-fields"></div>
+        <div id="dp-progress"></div>
+      </div>
+      <div class="dp-section" id="dp-investor-section">
+        <div class="dp-section-title">Note Assignment</div>
+        <div id="dp-investor-content"></div>
+      </div>
+    </div>
+    <div id="dp-tab-schedule" style="display:none;overflow-y:auto">
+      <div class="dp-section">
+        <div class="dp-section-title">Amortization Schedule (First 24 Payments)</div>
+        <div class="amort-wrap" id="dp-amort-preview"></div>
+      </div>
+    </div>
+    <div id="dp-tab-history" style="display:none;overflow-y:auto">
+      <div class="dp-section">
+        <div class="dp-section-title" style="display:flex;justify-content:space-between">
+          <span>Payment History</span>
+          <button class="btn btn-green btn-sm" onclick="quickPayment()">＋ Record</button>
+        </div>
+        <div id="dp-payments"></div>
+      </div>
+    </div>
+    <div id="dp-tab-docs" style="display:none;overflow-y:auto">
+      <div class="dp-section">
+        <div class="dp-section-title">Document Checklist</div>
+        <div id="dp-docs"></div>
+      </div>
+    </div>
+    <div id="dp-tab-files" style="display:none;overflow-y:auto">
+      <div class="dp-section">
+        <div class="dp-section-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Parcel File Vault</span>
+        </div>
+        <div id="dp-file-vault"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toastEl"></div>
+
+<script>
+// ============================================================
+// SUPABASE CONFIG
+// ============================================================
+const SUPABASE_URL = 'https://rcidwqyrrfrthujymncn.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjaWR3cXlycmZydGh1anltbmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMjg3ODMsImV4cCI6MjA4ODYwNDc4M30.-cj-CqfqF6TXgWCz8E9RIEJNQT9lhYGKxFslnhWIPTo';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ============================================================
+// STATE
+// ============================================================
+let loans = [], payments = [], investors = [], invoices = [], vaultFiles = [];
+let currentLoanId = null, editingLoanId = null, toastTimer, currentUser = null;
+
+// ============================================================
+// AUTH
+// ============================================================
+async function initAuth() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    showApp();
+  } else {
+    showAuth();
+  }
+  sb.auth.onAuthStateChange((_evt, session) => {
+    if (session) { currentUser = session.user; showApp(); }
+    else { currentUser = null; showAuth(); }
+  });
+}
+
+function showAuth() {
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('app').classList.remove('visible');
+}
+
+async function showApp() {
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  await loadAllData();
+  renderLoans(); renderPaymentLedger(); renderBuyers();
+  renderInvestors(); updateStats(); renderAlerts(); renderInvoices();
+}
+
+async function signIn() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass = document.getElementById('authPass').value;
+  document.getElementById('authErr').textContent = '';
+  if (!email || !pass) { document.getElementById('authErr').textContent = 'Email and password required'; return; }
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) document.getElementById('authErr').textContent = error.message;
+}
+
+async function signUp() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass = document.getElementById('authPass').value;
+  document.getElementById('authErr').textContent = '';
+  if (!email || !pass) { document.getElementById('authErr').textContent = 'Email and password required'; return; }
+  if (pass.length < 6) { document.getElementById('authErr').textContent = 'Password must be at least 6 characters'; return; }
+  const { error } = await sb.auth.signUp({ email, password: pass });
+  if (error) document.getElementById('authErr').textContent = error.message;
+  else document.getElementById('authErr').style.color = 'var(--green)', document.getElementById('authErr').textContent = 'Check your email to confirm your account!';
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+}
+
+// ============================================================
+// DATA — Supabase CRUD
+// ============================================================
+async function loadAllData() {
+  if (!currentUser) return;
+  const uid = currentUser.id;
+  const [l, p, inv, ivs, vf] = await Promise.all([
+    sb.from('loans').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+    sb.from('payments').select('*').eq('user_id', uid).order('date', { ascending: false }),
+    sb.from('investors').select('*').eq('user_id', uid),
+    sb.from('invoices').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+    sb.from('vault_files').select('*').eq('user_id', uid),
+  ]);
+  loans = l.data || [];
+  payments = p.data || [];
+  investors = inv.data || [];
+  invoices = ivs.data || [];
+  vaultFiles = vf.data || [];
+}
+
+async function dbSaveLoan(data, id) {
+  const row = { ...data, user_id: currentUser.id };
+  if (id) {
+    const { data: d } = await sb.from('loans').update(row).eq('id', id).eq('user_id', currentUser.id).select().single();
+    return d;
+  } else {
+    const { data: d } = await sb.from('loans').insert(row).select().single();
+    return d;
+  }
+}
+
+async function dbDeleteLoan(id) {
+  await sb.from('loans').delete().eq('id', id).eq('user_id', currentUser.id);
+  await sb.from('payments').delete().eq('loan_id', id).eq('user_id', currentUser.id);
+}
+
+async function dbSavePayment(data) {
+  const { data: d } = await sb.from('payments').insert({ ...data, user_id: currentUser.id }).select().single();
+  return d;
+}
+
+async function dbDeletePayment(id) {
+  await sb.from('payments').delete().eq('id', id).eq('user_id', currentUser.id);
+}
+
+async function dbSaveInvestor(data) {
+  const { data: d } = await sb.from('investors').insert({ ...data, user_id: currentUser.id }).select().single();
+  return d;
+}
+
+async function dbSaveInvoice(data) {
+  const { data: d } = await sb.from('invoices').insert({ ...data, user_id: currentUser.id }).select().single();
+  return d;
+}
+
+async function dbDeleteInvoice(id) {
+  await sb.from('invoices').delete().eq('id', id).eq('user_id', currentUser.id);
+}
+
+async function dbSaveVaultFile(data) {
+  const { data: d } = await sb.from('vault_files').insert({ ...data, user_id: currentUser.id }).select().single();
+  return d;
+}
+
+async function dbDeleteVaultFile(id) {
+  await sb.from('vault_files').delete().eq('id', id).eq('user_id', currentUser.id);
+}
+
+async function dbUpdateVaultFile(id, updates) {
+  await sb.from('vault_files').update(updates).eq('id', id).eq('user_id', currentUser.id);
+}
+
+// ============================================================
+// MATH
+// ============================================================
+function calcPayment(p,r,t){if(!p||!r||!t)return 0;const mr=r/100/12,n=t*12;if(mr===0)return p/n;return p*(mr*Math.pow(1+mr,n))/(Math.pow(1+mr,n)-1);}
+function calcBalance(p,r,t,paid){if(!p||!r||!t)return p||0;const mr=r/100/12,n=t*12,pmt=calcPayment(p,r,t);if(mr===0)return p-pmt*paid;let bal=p;for(let i=0;i<Math.min(paid,n);i++){const int=bal*mr;bal-=(pmt-int);if(bal<0)bal=0;}return bal;}
+function genSchedule(p,r,t,startDate,limit){const mr=r/100/12,n=t*12,pmt=calcPayment(p,r,t);let bal=p;const rows=[],start=startDate?new Date(startDate):new Date();const max=limit||n;for(let i=0;i<max&&bal>0.01;i++){const int=bal*mr,prin=pmt-int;bal=Math.max(0,bal-prin);const d=new Date(start);d.setMonth(d.getMonth()+i+1);rows.push({num:i+1,date:d.toLocaleDateString('en-US',{month:'short',year:'numeric'}),payment:pmt,principal:prin,interest:int,balance:bal});}return rows;}
+function paysMade(origDate){if(!origDate)return 0;const start=new Date(origDate),now=new Date();return Math.max(0,(now.getFullYear()-start.getFullYear())*12+now.getMonth()-start.getMonth());}
+function matDate(orig,years){if(!orig||!years)return'—';const d=new Date(orig);d.setFullYear(d.getFullYear()+parseInt(years));return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function balloonDate(orig,bYears){if(!orig||!bYears)return null;const d=new Date(orig);d.setFullYear(d.getFullYear()+parseInt(bYears));return d;}
+const fmt=n=>'$'+Math.round(n||0).toLocaleString();
+const fmtD=n=>'$'+(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+const fmtDate=d=>d?new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+
+// ============================================================
+// NAV
+// ============================================================
+function nav(view, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelectorAll('.nav-item,.bn-item').forEach(i => i.classList.remove('active'));
+  // Activate all matching nav items
+  document.querySelectorAll('[onclick*="nav(\'' + view + '\'"]').forEach(i => i.classList.add('active'));
+  const title = el?.dataset?.title || view;
+  document.getElementById('topnavTitle').textContent = title;
+  document.getElementById('desktopTitle').textContent = title;
+  closeDrawer();
+  if (view === 'payments') renderPaymentLedger();
+  if (view === 'buyers') renderBuyers();
+  if (view === 'investors') renderInvestors();
+  if (view === 'vault') renderVault();
+  if (view === 'alerts') renderAlerts();
+  if (view === 'invoices') renderInvoices();
+}
+
+function toggleDrawer() {
+  document.getElementById('drawer').classList.toggle('open');
+  document.getElementById('drawerOverlay').classList.toggle('open');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+
+// ============================================================
+// STATS
+// ============================================================
+function updateStats() {
+  const total = loans.reduce((s,l)=>s+parseFloat(l.loan_amount||0),0);
+  const monthly = loans.reduce((s,l)=>s+calcPayment(parseFloat(l.loan_amount),parseFloat(l.rate),parseInt(l.term)),0);
+  const assigned = loans.filter(l=>l.investor);
+  const assignedTotal = assigned.reduce((s,l)=>s+parseFloat(l.loan_amount||0),0);
+  const alerts = computeAlerts().length;
+  document.getElementById('st-portfolio').textContent = fmt(total);
+  document.getElementById('st-portfolio-sub').textContent = loans.length + ' active notes';
+  document.getElementById('st-monthly').textContent = fmt(monthly);
+  document.getElementById('st-assigned').textContent = fmt(assignedTotal);
+  document.getElementById('st-assigned-sub').textContent = assigned.length + ' notes';
+  document.getElementById('st-alerts').textContent = alerts;
+  document.getElementById('ss-loans').textContent = loans.length;
+  document.getElementById('ss-portfolio').textContent = total>=1e6?'$'+(total/1e6).toFixed(1)+'M':fmt(total);
+  document.getElementById('ss-monthly').textContent = fmt(monthly);
+  document.getElementById('alertBadge').textContent = alerts;
+  document.getElementById('alertBadge').style.display = alerts ? '' : 'none';
+  const dot = document.getElementById('alertDot');
+  if (dot) { dot.classList.toggle('show', alerts > 0); }
+}
+
+// ============================================================
+// BADGES
+// ============================================================
+function getBadge(l) {
+  if (l.status==='late') return '<span class="badge badge-late">Late</span>';
+  if (l.status==='default') return '<span class="badge badge-late">Default</span>';
+  const bd = balloonDate(l.orig_date, l.balloon);
+  if (bd) { const mo=(bd-new Date())/(1000*60*60*24*30); if(mo<12&&mo>0) return '<span class="badge badge-balloon">Balloon Soon</span>'; }
+  if (l.investor) return '<span class="badge badge-assigned">Assigned</span>';
+  return '<span class="badge badge-current">Current</span>';
+}
+
+// ============================================================
+// LOANS
+// ============================================================
+function renderLoans() {
+  const grid = document.getElementById('loansGrid');
+  const q = (document.getElementById('loanSearch')?.value || '').toLowerCase();
+  const filtered = q ? loans.filter(l =>
+    (l.borrower||'').toLowerCase().includes(q) ||
+    (l.seller||'').toLowerCase().includes(q) ||
+    (l.parcel||'').toLowerCase().includes(q) ||
+    (l.county||'').toLowerCase().includes(q) ||
+    (l.address||'').toLowerCase().includes(q)
+  ) : loans;
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🏡</div><div class="empty-title">${q?'No matches':'No loans yet'}</div><div class="empty-sub">${q?'Try a different search':'Add your first seller-financed loan'}</div>${!q?'<button class="btn btn-gold" onclick="openLoanModal()">＋ Add Loan</button>':''}</div>`;
+    return;
+  }
+  grid.innerHTML = filtered.map(l => {
+    const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
+    const paid = paysMade(l.orig_date);
+    const bal = calcBalance(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), paid);
+    const loanPmts = payments.filter(p => p.loan_id === l.id);
+    return `<div class="loan-card" onclick="openDetail('${l.id}')">
+      <div class="lc-head">
+        <div>
+          <div class="lc-id">${l.id?.slice(0,8).toUpperCase() || ''} ${l.parcel ? '· ' + l.parcel : ''}</div>
+          <div class="lc-name">${l.borrower||'Unnamed'}</div>
+          <div class="lc-addr">📍 ${l.address||'—'}</div>
+        </div>
+        ${getBadge(l)}
+      </div>
+      <div class="lc-body">
+        <div><div class="lc-label">Balance</div><div class="lc-val gold">${fmt(bal)}</div></div>
+        <div><div class="lc-label">Monthly</div><div class="lc-val green">${fmtD(pmt)}</div></div>
+        <div><div class="lc-label">Payments</div><div class="lc-val">${loanPmts.length}</div></div>
+      </div>
+      <div class="lc-foot">
+        <span>${l.rate}% · ${l.term}yr</span>
+        <span>${fmtDate(l.orig_date)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openLoanModal(editId) {
+  editingLoanId = editId || null;
+  document.getElementById('loanModalTitle').textContent = editId ? 'Edit Loan' : 'New Loan';
+  document.getElementById('f-edit-id').value = editId || '';
+  if (editId) {
+    const l = loans.find(x => x.id === editId);
+    if (!l) return;
+    document.getElementById('f-borrower').value = l.borrower||'';
+    document.getElementById('f-seller').value = l.seller||'';
+    document.getElementById('f-seller-phone').value = l.seller_phone||'';
+    document.getElementById('f-seller-address').value = l.seller_address||'';
+    document.getElementById('f-price-paid').value = l.price_paid||'';
+    document.getElementById('f-buyer-address').value = l.buyer_address||'';
+    document.getElementById('f-phone').value = l.phone||'';
+    document.getElementById('f-email').value = l.email||'';
+    document.getElementById('f-ssn').value = l.ssn||'';
+    document.getElementById('f-county').value = l.county||'';
+    document.getElementById('f-parcel').value = l.parcel||'';
+    document.getElementById('f-address').value = l.address||'';
+    document.getElementById('f-legaldesc').value = l.legal_desc||'';
+    document.getElementById('f-saleprice').value = l.sale_price||'';
+    document.getElementById('f-down').value = l.down_payment||'';
+    document.getElementById('f-loanamt').value = l.loan_amount||'';
+    document.getElementById('f-rate').value = l.rate||'';
+    document.getElementById('f-term').value = l.term||'30';
+    document.getElementById('f-balloon').value = l.balloon||'';
+    document.getElementById('f-origdate').value = l.orig_date||'';
+    document.getElementById('f-firstpay').value = l.first_pay_date||'';
+    document.getElementById('f-status').value = l.status||'current';
+    document.getElementById('f-investor').value = l.investor||'';
+    document.getElementById('f-inv-contact').value = l.inv_contact||'';
+    document.getElementById('f-inv-date').value = l.inv_date||'';
+    document.getElementById('f-inv-price').value = l.inv_price||'';
+    document.getElementById('f-nb-name').value = l.nb_name||'';
+    document.getElementById('f-nb-business').value = l.nb_business||'';
+    document.getElementById('f-nb-phone').value = l.nb_phone||'';
+    document.getElementById('f-nb-email').value = l.nb_email||'';
+    document.getElementById('f-nb-address').value = l.nb_address||'';
+    document.getElementById('f-notes').value = l.notes||'';
+  } else {
+    clearLoanForm();
+    document.getElementById('f-origdate').value = new Date().toISOString().split('T')[0];
+  }
+  const dl = document.getElementById('investorList');
+  dl.innerHTML = investors.map(i => `<option value="${i.name}">`).join('');
+  updatePreview();
+  openModal('loanModal');
+}
+
+function clearLoanForm() {
+  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-address','f-phone','f-email','f-ssn','f-county','f-parcel','f-address','f-legaldesc',
+   'f-saleprice','f-down','f-loanamt','f-rate','f-origdate','f-firstpay','f-investor','f-inv-contact',
+   'f-inv-date','f-inv-price','f-nb-name','f-nb-business','f-nb-phone','f-nb-email','f-nb-address','f-notes']
+  .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('f-term').value = '30';
+  document.getElementById('f-balloon').value = '';
+  document.getElementById('f-status').value = 'current';
+}
+
+function autoCalcLoan() {
+  const sp = parseFloat(document.getElementById('f-saleprice').value);
+  const dp = parseFloat(document.getElementById('f-down').value)||0;
+  const la = document.getElementById('f-loanamt');
+  if (sp && !la.value) la.value = sp - dp;
+  updatePreview();
+}
+
+function updatePreview() {
+  const p = parseFloat(document.getElementById('f-loanamt').value);
+  const r = parseFloat(document.getElementById('f-rate').value);
+  const t = parseInt(document.getElementById('f-term').value);
+  const orig = document.getElementById('f-origdate').value;
+  if (p && r && t) {
+    const pmt = calcPayment(p,r,t);
+    const total = pmt * t * 12;
+    document.getElementById('pv-payment').textContent = fmtD(pmt);
+    document.getElementById('pv-totalint').textContent = fmt(total - p);
+    document.getElementById('pv-maturity').textContent = matDate(orig, t);
+  } else {
+    ['pv-payment','pv-totalint','pv-maturity'].forEach(id => document.getElementById(id).textContent = '—');
+  }
+}
+
+async function saveLoan() {
+  const borrower = document.getElementById('f-borrower').value.trim();
+  const loanAmount = parseFloat(document.getElementById('f-loanamt').value);
+  const rate = parseFloat(document.getElementById('f-rate').value);
+  const origDate = document.getElementById('f-origdate').value;
+  if (!borrower) return showToast('⚠️ Buyer name required', 'error');
+  if (!loanAmount || isNaN(loanAmount)) return showToast('⚠️ Loan amount required', 'error');
+  if (!rate || isNaN(rate)) return showToast('⚠️ Interest rate required', 'error');
+  if (!origDate) return showToast('⚠️ Origination date required', 'error');
+  const data = {
+    borrower, loan_amount: loanAmount, rate, orig_date: origDate,
+    seller: document.getElementById('f-seller').value.trim(),
+    seller_phone: document.getElementById('f-seller-phone').value.trim(),
+    seller_address: document.getElementById('f-seller-address').value.trim(),
+    price_paid: parseFloat(document.getElementById('f-price-paid').value)||0,
+    buyer_address: document.getElementById('f-buyer-address').value.trim(),
+    phone: document.getElementById('f-phone').value,
+    email: document.getElementById('f-email').value,
+    ssn: document.getElementById('f-ssn').value,
+    county: document.getElementById('f-county').value.trim(),
+    parcel: document.getElementById('f-parcel').value.trim(),
+    address: document.getElementById('f-address').value,
+    legal_desc: document.getElementById('f-legaldesc').value.trim(),
+    sale_price: parseFloat(document.getElementById('f-saleprice').value)||loanAmount,
+    down_payment: parseFloat(document.getElementById('f-down').value)||0,
+    term: parseInt(document.getElementById('f-term').value),
+    balloon: document.getElementById('f-balloon').value,
+    first_pay_date: document.getElementById('f-firstpay').value,
+    status: document.getElementById('f-status').value,
+    investor: document.getElementById('f-investor').value.trim(),
+    inv_contact: document.getElementById('f-inv-contact').value.trim(),
+    inv_date: document.getElementById('f-inv-date').value,
+    inv_price: parseFloat(document.getElementById('f-inv-price').value)||0,
+    nb_name: document.getElementById('f-nb-name').value.trim(),
+    nb_business: document.getElementById('f-nb-business').value.trim(),
+    nb_phone: document.getElementById('f-nb-phone').value.trim(),
+    nb_email: document.getElementById('f-nb-email').value.trim(),
+    nb_address: document.getElementById('f-nb-address').value.trim(),
+    notes: document.getElementById('f-notes').value,
+  };
+  showToast('Saving…');
+  const saved = await dbSaveLoan(data, editingLoanId);
+  if (editingLoanId) {
+    const idx = loans.findIndex(l => l.id === editingLoanId);
+    if (idx >= 0) loans[idx] = saved;
+    showToast('✅ Loan updated!', 'success');
+  } else {
+    loans.unshift(saved);
+    showToast('✅ Loan created!', 'success');
+    setTimeout(() => openDetail(saved.id), 400);
+  }
+  renderLoans(); updateStats();
+  closeModal('loanModal');
+  if (editingLoanId && currentLoanId === editingLoanId) openDetail(editingLoanId);
+  editingLoanId = null;
+}
+
+function editLoan() { if (currentLoanId) openLoanModal(currentLoanId); }
+
+async function deleteLoan() {
+  if (!currentLoanId) return;
+  if (!confirm('Delete this loan? This also removes payment history.')) return;
+  await dbDeleteLoan(currentLoanId);
+  loans = loans.filter(l => l.id !== currentLoanId);
+  payments = payments.filter(p => p.loan_id !== currentLoanId);
+  renderLoans(); updateStats(); closeDetail();
+  showToast('🗑 Loan deleted');
+}
+
+// ============================================================
+// DETAIL PANEL
+// ============================================================
+function openDetail(id) {
+  currentLoanId = id;
+  const l = loans.find(x => x.id === id);
+  if (!l) return;
+  const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
+  const paid = paysMade(l.orig_date);
+  const bal = calcBalance(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), paid);
+  document.getElementById('dp-id').textContent = (l.id?.slice(0,8).toUpperCase()||'') + (l.parcel ? ' · Parcel ' + l.parcel : '') + ' · ' + fmtDate(l.orig_date);
+  document.getElementById('dp-name').textContent = l.borrower || 'Unnamed';
+  document.getElementById('dp-addr').textContent = '📍 ' + (l.address||'—') + (l.county ? ' · ' + l.county + ' County' : '');
+  document.getElementById('dp-badge').innerHTML = getBadge(l);
+  document.getElementById('dp-payment').textContent = fmtD(pmt);
+  document.getElementById('dp-balance').textContent = fmt(bal);
+  document.getElementById('dp-rate').textContent = l.rate + '%';
+  document.getElementById('dp-fields').innerHTML = [
+    ['Original Amount', fmt(l.loan_amount), 'gold mono'],
+    ['Sale Price', fmt(l.sale_price||0), 'mono'],
+    ['Down Payment', fmt(l.down_payment||0), 'mono'],
+    ['Rate / Term', l.rate + '% · ' + l.term + 'yr', ''],
+    ['Balloon', l.balloon ? l.balloon + ' yr' : 'None', ''],
+    ['Origination', fmtDate(l.orig_date), 'mono'],
+    ['Maturity', matDate(l.orig_date, l.term), 'mono'],
+    ['Payments Made', paid + ' of ' + (l.term*12), 'green'],
+    ['Buyer Phone', l.phone||'—', ''],
+    ['Buyer Email', l.email||'—', ''],
+    ['Buyer Address', l.buyer_address||'—', ''],
+    ['Seller', l.seller||'—', ''],
+    ['Seller Phone', l.seller_phone||'—', ''],
+    ['Seller Address', l.seller_address||'—', ''],
+    ['Price Paid', l.price_paid ? fmt(l.price_paid) : '—', 'mono'],
+    ['County', l.county||'—', ''],
+  ].map(([lb,val,cls]) => `<div class="dp-field"><div class="dp-field-label">${lb}</div><div class="dp-field-val ${cls}">${val}</div></div>`).join('');
+  const pct = Math.min(100, (paid/(l.term*12))*100);
+  document.getElementById('dp-progress').innerHTML = `<div class="progress-wrap"><div class="progress-label"><span>Paydown</span><span>${pct.toFixed(1)}%</span></div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div></div>`;
+  document.getElementById('dp-investor-content').innerHTML = l.investor
+    ? `<div style="font-weight:700;margin-bottom:8px;color:var(--blue)">🏦 ${l.investor}</div>
+       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+         <div><div class="dp-field-label">Contact</div><div>${l.inv_contact||'—'}</div></div>
+         <div><div class="dp-field-label">Assigned</div><div>${fmtDate(l.inv_date)}</div></div>
+         <div><div class="dp-field-label">Purchase Price</div><div>${l.inv_price?fmt(l.inv_price):'—'}</div></div>
+         <div><div class="dp-field-label">Yield</div><div>${l.rate}%</div></div>
+       </div>
+       ${(l.nb_name||l.nb_business)?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-weight:700;margin-bottom:8px;color:var(--gold)">🤝 Note Buyer</div>
+       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+         <div><div class="dp-field-label">Name</div><div>${l.nb_name||'—'}</div></div>
+         <div><div class="dp-field-label">Business</div><div>${l.nb_business||'—'}</div></div>
+         <div><div class="dp-field-label">Phone</div><div>${l.nb_phone||'—'}</div></div>
+         <div><div class="dp-field-label">Email</div><div>${l.nb_email||'—'}</div></div>
+         <div style="grid-column:1/-1"><div class="dp-field-label">Address</div><div>${l.nb_address||'—'}</div></div>
+       </div>`:''}`
+    : `<div style="color:var(--text3);font-size:13px">Note retained — not assigned</div>`;
+  const sched = genSchedule(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), l.first_pay_date||l.orig_date, 24);
+  document.getElementById('dp-amort-preview').innerHTML = `<table class="amort-table"><thead><tr><th>#</th><th>Date</th><th>Payment</th><th>Principal</th><th>Interest</th><th>Balance</th></tr></thead><tbody>${sched.map(r=>`<tr><td>${r.num}</td><td>${r.date}</td><td>${fmtD(r.payment)}</td><td class="p">${fmtD(r.principal)}</td><td class="i">${fmtD(r.interest)}</td><td class="b">${fmtD(r.balance)}</td></tr>`).join('')}</tbody></table>`;
+  renderDpPayments(l);
+  renderDpDocs(l);
+  renderFileVault(l.id);
+  document.getElementById('detailPanel').classList.add('open');
+  document.getElementById('detailOverlay').classList.add('open');
+  dpTab('details', document.querySelector('#detailPanel .tab-btn'));
+}
+
+function dpTab(name, btn) {
+  ['details','schedule','history','docs','files'].forEach(t => {
+    document.getElementById('dp-tab-'+t).style.display = t === name ? '' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+  document.getElementById('detailOverlay').classList.remove('open');
+  currentLoanId = null;
+}
+
+function renderDpPayments(l) {
+  const loanPmts = payments.filter(p => p.loan_id === l.id).slice().reverse();
+  const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
+  const totalRec = payments.filter(p => p.loan_id === l.id).reduce((s,p) => s + parseFloat(p.amount||0), 0);
+  document.getElementById('dp-payments').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px;background:var(--s2);border-radius:var(--r);margin-bottom:12px">
+      <div><div class="lc-label">Total Received</div><div class="lc-val green" style="font-size:13px">${fmt(totalRec)}</div></div>
+      <div><div class="lc-label">Payments</div><div class="lc-val" style="font-size:13px">${loanPmts.length}</div></div>
+      <div><div class="lc-label">Expected</div><div class="lc-val gold" style="font-size:13px">${fmtD(pmt)}</div></div>
+    </div>
+    ${loanPmts.length===0?'<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">No payments recorded yet</div>':
+    loanPmts.map(p => {
+      const late = p.type==='late';
+      const color = late ? 'var(--red)' : 'var(--green)';
+      return `<div class="payment-item">
+        <div class="pay-left">
+          <div class="pay-dot" style="background:${color}"></div>
+          <div>
+            <div class="pay-date">${fmtDate(p.date)} ${p.ref?'· Ref #'+p.ref:''}</div>
+            <div class="pay-note">${p.type}${p.notes?' · '+p.notes:''}</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="pay-amt" style="color:${color}">${fmtD(p.amount)}</div>
+          <button onclick="deletePayment('${p.id}')" style="font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer;margin-top:2px">🗑 remove</button>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+function renderDpDocs(l) {
+  const loanFiles = vaultFiles.filter(f => f.loan_id === l.id);
+  const byCategory = {};
+  FILE_CATEGORIES.forEach(c => { byCategory[c.id] = loanFiles.filter(f => f.cat_id === c.id).length; });
+  const total = loanFiles.length;
+  document.getElementById('dp-docs').innerHTML = total === 0
+    ? `<div style="color:var(--text3);font-size:13px;padding:8px 0">No files uploaded yet — click the <strong>📁 Files</strong> tab to upload documents</div>`
+    : FILE_CATEGORIES.map(c => {
+        const count = byCategory[c.id];
+        if (!count) return '';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+          <span>${c.icon} ${c.label}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--gold)">${count} file${count!==1?'s':''}</span>
+        </div>`;
+      }).join('') + `<div style="padding-top:8px;font-size:12px;color:var(--text3)">${total} total file${total!==1?'s':''}</div>`;
+}
+
+// ============================================================
+// PAYMENTS
+// ============================================================
+function openPaymentModal(loanId) {
+  const sel = document.getElementById('pay-loan');
+  sel.innerHTML = '<option value="">— Select loan —</option>' + loans.map(l => `<option value="${l.id}" ${l.id===loanId?'selected':''}>${l.borrower} ${l.parcel?'· '+l.parcel:''}</option>`).join('');
+  document.getElementById('paymentModal').classList.add('open');
+  document.getElementById('pay-date').value = new Date().toISOString().split('T')[0];
+  if (loanId) populatePaymentDefaults();
+}
+
+function quickPayment() { if (currentLoanId) openPaymentModal(currentLoanId); }
+
+function populatePaymentDefaults() {
+  const id = document.getElementById('pay-loan').value;
+  const l = loans.find(x => x.id === id);
+  const box = document.getElementById('payPreviewBox');
+  if (!l) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  const paid = paysMade(l.orig_date);
+  const bal = calcBalance(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), paid);
+  const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
+  const int = bal * (parseFloat(l.rate)/100/12);
+  const prin = pmt - int;
+  document.getElementById('pay-expected').textContent = fmtD(pmt);
+  document.getElementById('pay-principal-split').textContent = fmtD(prin);
+  document.getElementById('pay-interest-split').textContent = fmtD(int);
+  document.getElementById('pay-amount').value = pmt.toFixed(2);
+}
+
+async function savePayment() {
+  const loanId = document.getElementById('pay-loan').value;
+  const date = document.getElementById('pay-date').value;
+  const amount = parseFloat(document.getElementById('pay-amount').value);
+  if (!loanId) return showToast('⚠️ Select a loan', 'error');
+  if (!date) return showToast('⚠️ Enter payment date', 'error');
+  if (!amount || isNaN(amount)) return showToast('⚠️ Enter payment amount', 'error');
+  const data = {
+    loan_id: loanId, date, amount,
+    type: document.getElementById('pay-type').value,
+    ref: document.getElementById('pay-ref').value,
+    notes: document.getElementById('pay-notes').value,
+  };
+  showToast('Saving…');
+  const saved = await dbSavePayment(data);
+  payments.unshift(saved);
+  const loan = loans.find(l => l.id === loanId);
+  if (loan && loan.status === 'late') { loan.status = 'current'; await dbSaveLoan({ status: 'current' }, loanId); }
+  renderLoans(); updateStats(); renderPaymentLedger();
+  closeModal('paymentModal');
+  showToast('✅ Payment of ' + fmtD(amount) + ' recorded!', 'success');
+  document.getElementById('pay-amount').value = '';
+  document.getElementById('pay-ref').value = '';
+  document.getElementById('pay-notes').value = '';
+  if (currentLoanId === loanId) { const l = loans.find(x => x.id === loanId); if (l) renderDpPayments(l); }
+}
+
+async function deletePayment(id) {
+  if (!confirm('Delete this payment?')) return;
+  await dbDeletePayment(id);
+  payments = payments.filter(p => p.id !== id);
+  renderPaymentLedger();
+  if (currentLoanId) { const l = loans.find(x => x.id === currentLoanId); if (l) renderDpPayments(l); }
+  showToast('Payment deleted');
+}
+
+function renderPaymentLedger() {
+  const el = document.getElementById('paymentLedger');
+  if (!payments.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">💳</div><div class="empty-title">No payments recorded</div><div class="empty-sub">Record payments as they come in</div><button class="btn btn-green" onclick="openPaymentModal()">＋ Record First Payment</button></div>`;
+    return;
+  }
+  const sorted = [...payments].sort((a,b) => new Date(b.date)-new Date(a.date));
+  const byMonth = {};
+  sorted.forEach(p => {
+    const mo = new Date(p.date).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+    if (!byMonth[mo]) byMonth[mo] = [];
+    byMonth[mo].push(p);
+  });
+  el.innerHTML = Object.entries(byMonth).map(([month, pays]) => {
+    const total = pays.reduce((s,p) => s + parseFloat(p.amount||0), 0);
+    return `<div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--text2)">${month}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--green)">${fmtD(total)}</div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Loan</th><th>Borrower</th><th>Date</th><th>Amount</th><th>Ref</th><th></th></tr></thead>
+          <tbody>${pays.map(p => {
+            const l = loans.find(x => x.id === p.loan_id);
+            return `<tr>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${p.loan_id?.slice(0,8).toUpperCase()||''}</td>
+              <td style="font-weight:600">${l ? l.borrower : '—'}</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${fmtDate(p.date)}</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--green)">${fmtD(p.amount)}</td>
+              <td style="font-size:11px;color:var(--text3)">${p.ref||'—'}</td>
+              <td><button onclick="deletePayment('${p.id}')" class="btn btn-danger btn-sm" style="padding:3px 8px">🗑</button></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// INVOICES
+// ============================================================
+function openInvoiceModal(loanId) {
+  const sel = document.getElementById('inv-loan');
+  sel.innerHTML = '<option value="">— Select loan —</option>' + loans.map(l => `<option value="${l.id}" ${l.id===loanId?'selected':''}>${l.borrower} ${l.parcel?'· '+l.parcel:''}</option>`).join('');
+  document.getElementById('inv-due').value = '';
+  document.getElementById('inv-amount').value = '';
+  document.getElementById('inv-email').value = '';
+  document.getElementById('inv-period').value = new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  if (loanId) populateInvoiceDefaults();
+  openModal('invoiceModal');
+}
+
+function quickInvoice() { if (currentLoanId) openInvoiceModal(currentLoanId); }
+
+function populateInvoiceDefaults() {
+  const id = document.getElementById('inv-loan').value;
+  const l = loans.find(x => x.id === id);
+  if (!l) return;
+  const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
+  document.getElementById('inv-amount').value = pmt.toFixed(2);
+  if (l.email) document.getElementById('inv-email').value = l.email;
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+1);
+  document.getElementById('inv-due').value = d.toISOString().split('T')[0];
+}
+
+async function saveInvoice() {
+  const loanId = document.getElementById('inv-loan').value;
+  const due = document.getElementById('inv-due').value;
+  const amount = parseFloat(document.getElementById('inv-amount').value);
+  const email = document.getElementById('inv-email').value.trim();
+  if (!loanId) return showToast('⚠️ Select a loan', 'error');
+  if (!due) return showToast('⚠️ Enter due date', 'error');
+  if (!amount || isNaN(amount)) return showToast('⚠️ Enter amount', 'error');
+  if (!email) return showToast('⚠️ Enter borrower email', 'error');
+  const l = loans.find(x => x.id === loanId);
+  const data = {
+    loan_id: loanId, due_date: due, amount, email,
+    period: document.getElementById('inv-period').value,
+    notes: document.getElementById('inv-notes').value,
+    borrower: l?.borrower || '',
+    status: 'pending',
+  };
+  showToast('Saving…');
+  const saved = await dbSaveInvoice(data);
+  invoices.unshift(saved);
+  closeModal('invoiceModal');
+  renderInvoices();
+  showToast('✅ Invoice created!', 'success');
+}
+
+async function deleteInvoice(id) {
+  if (!confirm('Delete this invoice?')) return;
+  await dbDeleteInvoice(id);
+  invoices = invoices.filter(i => i.id !== id);
+  renderInvoices();
+  showToast('Invoice deleted');
+}
+
+function renderInvoices() {
+  const el = document.getElementById('invoicesContent');
+  if (!invoices.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🧾</div><div class="empty-title">No invoices yet</div><div class="empty-sub">Create monthly payment invoices for your borrowers</div><button class="btn btn-gold" onclick="openInvoiceModal()">＋ Create Invoice</button></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div style="margin-bottom:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="sendAllPendingInvoices()">📧 Send All Pending</button>
+    </div>` +
+  invoices.map(inv => {
+    const l = loans.find(x => x.id === inv.loan_id);
+    const isPending = inv.status === 'pending';
+    return `<div class="invoice-card">
+      <div class="inv-head">
+        <div>
+          <div class="inv-id">${inv.loan_id?.slice(0,8).toUpperCase()||''} · ${inv.period||''}</div>
+          <div class="inv-borrower">${inv.borrower||l?.borrower||'—'}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">Due: ${fmtDate(inv.due_date)} · ${inv.email}</div>
+        </div>
+        <div>
+          <div class="inv-amount">${fmtD(inv.amount)}</div>
+          <div style="text-align:right;margin-top:4px">
+            <span class="badge ${isPending?'badge-balloon':'badge-current'}">${isPending?'Pending':'Sent'}</span>
+          </div>
+        </div>
+      </div>
+      ${inv.notes ? `<div style="font-size:12px;color:var(--text3);margin-top:4px">${inv.notes}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        ${isPending?`<button class="btn btn-ghost btn-sm" onclick="sendInvoice('${inv.id}')">📧 Send Email</button>`:''}
+        <button class="btn btn-ghost btn-sm" onclick="viewInvoice('${inv.id}')">👁 View</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${inv.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function viewInvoice(id) {
+  const inv = invoices.find(x => x.id === id);
+  if (!inv) return;
+  const l = loans.find(x => x.id === inv.loan_id);
+  const w = window.open('', '_blank');
+  const paid = l ? paysMade(l.orig_date) : 0;
+  const bal = l ? calcBalance(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), paid) : 0;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice</title><style>
+    body{font-family:Georgia,serif;max-width:680px;margin:40px auto;padding:20px;color:#222}
+    .header{border-bottom:3px solid #c9933a;padding-bottom:16px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start}
+    .logo{font-size:28px;color:#c9933a;font-weight:bold}
+    .inv-num{font-size:12px;color:#888;margin-top:4px}
+    .amount-box{background:#fdf7ef;border:2px solid #c9933a;border-radius:8px;padding:16px 24px;text-align:center;margin:24px 0}
+    .amount-label{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px}
+    .amount-val{font-size:36px;font-weight:bold;color:#c9933a}
+    .due{font-size:14px;color:#c55;margin-top:4px}
+    .details{background:#f9f9f9;border-radius:8px;padding:16px;margin-bottom:24px}
+    .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}
+    .row:last-child{border-bottom:none}
+    .label{color:#888;font-size:13px}.value{font-size:13px;font-weight:600}
+    .footer{text-align:center;color:#888;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #eee}
+  </style></head><body>
+  <div class="header">
+    <div><div class="logo">LandFlow CRM</div><div class="inv-num">Invoice · ${new Date().toLocaleDateString()}</div></div>
+    <div style="text-align:right"><div style="font-size:12px;color:#888">Bill To:</div><div style="font-weight:bold">${inv.borrower||l?.borrower||''}</div><div style="font-size:12px;color:#888">${inv.email}</div></div>
+  </div>
+  <div class="amount-box">
+    <div class="amount-label">Amount Due</div>
+    <div class="amount-val">${fmtD(inv.amount)}</div>
+    <div class="due">Due: ${fmtDate(inv.due_date)}</div>
+  </div>
+  <div class="details">
+    <div class="row"><span class="label">Period</span><span class="value">${inv.period||''}</span></div>
+    <div class="row"><span class="label">Loan ID</span><span class="value">${inv.loan_id?.slice(0,8).toUpperCase()||''}</span></div>
+    <div class="row"><span class="label">Property</span><span class="value">${l?.address||'—'}</span></div>
+    <div class="row"><span class="label">Parcel #</span><span class="value">${l?.parcel||'—'}</span></div>
+    <div class="row"><span class="label">Remaining Balance</span><span class="value">${fmt(bal)}</span></div>
+    ${inv.notes?`<div class="row"><span class="label">Note</span><span class="value">${inv.notes}</span></div>`:''}
+  </div>
+  <div class="footer">LandFlow CRM · Seller Finance Management · Please remit payment by the due date shown above</div>
+  </body></html>`);
+  w.document.close();
+}
+
+async function sendInvoice(id) {
+  const inv = invoices.find(x => x.id === id);
+  if (!inv) return;
+  const subject = encodeURIComponent(`Payment Due — ${inv.period||''} — ${fmtD(inv.amount)}`);
+  const body = encodeURIComponent(`Dear ${inv.borrower},\n\nYour payment of ${fmtD(inv.amount)} is due on ${fmtDate(inv.due_date)}.\n\nProperty: Parcel ${loans.find(l=>l.id===inv.loan_id)?.parcel||inv.loan_id?.slice(0,8).toUpperCase()}\nPeriod: ${inv.period||''}\n${inv.notes?'\n'+inv.notes+'\n':''}\nThank you,\nLandFlow CRM`);
+  window.open(`mailto:${inv.email}?subject=${subject}&body=${body}`);
+  await sb.from('invoices').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id);
+  const idx = invoices.findIndex(i => i.id === id);
+  if (idx >= 0) { invoices[idx].status = 'sent'; invoices[idx].sent_at = new Date().toISOString(); }
+  renderInvoices();
+  showToast('📧 Email client opened!', 'success');
+}
+
+function sendAllPendingInvoices() {
+  const pending = invoices.filter(i => i.status === 'pending');
+  if (!pending.length) { showToast('No pending invoices', 'error'); return; }
+  if (!confirm(`Send ${pending.length} pending invoice email${pending.length!==1?'s':''}?`)) return;
+  pending.forEach(inv => sendInvoice(inv.id));
+}
+
+// ============================================================
+// INVESTORS
+// ============================================================
+function openInvestorModal() { openModal('investorModal'); }
+
+async function saveInvestor() {
+  const name = document.getElementById('inv2-name').value.trim();
+  if (!name) return showToast('⚠️ Name required', 'error');
+  const data = {
+    name, contact: document.getElementById('inv2-contact').value,
+    phone: document.getElementById('inv2-phone').value,
+    email: document.getElementById('inv2-email').value,
+    notes: document.getElementById('inv2-notes').value,
+  };
+  const saved = await dbSaveInvestor(data);
+  investors.push(saved);
+  renderInvestors(); closeModal('investorModal');
+  showToast('✅ Investor saved!', 'success');
+  ['inv2-name','inv2-contact','inv2-phone','inv2-email','inv2-notes'].forEach(id => document.getElementById(id).value = '');
+}
+
+function renderInvestors() {
+  const grid = document.getElementById('investorsGrid');
+  const allInv = [...investors];
+  loans.forEach(l => {
+    if (l.investor && !allInv.find(i => i.name === l.investor)) {
+      allInv.push({ id: 'auto', name: l.investor, contact: l.inv_contact||'—', phone: '', email: '', notes: '', auto: true });
+    }
+  });
+  if (!allInv.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">💼</div><div class="empty-title">No investors yet</div></div>`;
+    return;
+  }
+  grid.innerHTML = allInv.map(inv => {
+    const assigned = loans.filter(l => l.investor === inv.name);
+    const total = assigned.reduce((s,l) => s + parseFloat(l.loan_amount||0), 0);
+    return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px">🏦 ${inv.name}</div>
+      ${inv.contact&&inv.contact!=='—'?`<div style="font-size:12px;color:var(--text2)">👤 ${inv.contact}</div>`:''}
+      ${inv.phone?`<div style="font-size:12px;color:var(--text2)">📞 ${inv.phone}</div>`:''}
+      ${inv.email?`<div style="font-size:12px;color:var(--text2)">✉️ ${inv.email}</div>`:''}
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        <div><div class="lc-label">Notes Held</div><div class="lc-val">${assigned.length}</div></div>
+        <div><div class="lc-label">Portfolio</div><div class="lc-val gold">${fmt(total)}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// BUYERS
+// ============================================================
+function renderBuyers() {
+  const grid = document.getElementById('buyersGrid');
+  if (!loans.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">👤</div><div class="empty-title">No buyers yet</div></div>`;
+    return;
+  }
+  grid.innerHTML = loans.map(l => {
+    const pmts = payments.filter(p => p.loan_id === l.id);
+    const totalPaid = pmts.reduce((s,p) => s + parseFloat(p.amount||0), 0);
+    const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
+    const paid = paysMade(l.orig_date);
+    const bal = calcBalance(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), paid);
+    return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer" onclick="openDetail('${l.id}')">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px">👤 ${l.borrower||'Unnamed'}</div>
+      ${getBadge(l)}
+      ${l.phone?`<div style="font-size:12px;color:var(--text2);margin-top:4px">📞 ${l.phone}</div>`:''}
+      ${l.email?`<div style="font-size:12px;color:var(--text2)">✉️ ${l.email}</div>`:''}
+      <div style="font-size:12px;color:var(--text2)">📍 ${l.address||'—'}</div>
+      ${l.parcel?`<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3)">Parcel: ${l.parcel}</div>`:''}
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div><div class="lc-label">Balance</div><div class="lc-val gold">${fmt(bal)}</div></div>
+        <div><div class="lc-label">Monthly</div><div class="lc-val green">${fmt(pmt)}</div></div>
+        <div><div class="lc-label">Total Paid</div><div class="lc-val">${fmt(totalPaid)}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// ALERTS
+// ============================================================
+function computeAlerts() {
+  const alerts = [];
+  loans.forEach(l => {
+    if (l.status === 'late') alerts.push({ type:'urgent', icon:'🚨', title: l.borrower + ' — Payment Late', sub: l.parcel||l.id?.slice(0,8).toUpperCase()||'', loanId: l.id });
+    const bd = balloonDate(l.orig_date, l.balloon);
+    if (bd) {
+      const days = (bd - new Date()) / (1000*60*60*24);
+      if (days < 365 && days > 0) {
+        const urgency = days < 90 ? 'urgent' : 'warning';
+        alerts.push({ type: urgency, icon:'⏰', title: l.borrower + ' — Balloon Due', sub: 'Due ' + fmtDate(bd) + ' · ' + Math.round(days) + ' days', loanId: l.id });
+      }
+    }
+    const pmts = payments.filter(p => p.loan_id === l.id);
+    if (pmts.length > 0) {
+      const last = new Date(Math.max(...pmts.map(p => new Date(p.date))));
+      const daysSince = (new Date() - last) / (1000*60*60*24);
+      if (daysSince > 45) alerts.push({ type:'warning', icon:'📅', title: l.borrower + ' — No Payment in ' + Math.round(daysSince) + ' Days', sub: 'Last: ' + fmtDate(last), loanId: l.id });
+    }
+  });
+  return alerts;
+}
+
+function renderAlerts() {
+  const alerts = computeAlerts();
+  const el = document.getElementById('alertsContent');
+  if (!alerts.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">All clear!</div><div class="empty-sub">No alerts at this time</div></div>`;
+  } else {
+    el.innerHTML = alerts.map(a => `<div class="alert-item ${a.type}" onclick="if('${a.loanId}') openDetail('${a.loanId}')">
+      <div class="alert-icon">${a.icon}</div>
+      <div><div class="alert-title">${a.title}</div><div class="alert-sub">${a.sub}</div></div>
+    </div>`).join('');
+  }
+  updateStats();
+}
+
+// ============================================================
+// DOCUMENT VAULT (status tracking)
+// ============================================================
+function renderVault() {
+  const el = document.getElementById('vaultContent');
+  if (!loans.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🗄</div><div class="empty-title">No loans yet</div><div class="empty-sub">Add loans first</div></div>`;
+    return;
+  }
+  el.innerHTML = loans.map(l => {
+    const loanFiles = vaultFiles.filter(f => f.loan_id === l.id);
+    const totalFiles = loanFiles.length;
+    const recCount = loanFiles.filter(f => f.cat_id === 'recorded').length;
+    return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;cursor:pointer" onclick="openDetail('${l.id}');setTimeout(()=>dpTab('files',document.querySelectorAll('.tab-btn')[4]),200)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-weight:700;font-size:14px">${l.borrower||'Unnamed'}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${l.id?.slice(0,8).toUpperCase()||''} ${l.parcel?'· Parcel '+l.parcel:''} ${l.county?'· '+l.county+' County':''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gold)">${totalFiles} file${totalFiles!==1?'s':''}</div>
+          ${recCount?`<div style="font-size:11px;color:var(--green)">${recCount} recorded</div>`:''}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        ${FILE_CATEGORIES.map(c => {
+          const cnt = loanFiles.filter(f => f.cat_id === c.id).length;
+          return cnt ? `<span style="background:var(--s3);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px">${c.icon} ${c.label}: ${cnt}</span>` : '';
+        }).join('')}
+        ${!totalFiles?`<span style="color:var(--text3);font-size:12px">No files uploaded yet — click to open file vault</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// FILE VAULT (per parcel)
+// ============================================================
+const FILE_CATEGORIES = [
+  { id:'recorded', icon:'🏛', label:'Recorded & Stamped' },
+  { id:'notarized', icon:'✍️', label:'Signed & Notarized' },
+  { id:'plats', icon:'🗺', label:'Plats & Maps' },
+  { id:'county', icon:'🏢', label:'County Information' },
+  { id:'photos', icon:'📸', label:'Photos' },
+  { id:'other', icon:'📎', label:'Other Documents' },
+];
+
+async function vaultUpload(loanId, catId) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.multiple = true; input.accept = '*/*';
+  input.onchange = async () => {
+    let added = 0;
+    for (const f of input.files) {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result); r.onerror = rej;
+        r.readAsDataURL(f);
+      });
+      const data = {
+        loan_id: loanId, cat_id: catId,
+        name: f.name, size: f.size, type: f.type,
+        data: b64, book_page: '', notes: '',
+      };
+      showToast('Uploading…');
+      const saved = await dbSaveVaultFile(data);
+      vaultFiles.push(saved);
+      added++;
+    }
+    showToast('✅ ' + added + ' file(s) uploaded', 'success');
+    renderFileVault(loanId);
+    renderDpDocs(loans.find(l => l.id === loanId));
+    renderVault();
+  };
+  input.click();
+}
+
+async function vaultDelete(loanId, fileId) {
+  if (!confirm('Remove this file?')) return;
+  await dbDeleteVaultFile(fileId);
+  vaultFiles = vaultFiles.filter(f => f.id !== fileId);
+  renderFileVault(loanId);
+  renderDpDocs(loans.find(l => l.id === loanId));
+  renderVault();
+}
+
+function vaultDownload(loanId, fileId) {
+  const f = vaultFiles.find(x => x.id === fileId);
+  if (!f) return;
+  const a = document.createElement('a');
+  a.href = f.data; a.download = f.name; a.click();
+}
+
+async function vaultSaveNote(loanId, fileId, field, val) {
+  const updates = { [field]: val };
+  await dbUpdateVaultFile(fileId, updates);
+  const f = vaultFiles.find(x => x.id === fileId);
+  if (f) f[field] = val;
+}
+
+function fmtFileSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+function fileIcon(type, name) {
+  if (type?.startsWith('image/')) return '🖼';
+  if (type === 'application/pdf') return '📄';
+  if (type?.includes('word') || name?.endsWith('.docx')) return '📝';
+  return '📎';
+}
+
+function renderFileVault(loanId) {
+  const el = document.getElementById('dp-file-vault');
+  if (!el) return;
+  const allFiles = vaultFiles.filter(f => f.loan_id === loanId);
+  let html = '';
+  FILE_CATEGORIES.forEach(cat => {
+    const catFiles = allFiles.filter(f => f.cat_id === cat.id);
+    html += `<div class="vault-cat">
+      <div class="vault-cat-head">
+        <div class="vault-cat-title">${cat.icon} ${cat.label} <span style="color:var(--text3);font-weight:400">(${catFiles.length})</span></div>
+        <button class="btn btn-ghost btn-sm" onclick="vaultUpload('${loanId}','${cat.id}')">＋ Upload</button>
+      </div>`;
+    if (!catFiles.length) {
+      html += `<div style="padding:10px 14px;color:var(--text3);font-size:12px">No files yet</div>`;
+    } else {
+      catFiles.forEach(f => {
+        html += `<div class="vault-file-row">
+          <div class="vault-file-icon">${fileIcon(f.type, f.name)}</div>
+          <div style="flex:1;min-width:0">
+            <div class="vault-file-name">${f.name}</div>
+            <div class="vault-file-meta">${fmtFileSize(f.size)} · ${new Date(f.created_at||f.uploaded_at||Date.now()).toLocaleDateString()}</div>
+            ${cat.id==='recorded' ? `
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <input class="form-input" style="flex:1;font-size:11px;padding:4px 8px;height:26px" placeholder="Book / Instrument #" value="${f.book_page||''}" onchange="vaultSaveNote('${loanId}','${f.id}','book_page',this.value)">
+              <input class="form-input" style="flex:2;font-size:11px;padding:4px 8px;height:26px" placeholder="Notes" value="${f.notes||''}" onchange="vaultSaveNote('${loanId}','${f.id}','notes',this.value)">
+            </div>` : `<input class="form-input" style="width:100%;font-size:11px;padding:4px 8px;height:26px;margin-top:6px" placeholder="Notes" value="${f.notes||''}" onchange="vaultSaveNote('${loanId}','${f.id}','notes',this.value)">`}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            <button class="btn btn-ghost btn-sm" onclick="vaultDownload('${loanId}','${f.id}')">⬇</button>
+            <button class="btn btn-danger btn-sm" onclick="vaultDelete('${loanId}','${f.id}')">🗑</button>
+          </div>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type) {
+  const el = document.getElementById('toastEl');
+  el.textContent = msg;
+  el.style.color = type==='error' ? 'var(--red)' : type==='success' ? 'var(--green)' : 'var(--text)';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Handle Enter key on auth inputs
+  document.getElementById('authPass').addEventListener('keydown', e => { if(e.key==='Enter') signIn(); });
+  initAuth();
+});
+</script>
+</body>
+</html>
