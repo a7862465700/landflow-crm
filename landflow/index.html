@@ -2965,6 +2965,10 @@ function buildMergeData(loan) {
     last_payment_date: fmtDate(matDate.toISOString()),
     term_months: termMonths.toString(),
     total_interest: fmtD(totalInterest), total_interest_words: numberToWords(totalInterest),
+    total_of_payments: fmtD(totalInterest + parseFloat(loan.loan_amount || 0)),
+    total_of_payments_words: numberToWords(totalInterest + parseFloat(loan.loan_amount || 0)),
+    total_sale_price: fmtD(totalInterest + parseFloat(loan.loan_amount || 0) + parseFloat(loan.down_payment || 0)),
+    total_sale_price_words: numberToWords(totalInterest + parseFloat(loan.loan_amount || 0) + parseFloat(loan.down_payment || 0)),
     // Company / Lender
     company_name: s.company_name || '', company_address: s.company_address || '',
     company_phone: fmtPhone(s.company_phone) || '', company_email: s.company_email || '',
@@ -3142,6 +3146,10 @@ const MERGE_FIELDS = [
     ['{maturity_date}', 'Last payment date'], ['{last_payment_date}', 'Last payment date (same)'],
     ['{total_interest}', 'Total interest ($)'],
     ['{total_interest_words}', 'Total interest (written out)'],
+    ['{total_of_payments}', 'Total of payments (interest + loan amount)'],
+    ['{total_of_payments_words}', 'Total of payments (written out)'],
+    ['{total_sale_price}', 'Total sale price (interest + loan amount + down)'],
+    ['{total_sale_price_words}', 'Total sale price (written out)'],
     ['{account_number}', 'Account # (parcel or loan ID)'],
   ]},
   { section: 'Investor / Note Buyer', fields: [
