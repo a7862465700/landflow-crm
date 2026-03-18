@@ -443,7 +443,7 @@ textarea.form-input{resize:vertical;min-height:80px}
           <button class="btn btn-sm" style="background:#3b7be0;color:#fff" onclick="importPDF()">📄 Import PDF</button>
         </div>
         <div class="search-bar">
-          <input class="search-input" id="loanSearch" placeholder="🔍  Search by buyer, seller, parcel, county..." oninput="renderLoans()">
+          <input class="search-input" id="loanSearch" placeholder="🔍  Search by buyer, company, seller, parcel, investor..." oninput="renderLoans()">
         </div>
         <div id="loansGrid"><div class="empty-state"><div class="empty-icon">🏡</div><div class="empty-title">No loans yet</div><div class="empty-sub">Add your first seller-financed loan</div><button class="btn btn-gold" onclick="openLoanModal()">＋ Add Loan</button></div></div>
       </div>
@@ -1242,10 +1242,13 @@ function renderLoans() {
   const q = (document.getElementById('loanSearch')?.value || '').toLowerCase();
   const filtered = q ? loans.filter(l =>
     (l.borrower||'').toLowerCase().includes(q) ||
+    (l.buyer_company||'').toLowerCase().includes(q) ||
     (l.seller||'').toLowerCase().includes(q) ||
     (l.parcel||'').toLowerCase().includes(q) ||
     (l.county||'').toLowerCase().includes(q) ||
-    (l.address||'').toLowerCase().includes(q)
+    (l.address||'').toLowerCase().includes(q) ||
+    (l.investor||'').toLowerCase().includes(q) ||
+    (l.nb_business||'').toLowerCase().includes(q)
   ) : loans;
   if (!filtered.length) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🏡</div><div class="empty-title">${q?'No matches':'No loans yet'}</div><div class="empty-sub">${q?'Try a different search':'Add your first seller-financed loan'}</div>${!q?'<button class="btn btn-gold" onclick="openLoanModal()">＋ Add Loan</button>':''}</div>`;
