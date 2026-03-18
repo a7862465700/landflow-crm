@@ -2923,7 +2923,7 @@ function buildMergeData(loan) {
   return {
     // Borrower / Buyer
     borrower: loan.borrower || '', buyer_company: loan.buyer_company || '', buyer_address: loan.buyer_address || '',
-    phone: fmtPhone(loan.phone) || '', email: loan.email || '', ssn: loan.ssn || '',
+    phone: fmtPhone(loan.phone) || '', email: loan.email || '', ssn: loan.ssn || '', buyer_county: loan.buyer_county || '',
     // Seller
     seller: loan.seller || '', seller_phone: fmtPhone(loan.seller_phone) || '',
     seller_address: loan.seller_address || '', price_paid: fmtNum(loan.price_paid),
@@ -3107,7 +3107,7 @@ async function previewTemplateFields(templateId) {
 const MERGE_FIELDS = [
   { section: 'Borrower / Buyer', fields: [
     ['{borrower}', 'Full name'], ['{buyer_company}', 'Company name'], ['{buyer_address}', 'Mailing address'], ['{phone}', 'Phone (formatted)'],
-    ['{email}', 'Email'], ['{ssn}', 'SSN/EIN (last 4)'],
+    ['{email}', 'Email'], ['{ssn}', 'SSN/EIN (last 4)'], ['{buyer_county}', 'Buyer county'],
   ]},
   { section: 'Seller', fields: [
     ['{seller}', 'Full name'], ['{seller_phone}', 'Phone (formatted)'],
