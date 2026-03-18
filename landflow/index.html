@@ -565,6 +565,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       </div>
       <div class="form-section">📍 Property Info</div>
       <div class="form-grid">
+        <div class="form-group"><label class="form-label">State</label><input class="form-input" id="f-state" placeholder="Georgia"></div>
         <div class="form-group"><label class="form-label">County</label><input class="form-input" id="f-county" placeholder="Hancock"></div>
         <div class="form-group"><label class="form-label">Parcel #</label><input class="form-input" id="f-parcel" placeholder="013B048"></div>
         <div class="form-group form-full"><label class="form-label">Property Address</label><input class="form-input" id="f-address" placeholder="123 Main St, Atlanta GA 30301"></div>
@@ -1246,15 +1247,18 @@ function renderLoans() {
     (l.seller||'').toLowerCase().includes(q) ||
     (l.parcel||'').toLowerCase().includes(q) ||
     (l.county||'').toLowerCase().includes(q) ||
+    (l.property_state||'').toLowerCase().includes(q) ||
     (l.address||'').toLowerCase().includes(q) ||
     (l.investor||'').toLowerCase().includes(q) ||
     (l.nb_business||'').toLowerCase().includes(q)
   ) : loans;
-  // Sort by parcel number numerically
+  // Sort by state, then county, then parcel number (alphanumeric)
   filtered.sort((a, b) => {
-    const pa = parseFloat((a.parcel||'').replace(/[^0-9.]/g, '')) || 0;
-    const pb = parseFloat((b.parcel||'').replace(/[^0-9.]/g, '')) || 0;
-    return pa - pb;
+    const sa = (a.property_state||'').toLowerCase(), sb = (b.property_state||'').toLowerCase();
+    if (sa !== sb) return sa.localeCompare(sb);
+    const ca = (a.county||'').toLowerCase(), cb = (b.county||'').toLowerCase();
+    if (ca !== cb) return ca.localeCompare(cb);
+    return (a.parcel||'').localeCompare(b.parcel||'', undefined, { numeric: true, sensitivity: 'base' });
   });
   if (!filtered.length) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🏡</div><div class="empty-title">${q?'No matches':'No loans yet'}</div><div class="empty-sub">${q?'Try a different search':'Add your first seller-financed loan'}</div>${!q?'<button class="btn btn-gold" onclick="openLoanModal()">＋ Add Loan</button>':''}</div>`;
@@ -1306,6 +1310,7 @@ function openLoanModal(editId) {
     document.getElementById('f-phone').value = l.phone||'';
     document.getElementById('f-email').value = l.email||'';
     document.getElementById('f-ssn').value = l.ssn||'';
+    document.getElementById('f-state').value = l.property_state||'';
     document.getElementById('f-county').value = l.county||'';
     document.getElementById('f-parcel').value = l.parcel||'';
     document.getElementById('f-address').value = l.address||'';
@@ -1341,7 +1346,7 @@ function openLoanModal(editId) {
 }
 
 function clearLoanForm() {
-  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-company','f-buyer-address','f-phone','f-email','f-ssn','f-county','f-parcel','f-address','f-legaldesc',
+  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-company','f-buyer-address','f-phone','f-email','f-ssn','f-state','f-county','f-parcel','f-address','f-legaldesc',
    'f-saleprice','f-down','f-loanamt','f-rate','f-origdate','f-firstpay','f-investor','f-inv-contact',
    'f-inv-date','f-inv-price','f-nb-name','f-nb-business','f-nb-phone','f-nb-email','f-nb-address','f-notes']
   .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
@@ -1403,6 +1408,7 @@ async function saveLoan() {
     phone: document.getElementById('f-phone').value,
     email: document.getElementById('f-email').value,
     ssn: document.getElementById('f-ssn').value,
+    property_state: document.getElementById('f-state').value.trim(),
     county: document.getElementById('f-county').value.trim(),
     parcel: document.getElementById('f-parcel').value.trim(),
     address: document.getElementById('f-address').value,
@@ -1644,6 +1650,7 @@ function openDetail(id) {
     ['Seller Phone', fmtPhone(l.seller_phone)||'—', ''],
     ['Seller Address', l.seller_address||'—', ''],
     ['Price Paid', l.price_paid ? fmt(l.price_paid) : '—', 'mono'],
+    ['State', l.property_state||'—', ''],
     ['County', l.county||'—', ''],
   ].map(([lb,val,cls]) => `<div class="dp-field"><div class="dp-field-label">${lb}</div><div class="dp-field-val ${cls}">${val}</div></div>`).join('');
   const pct = Math.min(100, (paid/(l.term*12))*100);
@@ -2920,7 +2927,7 @@ function buildMergeData(loan) {
     price_paid_fmt: fmt(loan.price_paid || 0),
     price_paid_words: numberToWords(loan.price_paid),
     // Property
-    county: loan.county || '', parcel: loan.parcel || '',
+    property_state: loan.property_state || '', county: loan.county || '', parcel: loan.parcel || '',
     address: loan.address || '', legal_desc: loan.legal_desc || '',
     // Loan Terms
     sale_price: fmtNum(loan.sale_price), sale_price_fmt: fmt(loan.sale_price || 0),
@@ -3105,7 +3112,7 @@ const MERGE_FIELDS = [
     ['{price_paid_words}', 'Price paid (written out)'],
   ]},
   { section: 'Property', fields: [
-    ['{address}', 'Property address'], ['{county}', 'County'], ['{parcel}', 'Parcel number'],
+    ['{address}', 'Property address'], ['{property_state}', 'State'], ['{county}', 'County'], ['{parcel}', 'Parcel number'],
     ['{legal_desc}', 'Legal description'],
   ]},
   { section: 'Loan Terms', fields: [
