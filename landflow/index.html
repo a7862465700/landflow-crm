@@ -562,7 +562,6 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="form-group"><label class="form-label">Buyer Email</label><input class="form-input" id="f-email" type="email" placeholder="buyer@email.com"></div>
         <div class="form-group form-full"><label class="form-label">Buyer Address</label><input class="form-input" id="f-buyer-address" placeholder="123 Main St, Atlanta GA 30301"></div>
         <div class="form-group"><label class="form-label">SSN / EIN (last 4)</label><input class="form-input" id="f-ssn" placeholder="••••" maxlength="4"></div>
-        <div class="form-group"><label class="form-label">Buyer State</label><input class="form-input" id="f-buyer-state" placeholder="Nevada"></div>
         <div class="form-group"><label class="form-label">Buyer County</label><input class="form-input" id="f-buyer-county" placeholder="Clark"></div>
       </div>
       <div class="form-section">📍 Property Info</div>
@@ -1312,7 +1311,6 @@ function openLoanModal(editId) {
     document.getElementById('f-phone').value = l.phone||'';
     document.getElementById('f-email').value = l.email||'';
     document.getElementById('f-ssn').value = l.ssn||'';
-    document.getElementById('f-buyer-state').value = l.buyer_state||'';
     document.getElementById('f-buyer-county').value = l.buyer_county||'';
     document.getElementById('f-state').value = l.property_state||'';
     document.getElementById('f-county').value = l.county||'';
@@ -1350,7 +1348,7 @@ function openLoanModal(editId) {
 }
 
 function clearLoanForm() {
-  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-company','f-buyer-address','f-phone','f-email','f-ssn','f-buyer-state','f-buyer-county','f-state','f-county','f-parcel','f-address','f-legaldesc',
+  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-company','f-buyer-address','f-phone','f-email','f-ssn','f-buyer-county','f-state','f-county','f-parcel','f-address','f-legaldesc',
    'f-saleprice','f-down','f-loanamt','f-rate','f-origdate','f-firstpay','f-investor','f-inv-contact',
    'f-inv-date','f-inv-price','f-nb-name','f-nb-business','f-nb-phone','f-nb-email','f-nb-address','f-notes']
   .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
@@ -1412,7 +1410,6 @@ async function saveLoan() {
     phone: document.getElementById('f-phone').value,
     email: document.getElementById('f-email').value,
     ssn: document.getElementById('f-ssn').value,
-    buyer_state: document.getElementById('f-buyer-state').value.trim(),
     buyer_county: document.getElementById('f-buyer-county').value.trim(),
     property_state: document.getElementById('f-state').value.trim(),
     county: document.getElementById('f-county').value.trim(),
