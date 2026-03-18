@@ -1260,8 +1260,10 @@ function renderLoans() {
       <div class="lc-head">
         <div>
           <div class="lc-id">${l.id?.slice(0,8).toUpperCase() || ''} ${l.parcel ? '· ' + l.parcel : ''}</div>
-          <div class="lc-name">${l.borrower||'Unnamed'}</div>
+          <div class="lc-name">${l.buyer_company||l.borrower||'Unnamed'}</div>
           <div class="lc-addr">📍 ${l.address||'—'}</div>
+          ${l.investor ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">🏦 Investor: ${l.investor}</div>` : ''}
+          ${l.nb_business ? `<div style="font-size:11px;color:var(--text2)">🏢 ${l.nb_business}</div>` : ''}
         </div>
         ${getBadge(l)}
       </div>
