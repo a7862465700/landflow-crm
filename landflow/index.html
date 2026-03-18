@@ -1250,6 +1250,12 @@ function renderLoans() {
     (l.investor||'').toLowerCase().includes(q) ||
     (l.nb_business||'').toLowerCase().includes(q)
   ) : loans;
+  // Sort by parcel number numerically
+  filtered.sort((a, b) => {
+    const pa = parseFloat((a.parcel||'').replace(/[^0-9.]/g, '')) || 0;
+    const pb = parseFloat((b.parcel||'').replace(/[^0-9.]/g, '')) || 0;
+    return pa - pb;
+  });
   if (!filtered.length) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🏡</div><div class="empty-title">${q?'No matches':'No loans yet'}</div><div class="empty-sub">${q?'Try a different search':'Add your first seller-financed loan'}</div>${!q?'<button class="btn btn-gold" onclick="openLoanModal()">＋ Add Loan</button>':''}</div>`;
     return;
