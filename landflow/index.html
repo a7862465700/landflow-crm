@@ -1591,12 +1591,12 @@ async function handlePDFFile(e) {
     document.getElementById('f-buyer-state').value = ARKANSAS_DEFAULTS.buyer_state;
     document.getElementById('f-buyer-county').value = ARKANSAS_DEFAULTS.buyer_county;
 
-    // Set origination date to today
-    const today = new Date();
-    document.getElementById('f-origdate').value = today.toISOString().split('T')[0];
+    // Set origination date to the filing date from the document (not today)
+    const filingDate = extracted.filing_date ? new Date(extracted.filing_date + 'T00:00:00') : new Date();
+    document.getElementById('f-origdate').value = filingDate.toISOString().split('T')[0];
 
-    // First payment date = 1st of the following month
-    const firstPay = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    // First payment date = 1st of the month following the filing date
+    const firstPay = new Date(filingDate.getFullYear(), filingDate.getMonth() + 1, 1);
     document.getElementById('f-firstpay').value = firstPay.toISOString().split('T')[0];
     document.getElementById('f-dueday').value = '1';
 
