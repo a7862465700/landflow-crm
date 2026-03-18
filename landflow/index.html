@@ -560,17 +560,17 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="form-group"><label class="form-label">Buyer Company</label><input class="form-input" id="f-buyer-company" placeholder="Terra Equity Holdings LLC"></div>
         <div class="form-group"><label class="form-label">Buyer Phone</label><input class="form-input" id="f-phone" type="tel" placeholder="5550000000"></div>
         <div class="form-group"><label class="form-label">Buyer Email</label><input class="form-input" id="f-email" type="email" placeholder="buyer@email.com"></div>
-        <div class="form-group form-full"><label class="form-label">Buyer Address</label><input class="form-input" id="f-buyer-address" placeholder="123 Main St, Atlanta GA 30301"></div>
+        <div class="form-group form-full"><label class="form-label">Buyer Address</label><input class="form-input" id="f-buyer-address" placeholder="950 Seven Hills Drive, Henderson, NV 89052"></div>
         <div class="form-group"><label class="form-label">SSN / EIN (last 4)</label><input class="form-input" id="f-ssn" placeholder="••••" maxlength="4"></div>
         <div class="form-group"><label class="form-label">Buyer State</label><input class="form-input" id="f-buyer-state" placeholder="NEVADA" style="text-transform:uppercase"></div>
         <div class="form-group"><label class="form-label">Buyer County</label><input class="form-input" id="f-buyer-county" placeholder="CLARK" style="text-transform:uppercase"></div>
       </div>
       <div class="form-section">📍 Property Info</div>
       <div class="form-grid">
-        <div class="form-group"><label class="form-label">State</label><input class="form-input" id="f-state" placeholder="Georgia"></div>
-        <div class="form-group"><label class="form-label">County</label><input class="form-input" id="f-county" placeholder="Hancock"></div>
+        <div class="form-group"><label class="form-label">State</label><input class="form-input" id="f-state" placeholder="ARKANSAS" style="text-transform:uppercase"></div>
+        <div class="form-group"><label class="form-label">County</label><input class="form-input" id="f-county" placeholder="Garland"></div>
         <div class="form-group"><label class="form-label">Parcel #</label><input class="form-input" id="f-parcel" placeholder="013B048"></div>
-        <div class="form-group form-full"><label class="form-label">Property Address</label><input class="form-input" id="f-address" placeholder="123 Main St, Atlanta GA 30301"></div>
+        <div class="form-group form-full"><label class="form-label">Property Address</label><input class="form-input" id="f-address" placeholder="Hot Springs, AR"></div>
         <div class="form-group form-full"><label class="form-label">Legal Description</label><textarea class="form-input" id="f-legaldesc" rows="3" placeholder="Full legal description — no character limit"></textarea></div>
       </div>
       <div class="form-section" style="margin-top:16px">📋 Loan Terms</div>
@@ -1503,6 +1503,9 @@ const ARKANSAS_DEFAULTS = {
   loan_amount: 11550,
   rate: 10,
   term: '5',
+  property_state: 'ARKANSAS',
+  buyer_state: 'NEVADA',
+  buyer_county: 'CLARK',
 };
 
 let pendingImportPDF = null; // { name, size, type, dataUrl }
@@ -1584,6 +1587,9 @@ async function handlePDFFile(e) {
     document.getElementById('f-loanamt').value = ARKANSAS_DEFAULTS.loan_amount;
     document.getElementById('f-rate').value = ARKANSAS_DEFAULTS.rate;
     document.getElementById('f-term').value = ARKANSAS_DEFAULTS.term;
+    document.getElementById('f-state').value = ARKANSAS_DEFAULTS.property_state;
+    document.getElementById('f-buyer-state').value = ARKANSAS_DEFAULTS.buyer_state;
+    document.getElementById('f-buyer-county').value = ARKANSAS_DEFAULTS.buyer_county;
 
     // Set origination date to today
     const today = new Date();
