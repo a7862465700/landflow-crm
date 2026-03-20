@@ -36,21 +36,26 @@ exports.handler = async (event) => {
             },
             {
               type: "text",
-              text: `Extract the following fields from this Arkansas deed document. Return ONLY valid JSON with these exact keys:
+              text: `This is an Arkansas Limited Warranty Deed issued by the Commissioner of State Lands (Tommy Land or successor). Extract the following fields and return ONLY valid JSON with these exact keys:
 
 {
-  "seller": "Commissioner name and title (e.g. Tommy Land, Commissioner of State Lands)",
+  "seller": "Commissioner name and title (e.g. Tommy Land, Commissioner of State Lands, State of Arkansas)",
   "seller_address": "Commissioner office address",
-  "parcel": "Parcel number",
-  "legal_desc": "Full legal description (section, township, range, lot, block, city, addition, etc.)",
-  "county": "County name",
-  "city": "City name if present",
+  "parcel": "Parcel ID or parcel number — look for a format like XX-XXXXX-XXX or similar county assessor ID. In Garland County deeds this may appear as a parcel number near the legal description. In Saline County deeds it may be labeled 'Parcel ID' or 'Tax ID'. Extract the full number exactly as written.",
+  "legal_desc": "Full legal description including section, township, range, lot, block, subdivision, city, addition, or any other identifying language as written in the deed.",
+  "county": "County name only (e.g. Garland, Saline) — do not include the word County",
+  "city": "City or municipality name if present, otherwise empty string",
   "price_paid": 0.00,
-  "previous_owner": "Tax-assessed previous owner name",
-  "filing_date": "YYYY-MM-DD"
+  "previous_owner": "Name of the tax-assessed previous owner (the party who lost the property to the state for delinquent taxes)",
+  "filing_date": "The date shown at the top right of the document in YYYY-MM-DD format — this is the deed execution or filing date, NOT today's date"
 }
 
-For price_paid, use the dollar amount paid to the Commissioner. Return only the JSON, no other text.`,
+Important notes:
+- The grantee/buyer is always Terra Equity Holdings — do not include this in any field
+- filing_date must come from the document itself (top right corner), not the current date
+- For price_paid, use the dollar amount paid to the Commissioner of State Lands
+- Garland County and Saline County deeds have different layouts — extract parcel ID carefully from both
+- Return only the JSON object, no explanation or markdown`,
             },
           ],
         },
