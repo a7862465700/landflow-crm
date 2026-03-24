@@ -570,6 +570,7 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="form-group"><label class="form-label">State</label><input class="form-input" id="f-state" placeholder="ARKANSAS" style="text-transform:uppercase"></div>
         <div class="form-group"><label class="form-label">County</label><input class="form-input" id="f-county" placeholder="Garland"></div>
         <div class="form-group"><label class="form-label">Parcel #</label><input class="form-input" id="f-parcel" placeholder="013B048"></div>
+        <div class="form-group"><label class="form-label">Acreage</label><input class="form-input" id="f-acreage" type="number" step="0.01" placeholder="0.23"></div>
         <div class="form-group form-full"><label class="form-label">Property Address</label><input class="form-input" id="f-address" placeholder="Hot Springs, AR"></div>
         <div class="form-group form-full"><label class="form-label">Legal Description</label><textarea class="form-input" id="f-legaldesc" rows="3" placeholder="Full legal description — no character limit"></textarea></div>
       </div>
@@ -1317,6 +1318,7 @@ function openLoanModal(editId) {
     document.getElementById('f-state').value = l.property_state||'';
     document.getElementById('f-county').value = l.county||'';
     document.getElementById('f-parcel').value = l.parcel||'';
+    document.getElementById('f-acreage').value = l.acreage||'';
     document.getElementById('f-address').value = l.address||'';
     document.getElementById('f-legaldesc').value = l.legal_desc||'';
     document.getElementById('f-saleprice').value = l.sale_price||'';
@@ -1350,7 +1352,7 @@ function openLoanModal(editId) {
 }
 
 function clearLoanForm() {
-  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-company','f-buyer-address','f-phone','f-email','f-ssn','f-buyer-state','f-buyer-county','f-state','f-county','f-parcel','f-address','f-legaldesc',
+  ['f-borrower','f-seller','f-seller-phone','f-seller-address','f-price-paid','f-buyer-company','f-buyer-address','f-phone','f-email','f-ssn','f-buyer-state','f-buyer-county','f-state','f-county','f-parcel','f-acreage','f-address','f-legaldesc',
    'f-saleprice','f-down','f-loanamt','f-rate','f-origdate','f-firstpay','f-investor','f-inv-contact',
    'f-inv-date','f-inv-price','f-nb-name','f-nb-business','f-nb-phone','f-nb-email','f-nb-address','f-notes']
   .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
@@ -1417,6 +1419,7 @@ async function saveLoan() {
     property_state: document.getElementById('f-state').value.trim(),
     county: document.getElementById('f-county').value.trim(),
     parcel: document.getElementById('f-parcel').value.trim(),
+    acreage: parseFloat(document.getElementById('f-acreage').value) || null,
     address: document.getElementById('f-address').value,
     legal_desc: document.getElementById('f-legaldesc').value.trim(),
     sale_price: parseFloat(document.getElementById('f-saleprice').value)||loanAmount,
