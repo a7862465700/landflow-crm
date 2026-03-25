@@ -599,8 +599,8 @@ textarea.form-input{resize:vertical;min-height:80px}
             <option value="">None</option><option value="3">3 yr</option><option value="5">5 yr</option><option value="7">7 yr</option><option value="10">10 yr</option>
           </select>
         </div>
-        <div class="form-group"><label class="form-label">Origination Date *</label><input class="form-input" id="f-origdate" type="date" oninput="updatePreview()"></div>
-        <div class="form-group"><label class="form-label">First Payment Date</label><input class="form-input" id="f-firstpay" type="date"></div>
+        <div class="form-group"><label class="form-label">Origination Date *</label><input class="form-input" id="f-origdate" type="date" oninput="updatePreview();updateDateWritten()"><div id="origdate-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
+        <div class="form-group"><label class="form-label">First Payment Date</label><input class="form-input" id="f-firstpay" type="date" oninput="updateFirstPayWritten()"><div id="firstpay-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
         <div class="form-group"><label class="form-label">Payment Due Day</label>
           <select class="form-input" id="f-dueday">
             <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
@@ -1361,6 +1361,8 @@ function openLoanModal(editId) {
   const dl = document.getElementById('investorList');
   dl.innerHTML = investors.map(i => `<option value="${i.name}">`).join('');
   updatePreview();
+  updateDateWritten();
+  updateFirstPayWritten();
   // Existing loans open read-only; new loans open editable
   setLoanFormEditable(!editId);
   openModal('loanModal');
@@ -1435,6 +1437,21 @@ function updatePreview() {
   } else {
     ['pv-payment','pv-totalint','pv-balance','pv-maturity','pv-finance-charge','pv-amount-financed','pv-total-payments','pv-total-sale'].forEach(id => document.getElementById(id).textContent = '—');
   }
+}
+
+function writtenDate(dateStr) {
+  if (!dateStr) return '';
+  const d = parseLocalDate(dateStr);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+function updateDateWritten() {
+  const v = document.getElementById('f-origdate').value;
+  document.getElementById('origdate-written').textContent = writtenDate(v);
+}
+function updateFirstPayWritten() {
+  const v = document.getElementById('f-firstpay').value;
+  document.getElementById('firstpay-written').textContent = writtenDate(v);
 }
 
 async function saveLoan() {
@@ -3097,7 +3114,10 @@ function buildMergeData(loan) {
     term: loan.term || '', balloon: loan.balloon || '',
     balloon_date: balloonDate,
     orig_date: fmtDate(loan.orig_date), contract_date: fmtDate(loan.orig_date), date: fmtDate(loan.orig_date),
+    orig_date_written: loan.orig_date ? writtenDate(loan.orig_date) : '',
+    contract_date_written: loan.orig_date ? writtenDate(loan.orig_date) : '',
     first_pay_date: fmtDate(firstPayDate),
+    first_pay_date_written: firstPayDate ? writtenDate(firstPayDate) : '',
     payment_due_day: loan.payment_due_day || '1', status: loan.status || '',
     notes: loan.notes || '',
     // Investor / Note Buyer
@@ -3286,8 +3306,10 @@ const MERGE_FIELDS = [
     ['{rate}', 'Interest rate (number)'], ['{rate_fmt}', 'Interest rate (%)'],
     ['{term}', 'Loan term (years)'], ['{term_months}', 'Loan term (months)'],
     ['{balloon}', 'Balloon (years)'], ['{balloon_date}', 'Balloon maturity date'],
-    ['{orig_date}', 'Origination/contract date'], ['{contract_date}', 'Same as orig_date'], ['{date}', 'Contract date'],
-    ['{first_pay_date}', 'First payment date (1st of next month)'],
+    ['{orig_date}', 'Origination date (short)'], ['{orig_date_written}', 'Origination date (written out)'],
+    ['{contract_date}', 'Same as orig_date'], ['{contract_date_written}', 'Contract date (written out)'],
+    ['{date}', 'Contract date'],
+    ['{first_pay_date}', 'First payment date (short)'], ['{first_pay_date_written}', 'First payment date (written out)'],
     ['{payment_due_day}', 'Due day of month'], ['{status}', 'Loan status'], ['{notes}', 'Notes'],
   ]},
   { section: 'Computed Values', fields: [
