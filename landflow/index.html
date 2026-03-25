@@ -646,9 +646,10 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="form-section" style="margin-top:16px">📝 Notes</div>
       <div class="form-group form-full"><textarea class="form-input" id="f-notes" rows="2" placeholder="Internal notes..."></textarea></div>
     </div>
-    <div class="modal-foot">
+    <div class="modal-foot" style="display:flex;gap:8px">
+      <button class="btn btn-ghost" onclick="closeModal('loanModal');if(editingLoanId)openDetail(editingLoanId)">📋 Edit</button>
       <button class="btn btn-ghost" onclick="closeModal('loanModal')">Cancel</button>
-      <button class="btn btn-gold" onclick="saveLoan()">💾 Save Loan</button>
+      <button class="btn btn-gold" onclick="saveLoan()">💾 Save</button>
     </div>
   </div>
 </div>
@@ -2279,7 +2280,6 @@ function renderChecklist() {
     { key:'acreage',   icon:'📐', label:'Missing Acreage',           severity:'gray',  type:'field', field:'acreage' },
     { key:'sale',      icon:'💲', label:'Missing Sale Price',        severity:'gray',  type:'field', field:'sale_price' },
     { key:'down',      icon:'💰', label:'Missing Down Payment',      severity:'gray',  type:'field', field:'down_payment' },
-    { key:'company',   icon:'🏢', label:'Missing Buyer Company',     severity:'gray',  type:'field', field:'buyer_company' },
     { key:'baddr',     icon:'📬', label:'Missing Buyer Address',     severity:'gray',  type:'field', field:'buyer_address' },
     { key:'phone',     icon:'📞', label:'Missing Phone',             severity:'gray',  type:'field', field:'phone' },
     { key:'email',     icon:'✉', label:'Missing Email',              severity:'gray',  type:'field', field:'email' },
@@ -2317,7 +2317,7 @@ function renderChecklist() {
     const parcelList = r.missing.map(l => {
       const label = l.parcel || l.id?.slice(0,8).toUpperCase() || '—';
       const company = l.buyer_company || l.borrower || '';
-      return `<span onclick="openDetail('${l.id}')" style="display:inline-flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;transition:background .15s" onmouseover="this.style.background='var(--s3)'" onmouseout="this.style.background='var(--s2)'">
+      return `<span onclick="openChecklistEdit('${l.id}')" style="display:inline-flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;transition:background .15s" onmouseover="this.style.background='var(--s3)'" onmouseout="this.style.background='var(--s2)'">
         <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:${sevColor[r.severity]}">${label}</span>
         ${company ? `<span style="color:var(--text3)">— ${company}</span>` : ''}
       </span>`;
@@ -2342,6 +2342,23 @@ function renderChecklist() {
     <div style="display:flex;flex-direction:column">${sections}</div>
     ${results.every(r => r.missing.length === 0) ? '<div style="text-align:center;padding:40px;color:var(--green);font-size:16px;font-weight:600">All loans are complete! 🎉</div>' : ''}
   `;
+}
+
+function openChecklistEdit(loanId) {
+  // Widen the modal for checklist editing
+  const modal = document.querySelector('#loanModal .modal');
+  modal.style.maxWidth = '720px';
+  openLoanModal(loanId);
+  // Restore default width when modal closes
+  const orig = document.getElementById('loanModal');
+  const observer = new MutationObserver(() => {
+    if (!orig.classList.contains('active')) {
+      modal.style.maxWidth = '';
+      observer.disconnect();
+      renderChecklist();
+    }
+  });
+  observer.observe(orig, { attributes: true, attributeFilter: ['class'] });
 }
 
 // ============================================================
