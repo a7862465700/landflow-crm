@@ -643,6 +643,7 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="f-nb-phone" type="tel" placeholder="5550000000"></div>
         <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="f-nb-email" type="email" placeholder="buyer@notefund.com"></div>
         <div class="form-group form-full"><label class="form-label">Mailing Address</label><input class="form-input" id="f-nb-address" placeholder="100 Capital Way, Atlanta GA 30301"></div>
+        <div class="form-group"><label class="form-label" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="f-paperstac" style="width:16px;height:16px;accent-color:var(--gold)"> Posted on Paperstac</label></div>
       </div>
       <div class="form-section" style="margin-top:16px">📝 Notes</div>
       <div class="form-group form-full"><textarea class="form-input" id="f-notes" rows="2" placeholder="Internal notes..."></textarea></div>
@@ -1353,6 +1354,7 @@ function openLoanModal(editId) {
     document.getElementById('f-nb-phone').value = l.nb_phone||'';
     document.getElementById('f-nb-email').value = l.nb_email||'';
     document.getElementById('f-nb-address').value = l.nb_address||'';
+    document.getElementById('f-paperstac').checked = !!l.paperstac_posted;
     document.getElementById('f-notes').value = l.notes||'';
   } else {
     clearLoanForm();
@@ -1396,6 +1398,7 @@ function clearLoanForm() {
   document.getElementById('f-balloon').value = '';
   document.getElementById('f-status').value = 'current';
   document.getElementById('f-dueday').value = (APP.settings?.default_due_day || 1).toString();
+  document.getElementById('f-paperstac').checked = false;
 }
 
 function autoCalcLoan() {
@@ -1498,6 +1501,7 @@ async function saveLoan() {
     nb_phone: document.getElementById('f-nb-phone').value.trim(),
     nb_email: document.getElementById('f-nb-email').value.trim(),
     nb_address: document.getElementById('f-nb-address').value.trim(),
+    paperstac_posted: document.getElementById('f-paperstac').checked,
     notes: document.getElementById('f-notes').value,
   };
   showToast('Saving…');
@@ -2222,8 +2226,10 @@ function renderBuyers() {
     const realBal = calcRealBalance(l.id);
     const bal = realBal.balance;
     return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer" onclick="openDetail('${l.id}')">
-      <div style="font-weight:700;font-size:14px;margin-bottom:2px">👤 ${l.borrower||'Unnamed'}</div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px">👤 ${l.buyer_company||l.borrower||'Unnamed'}</div>
+      ${l.buyer_company && l.borrower ? `<div style="font-size:12px;color:var(--text2)">${l.borrower}</div>` : ''}
       ${getBadge(l)}
+      ${l.paperstac_posted ? '<span style="display:inline-block;background:rgba(66,133,244,0.15);color:#4285F4;font-size:10px;padding:2px 8px;border-radius:10px;margin-top:4px;font-weight:600">Paperstac</span>' : ''}
       ${l.phone?`<div style="font-size:12px;color:var(--text2);margin-top:4px">📞 ${fmtPhone(l.phone)}</div>`:''}
       ${l.email?`<div style="font-size:12px;color:var(--text2)">✉️ ${l.email}</div>`:''}
       <div style="font-size:12px;color:var(--text2)">📍 ${l.address||'—'}</div>
