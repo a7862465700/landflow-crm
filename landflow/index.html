@@ -967,10 +967,11 @@ function showAuth() {
 }
 
 async function showApp() {
-  document.getElementById('loadingScreen').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
-  document.getElementById('app').classList.add('visible');
+  document.getElementById('loadingScreen').style.display = 'flex';
   await loadAllData();
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
   renderLoans(); renderPaymentLedger(); renderBuyers();
   renderInvestors(); updateStats(); renderAlerts(); renderInvoices();
 }
