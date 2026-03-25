@@ -3240,10 +3240,14 @@ async function executeTemplateGenerate() {
     const parcelPart = (loan.parcel || '').replace(/\s+/g, '_');
     const name = t.name.replace('.docx', '') + '_' + borrowerPart + (parcelPart ? '_' + parcelPart : '') + '.docx';
     // Download to local drive
+    const dlUrl = URL.createObjectURL(output);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(output);
-    a.download = name; a.click();
-    URL.revokeObjectURL(a.href);
+    a.href = dlUrl;
+    a.download = name;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(dlUrl); }, 500);
     // Also save a copy to the loan's files in the CRM
     try {
       const storagePath = `${currentUser.id}/generated/${Date.now()}_${name}`;
@@ -3309,7 +3313,14 @@ async function quickGeneratePurchaseAgreement() {
     const borrowerPart = (loan.borrower || 'document').replace(/\s+/g, '_');
     const parcelPart = (loan.parcel || '').replace(/\s+/g, '_');
     const name = 'Purchase_Agreement_' + borrowerPart + (parcelPart ? '_' + parcelPart : '') + '.docx';
-    const a = document.createElement('a'); a.href = URL.createObjectURL(output); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+    const blobUrl = URL.createObjectURL(output);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = name;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 500);
     try {
       const storagePath = `${currentUser.id}/generated/${Date.now()}_${name}`;
       await sb.storage.from('vault-files').upload(storagePath, output, { upsert: true, contentType: output.type });
