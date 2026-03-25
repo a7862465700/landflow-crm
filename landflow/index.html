@@ -3321,17 +3321,22 @@ async function quickGeneratePurchaseAgreement() {
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 500);
-    try {
-      const storagePath = `${currentUser.id}/generated/${Date.now()}_${name}`;
-      await sb.storage.from('vault-files').upload(storagePath, output, { upsert: true, contentType: output.type });
-      const saved = await dbSaveVaultFile({
-        loan_id: loan.id, cat_id: 'generated',
-        name: name, size: output.size, type: output.type,
-        data: 'storage:' + storagePath, book_page: '', notes: 'Generated from template: ' + template.name,
-      });
-      if (saved) { vaultFiles.push(saved); renderFileVault(loan.id); renderDpDocs(loan); renderVault(); }
-    } catch (uploadErr) { console.error('Auto-save to CRM failed:', uploadErr); }
-    showToast('Purchase Agreement generated & saved!', 'success');
+    showToast('Purchase Agreement downloaded!', 'success');
+    // Save to CRM in background (non-blocking)
+    const saveCopy = async () => {
+      try {
+        const storagePath = `${currentUser.id}/generated/${Date.now()}_${name}`;
+        await sb.storage.from('vault-files').upload(storagePath, output, { upsert: true, contentType: output.type });
+        const saved = await dbSaveVaultFile({
+          loan_id: loan.id, cat_id: 'generated',
+          name: name, size: output.size, type: output.type,
+          data: 'storage:' + storagePath, book_page: '', notes: 'Generated from template: ' + template.name,
+        });
+        if (saved) { vaultFiles.push(saved); renderFileVault(loan.id); renderDpDocs(loan); renderVault(); }
+        showToast('Saved to loan files!', 'success');
+      } catch (uploadErr) { console.error('Auto-save to CRM failed:', uploadErr); }
+    };
+    saveCopy();
   } catch (e) {
     console.error('Quick generate error:', e);
     showToast('Error: ' + (e.message || 'Generation failed'), 'error');
