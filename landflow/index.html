@@ -3258,7 +3258,7 @@ async function executeTemplateGenerate() {
 }
 
 async function quickGeneratePurchaseAgreement() {
-  const loanId = window._currentDetailLoan;
+  const loanId = editingLoanId || currentLoanId;
   if (!loanId) return showToast('No loan selected', 'error');
   const loan = loans.find(l => l.id === loanId);
   if (!loan) return showToast('Loan not found', 'error');
