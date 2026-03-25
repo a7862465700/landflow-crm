@@ -647,9 +647,9 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="form-group form-full"><textarea class="form-input" id="f-notes" rows="2" placeholder="Internal notes..."></textarea></div>
     </div>
     <div class="modal-foot" style="display:flex;gap:8px">
-      <button class="btn btn-ghost" onclick="closeModal('loanModal');if(editingLoanId)openDetail(editingLoanId)">📋 Edit</button>
+      <button id="loanEditBtn" class="btn btn-gold" onclick="enableLoanEdit()">✏️ Edit</button>
       <button class="btn btn-ghost" onclick="closeModal('loanModal')">Cancel</button>
-      <button class="btn btn-gold" onclick="saveLoan()">💾 Save</button>
+      <button id="loanSaveBtn" class="btn btn-gold" onclick="saveLoan()" style="display:none">💾 Save</button>
     </div>
   </div>
 </div>
@@ -1310,7 +1310,7 @@ function renderLoans() {
 
 function openLoanModal(editId) {
   editingLoanId = editId || null;
-  document.getElementById('loanModalTitle').textContent = editId ? 'Edit Loan' : 'New Loan';
+  document.getElementById('loanModalTitle').textContent = editId ? 'Loan Details' : 'New Loan';
   document.getElementById('f-edit-id').value = editId || '';
   if (editId) {
     const l = loans.find(x => x.id === editId);
@@ -1360,7 +1360,28 @@ function openLoanModal(editId) {
   const dl = document.getElementById('investorList');
   dl.innerHTML = investors.map(i => `<option value="${i.name}">`).join('');
   updatePreview();
+  // Existing loans open read-only; new loans open editable
+  setLoanFormEditable(!editId);
   openModal('loanModal');
+}
+
+function setLoanFormEditable(editable) {
+  const modal = document.querySelector('#loanModal .modal-body');
+  modal.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.id === 'f-edit-id') return;
+    el.disabled = !editable;
+    el.style.opacity = editable ? '1' : '0.85';
+    el.style.cursor = editable ? '' : 'default';
+  });
+  // Toggle button visibility
+  document.getElementById('loanEditBtn').style.display = editable ? 'none' : '';
+  document.getElementById('loanSaveBtn').style.display = editable ? '' : 'none';
+  if (editable) document.getElementById('loanModalTitle').textContent = editingLoanId ? 'Edit Loan' : 'New Loan';
+  else document.getElementById('loanModalTitle').textContent = 'Loan Details';
+}
+
+function enableLoanEdit() {
+  setLoanFormEditable(true);
 }
 
 function clearLoanForm() {
