@@ -1145,12 +1145,13 @@ function calcRealBalance(loanId) {
 function calcBalance(p,r,t,paid){if(!p||!r||!t)return p||0;const mr=r/100/12,pmt=calcPayment(p,r,t);let bal=p;for(let i=0;i<Math.min(paid,t*12);i++){const int=bal*mr;bal-=(pmt-int);if(bal<0)bal=0;}return bal;}
 
 function genSchedule(p,r,t,startDate,limit){const mr=r/100/12,n=t*12,pmt=calcPayment(p,r,t);let bal=p;const rows=[],start=startDate?new Date(startDate):new Date();const max=limit||n;for(let i=0;i<max&&bal>0.01;i++){const int=bal*mr,prin=pmt-int;bal=Math.max(0,bal-prin);const d=new Date(start);d.setMonth(d.getMonth()+i+1);rows.push({num:i+1,date:d.toLocaleDateString('en-US',{month:'short',year:'numeric'}),payment:pmt,principal:prin,interest:int,balance:bal});}return rows;}
-function paysMade(origDate){if(!origDate)return 0;const start=new Date(origDate),now=new Date();return Math.max(0,(now.getFullYear()-start.getFullYear())*12+now.getMonth()-start.getMonth());}
-function matDate(orig,years){if(!orig||!years)return'—';const d=new Date(orig);d.setFullYear(d.getFullYear()+parseInt(years));return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
-function balloonDate(orig,bYears){if(!orig||!bYears)return null;const d=new Date(orig);d.setFullYear(d.getFullYear()+parseInt(bYears));return d;}
+function parseLocalDate(s){const[y,m,d]=(s||'').split(/[-T]/);return new Date(Number(y),Number(m)-1,Number(d));}
+function paysMade(origDate){if(!origDate)return 0;const start=parseLocalDate(origDate),now=new Date();return Math.max(0,(now.getFullYear()-start.getFullYear())*12+now.getMonth()-start.getMonth());}
+function matDate(orig,years){if(!orig||!years)return'—';const d=parseLocalDate(orig);d.setFullYear(d.getFullYear()+parseInt(years));return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function balloonDate(orig,bYears){if(!orig||!bYears)return null;const d=parseLocalDate(orig);d.setFullYear(d.getFullYear()+parseInt(bYears));return d;}
 const fmt=n=>'$'+Math.round(n||0).toLocaleString();
 const fmtD=n=>'$'+(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
-const fmtDate=d=>d?new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+const fmtDate=d=>d?parseLocalDate(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
 const fmtPhone=p=>{if(!p)return'';const d=p.replace(/\D/g,'');if(d.length===10)return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;if(d.length===11&&d[0]==='1')return`(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;return p;};
 
 // Late fee check: returns true if payment is late (past grace period)
@@ -1275,7 +1276,7 @@ function renderLoans() {
     return `<div class="loan-card" onclick="openDetail('${l.id}')">
       <div class="lc-head">
         <div>
-          <div class="lc-id">${l.id?.slice(0,8).toUpperCase() || ''} ${l.parcel ? '· ' + l.parcel : ''}</div>
+          <div class="lc-id">${l.parcel || l.id?.slice(0,8).toUpperCase() || ''}</div>
           <div class="lc-name">${l.buyer_company||l.borrower||'Unnamed'}</div>
           <div class="lc-addr">📍 ${l.address||'—'}</div>
           ${l.investor ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">🏦 Investor: ${l.investor}</div>` : ''}
@@ -1640,7 +1641,7 @@ function openDetail(id) {
   const realBal = calcRealBalance(l.id);
   const bal = realBal.balance;
   const paid = realBal.totalPayments || 0;
-  document.getElementById('dp-id').textContent = (l.id?.slice(0,8).toUpperCase()||'') + (l.parcel ? ' · Parcel ' + l.parcel : '') + ' · ' + fmtDate(l.orig_date);
+  document.getElementById('dp-id').textContent = (l.parcel || l.id?.slice(0,8).toUpperCase() || '') + ' · ' + fmtDate(l.orig_date);
   document.getElementById('dp-name').textContent = l.buyer_company || l.borrower || 'Unnamed';
   document.getElementById('dp-addr').textContent = '📍 ' + (l.address||'—') + (l.county ? ' · ' + l.county + ' County' : '');
   document.getElementById('dp-badge').innerHTML = getBadge(l);
@@ -1900,12 +1901,12 @@ function renderPaymentLedger() {
       </div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>Loan</th><th>Borrower</th><th>Date</th><th>Amount</th><th>Ref</th><th></th></tr></thead>
+          <thead><tr><th>Loan #</th><th>Borrower</th><th>Date</th><th>Amount</th><th>Ref</th><th></th></tr></thead>
           <tbody>${pays.map(p => {
             const l = loans.find(x => x.id === p.loan_id);
             return `<tr>
-              <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${p.loan_id?.slice(0,8).toUpperCase()||''}</td>
-              <td style="font-weight:600">${l ? l.borrower : '—'}</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${l?.parcel||p.loan_id?.slice(0,8).toUpperCase()||''}</td>
+              <td style="font-weight:600">${l ? (l.buyer_company||l.borrower) : '—'}</td>
               <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${fmtDate(p.date)}</td>
               <td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--green)">${fmtD(p.amount)}</td>
               <td style="font-size:11px;color:var(--text3)">${p.ref||'—'}</td>
@@ -2232,8 +2233,8 @@ function renderVault() {
     return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;cursor:pointer" onclick="openDetail('${l.id}');setTimeout(()=>dpTab('files',document.querySelectorAll('.tab-btn')[4]),200)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
-          <div style="font-weight:700;font-size:14px">${l.borrower||'Unnamed'}</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px">${l.id?.slice(0,8).toUpperCase()||''} ${l.parcel?'· Parcel '+l.parcel:''} ${l.county?'· '+l.county+' County':''}</div>
+          <div style="font-weight:700;font-size:14px">${l.buyer_company||l.borrower||'Unnamed'}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${l.parcel||l.id?.slice(0,8).toUpperCase()||''} ${l.county?'· '+l.county+' County':''}</div>
         </div>
         <div style="text-align:right">
           <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gold)">${totalFiles} file${totalFiles!==1?'s':''}</div>
