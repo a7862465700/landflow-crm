@@ -650,6 +650,7 @@ textarea.form-input{resize:vertical;min-height:80px}
     </div>
     <div class="modal-foot" style="display:flex;gap:8px">
       <button id="loanEditBtn" class="btn btn-gold" onclick="enableLoanEdit()">✏️ Edit</button>
+      <button class="btn" style="background:rgba(66,133,244,0.15);color:#4285F4;font-weight:600" onclick="quickGeneratePurchaseAgreement()">📄 Purchase Agreement</button>
       <button class="btn btn-ghost" onclick="closeModal('loanModal')">Cancel</button>
       <button id="loanSaveBtn" class="btn btn-gold" onclick="saveLoan()" style="display:none">💾 Save</button>
     </div>
@@ -3253,6 +3254,59 @@ async function executeTemplateGenerate() {
   } catch (e) {
     console.error('Template generation error:', e);
     showToast('Error: ' + (e.message || 'Template generation failed'), 'error');
+  }
+}
+
+async function quickGeneratePurchaseAgreement() {
+  const loanId = window._currentDetailLoan;
+  if (!loanId) return showToast('No loan selected', 'error');
+  const loan = loans.find(l => l.id === loanId);
+  if (!loan) return showToast('Loan not found', 'error');
+  // Find the purchase agreement template by name
+  const template = vaultFiles.find(f =>
+    f.cat_id === 'templates' &&
+    /purchase.*(agreement|contract)/i.test(f.name)
+  );
+  if (!template) return showToast('No Purchase Agreement template found. Upload one under Templates first.', 'error');
+  showToast('Generating Purchase Agreement…');
+  try {
+    const bytes = await getTemplateBytes(template);
+    const zip = new PizZip(bytes.buffer);
+    const doc = new window.docxtemplater(zip, {
+      paragraphLoop: true, linebreaks: true,
+      nullGetter: () => '',
+      errorLogging: false,
+    });
+    const data = buildMergeData(loan);
+    try { doc.render(data); } catch (renderErr) {
+      if (renderErr.properties && renderErr.properties.errors) {
+        const details = renderErr.properties.errors.map(e =>
+          `• ${e.properties?.explanation || e.message || 'Unknown field error'}`
+        ).join('\n');
+        showToast('Template error — check field names:\n' + details, 'error');
+        return;
+      }
+      throw renderErr;
+    }
+    const output = doc.getZip().generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const borrowerPart = (loan.borrower || 'document').replace(/\s+/g, '_');
+    const parcelPart = (loan.parcel || '').replace(/\s+/g, '_');
+    const name = 'Purchase_Agreement_' + borrowerPart + (parcelPart ? '_' + parcelPart : '') + '.docx';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(output); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+    try {
+      const storagePath = `${currentUser.id}/generated/${Date.now()}_${name}`;
+      await sb.storage.from('vault-files').upload(storagePath, output, { upsert: true, contentType: output.type });
+      const saved = await dbSaveVaultFile({
+        loan_id: loan.id, cat_id: 'generated',
+        name: name, size: output.size, type: output.type,
+        data: 'storage:' + storagePath, book_page: '', notes: 'Generated from template: ' + template.name,
+      });
+      if (saved) { vaultFiles.push(saved); renderFileVault(loan.id); renderDpDocs(loan); renderVault(); }
+    } catch (uploadErr) { console.error('Auto-save to CRM failed:', uploadErr); }
+    showToast('Purchase Agreement generated & saved!', 'success');
+  } catch (e) {
+    console.error('Quick generate error:', e);
+    showToast('Error: ' + (e.message || 'Generation failed'), 'error');
   }
 }
 
