@@ -3264,7 +3264,7 @@ async function quickGeneratePurchaseAgreement() {
   if (!loan) return showToast('Loan not found', 'error');
   // Find the purchase agreement template by name
   const template = vaultFiles.find(f =>
-    f.cat_id === 'templates' &&
+    f.cat_id === 'template' &&
     /purchase.*(agreement|contract)/i.test(f.name)
   );
   if (!template) return showToast('No Purchase Agreement template found. Upload one under Templates first.', 'error');
