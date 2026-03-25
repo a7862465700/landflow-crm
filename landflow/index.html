@@ -615,9 +615,10 @@ textarea.form-input{resize:vertical;min-height:80px}
       </div>
       <div class="preview-box" style="margin-top:12px">
         <div class="preview-title">⚡ Live Calculation</div>
-        <div class="preview-grid">
+        <div class="preview-grid" style="grid-template-columns:repeat(4,1fr)">
           <div><div class="pv-label">Monthly Pmt</div><div class="pv-val" id="pv-payment">—</div></div>
           <div><div class="pv-label">Total Interest</div><div class="pv-val" id="pv-totalint">—</div></div>
+          <div><div class="pv-label">Current Balance</div><div class="pv-val" id="pv-balance">—</div></div>
           <div><div class="pv-label">Maturity</div><div class="pv-val" id="pv-maturity">—</div></div>
         </div>
         <div class="preview-title" style="margin-top:10px;font-size:11px;color:var(--text3)">Truth-In-Lending (TILA)</div>
@@ -1416,6 +1417,15 @@ function updatePreview() {
     const totalSalePrice = totalPayments + down;
     document.getElementById('pv-payment').textContent = fmtD(pmt);
     document.getElementById('pv-totalint').textContent = fmt(financeCharge);
+    // Current balance from real payment history if editing, else calc from origination date
+    const editId = document.getElementById('f-edit-id').value;
+    if (editId) {
+      const rb = calcRealBalance(editId);
+      document.getElementById('pv-balance').textContent = fmtD(rb.balance);
+    } else {
+      const paid = paysMade(orig);
+      document.getElementById('pv-balance').textContent = fmtD(calcBalance(p,r,t,paid));
+    }
     document.getElementById('pv-maturity').textContent = matDate(orig, t);
     // TILA fields
     document.getElementById('pv-finance-charge').textContent = fmt(financeCharge);
@@ -1423,7 +1433,7 @@ function updatePreview() {
     document.getElementById('pv-total-payments').textContent = fmt(totalPayments);
     document.getElementById('pv-total-sale').textContent = fmt(totalSalePrice);
   } else {
-    ['pv-payment','pv-totalint','pv-maturity','pv-finance-charge','pv-amount-financed','pv-total-payments','pv-total-sale'].forEach(id => document.getElementById(id).textContent = '—');
+    ['pv-payment','pv-totalint','pv-balance','pv-maturity','pv-finance-charge','pv-amount-financed','pv-total-payments','pv-total-sale'].forEach(id => document.getElementById(id).textContent = '—');
   }
 }
 
