@@ -558,7 +558,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <input type="hidden" id="f-edit-id">
       <div class="form-section">🏷️ Seller Info</div>
       <div class="form-grid">
-        <div class="form-group"><label class="form-label">Seller Full Name</label><input class="form-input" id="f-seller" placeholder="John Smith"></div>
+        <div class="form-group"><label class="form-label">Seller Full Name</label><input class="form-input" id="f-seller" placeholder="John Smith" oninput="autoFillFromSeller()"></div>
         <div class="form-group"><label class="form-label">Seller Phone</label><input class="form-input" id="f-seller-phone" type="tel" placeholder="5550000000"></div>
         <div class="form-group form-full"><label class="form-label">Seller Address</label><input class="form-input" id="f-seller-address" placeholder="123 Main St, Atlanta GA 30301"></div>
         <div class="form-group"><label class="form-label">Price Paid to Seller</label><input class="form-input" id="f-price-paid" type="number" placeholder="8000"></div>
@@ -1404,6 +1404,18 @@ function clearLoanForm() {
   document.getElementById('f-status').value = 'current';
   document.getElementById('f-dueday').value = (APP.settings?.default_due_day || 1).toString();
   document.getElementById('f-paperstac').checked = false;
+}
+
+function autoFillFromSeller() {
+  const seller = document.getElementById('f-seller').value.trim().toLowerCase();
+  if (seller.includes('tommy land') || seller.includes('commissioner of state lands')) {
+    const stateEl = document.getElementById('f-state');
+    if (!stateEl.value) stateEl.value = 'ARKANSAS';
+    const addrEl = document.getElementById('f-seller-address');
+    if (!addrEl.value) addrEl.value = '7003 Valley Ranch Drive, Little Rock, Arkansas 72223';
+    const phoneEl = document.getElementById('f-seller-phone');
+    if (!phoneEl.value) phoneEl.value = '5550000000';
+  }
 }
 
 function autoCalcLoan() {
