@@ -1660,6 +1660,7 @@ async function handlePDFFile(e) {
     }
 
     // Apply Arkansas defaults
+    if (!document.getElementById('f-seller-phone').value) document.getElementById('f-seller-phone').value = '5550000000';
     document.getElementById('f-borrower').value = ARKANSAS_DEFAULTS.borrower;
     document.getElementById('f-buyer-company').value = ARKANSAS_DEFAULTS.buyer_company;
     document.getElementById('f-buyer-address').value = ARKANSAS_DEFAULTS.buyer_address;
