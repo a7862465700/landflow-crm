@@ -954,9 +954,16 @@ async function initAuth() {
   } else {
     showAuth();
   }
+  let appInitialized = false;
   sb.auth.onAuthStateChange((_evt, session) => {
-    if (session) { currentUser = session.user; showApp(); }
-    else { currentUser = null; showAuth(); }
+    if (session) {
+      currentUser = session.user;
+      if (!appInitialized) { appInitialized = true; showApp(); }
+    } else {
+      currentUser = null;
+      appInitialized = false;
+      showAuth();
+    }
   });
 }
 
