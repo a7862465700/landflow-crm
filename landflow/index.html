@@ -1521,7 +1521,7 @@ async function saveLoan() {
   if (!rate || isNaN(rate)) return showToast('⚠️ Interest rate required', 'error');
   if (!origDate) return showToast('⚠️ Origination date required', 'error');
   const data = {
-    borrower, loan_amount: loanAmount, orig_date: origDate,
+    borrower, loan_amount: loanAmount, rate, orig_date: origDate,
     seller: document.getElementById('f-seller').value.trim(),
     seller_phone: document.getElementById('f-seller-phone').value.trim(),
     seller_address: document.getElementById('f-seller-address').value.trim(),
@@ -2386,9 +2386,10 @@ function renderVault() {
 // ============================================================
 function renderChecklist() {
   const checks = [
-    { key:'photos',    icon:'📸', label:'Missing Photos',             severity:'red',   type:'file', catId:'photos' },
-    { key:'contract',  icon:'📄', label:'Missing Purchase Contract',  severity:'red',   type:'file', catId:'generated' },
-    { key:'deed',      icon:'🏛', label:'Missing Recorded Deed',     severity:'red',   type:'file', catId:'recorded' },
+    { key:'purchase',  icon:'🏛', label:'Missing Purchase Documents', severity:'red',   type:'file', catId:'purchase' },
+    { key:'sale',      icon:'📝', label:'Missing Sale Documents',     severity:'red',   type:'file', catId:'sale' },
+    { key:'assignment',icon:'🤝', label:'Missing Assignment Documents',severity:'red',  type:'file', catId:'assignment' },
+    { key:'photos',    icon:'📸', label:'Missing Parcel Photos (min 2)',severity:'red', type:'fileMin', catId:'photos', min:2 },
     { key:'investor',  icon:'🏦', label:'No Investor Assigned',      severity:'amber', type:'field', field:'investor' },
     { key:'paperstac', icon:'📋', label:'Not Posted on Paperstac',   severity:'amber', type:'field', field:'paperstac_posted' },
     { key:'parcel',    icon:'📍', label:'Missing Parcel Number',     severity:'gray',  type:'field', field:'parcel' },
@@ -2411,6 +2412,8 @@ function renderChecklist() {
     let missing;
     if (chk.type === 'file') {
       missing = loans.filter(l => !vaultFiles.some(f => f.loan_id === l.id && f.cat_id === chk.catId));
+    } else if (chk.type === 'fileMin') {
+      missing = loans.filter(l => vaultFiles.filter(f => f.loan_id === l.id && f.cat_id === chk.catId).length < chk.min);
     } else {
       missing = loans.filter(l => !l[chk.field] || String(l[chk.field]).trim() === '');
     }
@@ -2484,9 +2487,11 @@ function openChecklistEdit(loanId) {
 // FILE VAULT (per parcel)
 // ============================================================
 const FILE_CATEGORIES = [
-  { id:'recorded', icon:'🏛', label:'Recorded & Stamped' },
-  { id:'notarized', icon:'✍️', label:'Signed & Notarized' },
-  { id:'photos', icon:'📸', label:'Photos' },
+  { id:'purchase', icon:'🏛', label:'Purchase Documents' },
+  { id:'sale', icon:'📝', label:'Sale Documents' },
+  { id:'assignment', icon:'🤝', label:'Assignment Documents' },
+  { id:'photos', icon:'📸', label:'Parcel Photos' },
+  { id:'stock_photos', icon:'🏞', label:'Stock Photos' },
   { id:'generated', icon:'📄', label:'Generated Documents' },
   { id:'other', icon:'📎', label:'Other Documents' },
 ];
@@ -2516,7 +2521,7 @@ async function vaultUpload(loanId, catId) {
     }
     if (added) {
       showToast('✅ ' + added + ' file(s) uploaded', 'success');
-      if (catId === 'photos') syncPhotosToWebsite(loanId);
+      if (catId === 'photos' || catId === 'stock_photos') syncPhotosToWebsite(loanId);
     } else {
       showToast('Upload failed — check database settings', 'error');
     }
@@ -2732,7 +2737,7 @@ function renderFileVault(loanId) {
           <div style="flex:1;min-width:0">
             <div class="vault-file-name" style="cursor:pointer;color:var(--gold)" onclick="vaultOpen('${loanId}','${f.id}')" title="Click to open">${f.name}</div>
             <div class="vault-file-meta">${fmtFileSize(f.size)} · ${new Date(f.created_at||f.uploaded_at||Date.now()).toLocaleDateString()}</div>
-            ${cat.id==='recorded' ? `
+            ${cat.id==='purchase' ? `
             <div style="display:flex;gap:6px;margin-top:6px">
               <input class="form-input" style="flex:1;font-size:11px;padding:4px 8px;height:26px" placeholder="Book / Instrument #" value="${f.book_page||''}" onchange="vaultSaveNote('${loanId}','${f.id}','book_page',this.value)">
               <input class="form-input" style="flex:2;font-size:11px;padding:4px 8px;height:26px" placeholder="Notes" value="${f.notes||''}" onchange="vaultSaveNote('${loanId}','${f.id}','notes',this.value)">
