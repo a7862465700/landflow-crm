@@ -1020,7 +1020,7 @@ async function loadAllData() {
     sb.from('payments').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('investors').select('*').eq('user_id', uid),
     sb.from('invoices').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-    sb.from('vault_files').select('*').eq('user_id', uid),
+    sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,storage_path,created_at,uploaded_at').eq('user_id', uid),
     sb.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
     sb.from('late_fees').select('*').eq('user_id', uid),
   ]);
@@ -2502,6 +2502,12 @@ async function vaultOpen(loanId, fileId) {
   const f = vaultFiles.find(x => x.id === fileId);
   if (!f) return;
   try {
+    // Lazy-load the data column if not already in memory
+    if (!f.data) {
+      const { data: full, error: fetchErr } = await sb.from('vault_files').select('data').eq('id', fileId).single();
+      if (fetchErr || !full) { showToast('Could not load file data.', 'error'); return; }
+      f.data = full.data;
+    }
     let blob;
     if (f.data && f.data.startsWith('storage:')) {
       const path = f.data.replace('storage:', '');
@@ -2599,6 +2605,12 @@ async function vaultDownload(loanId, fileId) {
   const f = vaultFiles.find(x => x.id === fileId);
   if (!f) return;
   try {
+    // Lazy-load the data column if not already in memory
+    if (!f.data) {
+      const { data: full, error: fetchErr } = await sb.from('vault_files').select('data').eq('id', fileId).single();
+      if (fetchErr || !full) { showToast('Could not load file data.', 'error'); return; }
+      f.data = full.data;
+    }
     if (f.data && f.data.startsWith('storage:')) {
       const path = f.data.replace('storage:', '');
       const { data, error } = await sb.storage.from('vault-files').download(path);
