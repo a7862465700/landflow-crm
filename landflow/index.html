@@ -1521,7 +1521,7 @@ async function saveLoan() {
   if (!rate || isNaN(rate)) return showToast('⚠️ Interest rate required', 'error');
   if (!origDate) return showToast('⚠️ Origination date required', 'error');
   const data = {
-    borrower, loan_amount: loanAmount, rate, orig_date: origDate,
+    borrower, loan_amount: loanAmount, orig_date: origDate,
     seller: document.getElementById('f-seller').value.trim(),
     seller_phone: document.getElementById('f-seller-phone').value.trim(),
     seller_address: document.getElementById('f-seller-address').value.trim(),
