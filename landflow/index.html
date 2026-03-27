@@ -2478,10 +2478,13 @@ async function vaultUpload(loanId, catId) {
       };
       showToast('Uploading…');
       const saved = await dbSaveVaultFile(data);
-      vaultFiles.push(saved);
-      added++;
+      if (saved) {
+        vaultFiles.push(saved);
+        added++;
+      }
     }
-    showToast('✅ ' + added + ' file(s) uploaded', 'success');
+    if (added) showToast('✅ ' + added + ' file(s) uploaded', 'success');
+    else showToast('Upload failed — check database settings', 'error');
     renderFileVault(loanId);
     renderDpDocs(loans.find(l => l.id === loanId));
     renderVault();
