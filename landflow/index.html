@@ -2349,16 +2349,69 @@ function renderAlerts() {
 // ============================================================
 // DOCUMENT VAULT (status tracking)
 // ============================================================
+async function uploadGlobalStockPhoto() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.multiple = true; input.accept = 'image/*';
+  input.onchange = async () => {
+    let added = 0;
+    for (const f of input.files) {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result); r.onerror = rej;
+        r.readAsDataURL(f);
+      });
+      const data = {
+        loan_id: null, cat_id: 'stock_photos',
+        name: f.name, size: f.size, type: f.type,
+        data: b64, book_page: '', notes: '',
+      };
+      showToast('Uploading…');
+      const saved = await dbSaveVaultFile(data);
+      if (saved) { vaultFiles.push(saved); added++; }
+    }
+    if (added) {
+      showToast('✅ ' + added + ' stock photo(s) uploaded', 'success');
+      renderVault();
+    }
+  };
+  input.click();
+}
+
+async function deleteStockPhoto(fileId) {
+  if (!confirm('Delete this stock photo?')) return;
+  await dbDeleteVaultFile(fileId);
+  vaultFiles = vaultFiles.filter(f => f.id !== fileId);
+  renderVault();
+}
+
 function renderVault() {
   const el = document.getElementById('vaultContent');
+
+  // Global Stock Photos section
+  const stockPhotos = vaultFiles.filter(f => f.cat_id === 'stock_photos' && !f.loan_id);
+  const stockHtml = `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <div style="font-weight:700;font-size:15px;color:var(--gold)">🏞 Global Stock Photos</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">Area photos included in all property video packages (${stockPhotos.length} photo${stockPhotos.length!==1?'s':''})</div>
+      </div>
+      <button class="btn btn-gold btn-sm" onclick="uploadGlobalStockPhoto()">＋ Add Photos</button>
+    </div>
+    ${stockPhotos.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px">${stockPhotos.map(f => `
+      <div style="position:relative;width:80px;height:60px;border-radius:4px;overflow:hidden;border:1px solid var(--border)">
+        <img src="${f.data}" style="width:100%;height:100%;object-fit:cover" alt="${f.name}">
+        <button onclick="deleteStockPhoto('${f.id}')" style="position:absolute;top:2px;right:2px;background:rgba(200,50,50,0.85);color:white;border:none;width:18px;height:18px;font-size:10px;cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center">✕</button>
+      </div>`).join('')}</div>` : `<div style="color:var(--text3);font-size:12px">No stock photos yet — upload area photos that will be included with every property listing</div>`}
+  </div>`;
+
   if (!loans.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🗄</div><div class="empty-title">No loans yet</div><div class="empty-sub">Add loans first</div></div>`;
+    el.innerHTML = stockHtml + `<div class="empty-state"><div class="empty-icon">🗄</div><div class="empty-title">No loans yet</div><div class="empty-sub">Add loans first</div></div>`;
     return;
   }
-  el.innerHTML = loans.map(l => {
+  el.innerHTML = stockHtml + loans.map(l => {
     const loanFiles = vaultFiles.filter(f => f.loan_id === l.id);
     const totalFiles = loanFiles.length;
-    const recCount = loanFiles.filter(f => f.cat_id === 'recorded').length;
+    const recCount = loanFiles.filter(f => f.cat_id === 'purchase').length;
     return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;cursor:pointer" onclick="openDetail('${l.id}');setTimeout(()=>dpTab('files',document.querySelectorAll('.tab-btn')[4]),200)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
@@ -2367,7 +2420,7 @@ function renderVault() {
         </div>
         <div style="text-align:right">
           <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gold)">${totalFiles} file${totalFiles!==1?'s':''}</div>
-          ${recCount?`<div style="font-size:11px;color:var(--green)">${recCount} recorded</div>`:''}
+          ${recCount?`<div style="font-size:11px;color:var(--green)">${recCount} purchase</div>`:''}
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
