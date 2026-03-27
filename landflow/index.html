@@ -581,7 +581,10 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="form-group"><label class="form-label">County</label><input class="form-input" id="f-county" placeholder="Garland"></div>
         <div class="form-group"><label class="form-label">Parcel #</label><input class="form-input" id="f-parcel" placeholder="013B048"></div>
         <div class="form-group"><label class="form-label">Acreage</label><input class="form-input" id="f-acreage" type="number" step="0.01" placeholder="0.23"></div>
+        <div class="form-group"><label class="form-label">Lot #</label><input class="form-input" id="f-lot" placeholder="12"></div>
         <div class="form-group form-full"><label class="form-label">Property Address</label><input class="form-input" id="f-address" placeholder="Hot Springs, AR"></div>
+        <div class="form-group"><label class="form-label">Latitude</label><input class="form-input" id="f-lat" type="number" step="0.0000001" placeholder="34.5037"></div>
+        <div class="form-group"><label class="form-label">Longitude</label><input class="form-input" id="f-lng" type="number" step="0.0000001" placeholder="-93.0552"></div>
         <div class="form-group form-full"><label class="form-label">Legal Description</label><textarea class="form-input" id="f-legaldesc" rows="3" placeholder="Full legal description — no character limit"></textarea></div>
       </div>
       <div class="form-section" style="margin-top:16px">📋 Loan Terms</div>
@@ -937,6 +940,26 @@ textarea.form-input{resize:vertical;min-height:80px}
 const SUPABASE_URL = 'https://rcidwqyrrfrthujymncn.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjaWR3cXlycmZydGh1anltbmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMjg3ODMsImV4cCI6MjA4ODYwNDc4M30.-cj-CqfqF6TXgWCz8E9RIEJNQT9lhYGKxFslnhWIPTo';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const VILLAGE_VISTA_API = 'https://hotspringsland.com';
+
+async function syncPhotosToWebsite(loanId) {
+  try {
+    const res = await fetch(VILLAGE_VISTA_API + '/api/sync-photos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loanId }),
+    });
+    const result = await res.json();
+    if (result.success) {
+      showToast('📸 Photos synced to website (' + result.photosProcessed + ')', 'success');
+    } else {
+      console.warn('Photo sync:', result);
+    }
+  } catch (err) {
+    console.error('Photo sync failed:', err);
+  }
+}
 
 // ============================================================
 // STATE
@@ -1348,6 +1371,9 @@ function openLoanModal(editId) {
     document.getElementById('f-parcel').value = l.parcel||'';
     document.getElementById('f-acreage').value = l.acreage||'';
     document.getElementById('f-address').value = l.address||'';
+    document.getElementById('f-lat').value = l.lat || '';
+    document.getElementById('f-lng').value = l.lng || '';
+    document.getElementById('f-lot').value = l.lot_number || '';
     document.getElementById('f-legaldesc').value = l.legal_desc||'';
     document.getElementById('f-saleprice').value = l.sale_price||'';
     document.getElementById('f-down').value = l.down_payment||'';
@@ -1511,6 +1537,9 @@ async function saveLoan() {
     county: document.getElementById('f-county').value.trim(),
     parcel: document.getElementById('f-parcel').value.trim(),
     acreage: parseFloat(document.getElementById('f-acreage').value) || null,
+    lat: parseFloat(document.getElementById('f-lat').value) || null,
+    lng: parseFloat(document.getElementById('f-lng').value) || null,
+    lot_number: document.getElementById('f-lot').value.trim() || null,
     address: document.getElementById('f-address').value,
     legal_desc: document.getElementById('f-legaldesc').value.trim(),
     sale_price: parseFloat(document.getElementById('f-saleprice').value)||loanAmount,
@@ -1762,6 +1791,8 @@ function openDetail(id) {
     ['Price Paid', l.price_paid ? fmt(l.price_paid) : '—', 'mono'],
     ['State', l.property_state||'—', ''],
     ['County', l.county||'—', ''],
+    ['Lot #', l.lot_number || '—', ''],
+    ['GPS', (l.lat && l.lng) ? l.lat + ', ' + l.lng : '—', 'mono'],
   ].map(([lb,val,cls]) => `<div class="dp-field"><div class="dp-field-label">${lb}</div><div class="dp-field-val ${cls}">${val}</div></div>`).join('');
   const pct = Math.min(100, (paid/(l.term*12))*100);
   document.getElementById('dp-progress').innerHTML = `<div class="progress-wrap"><div class="progress-label"><span>Paydown</span><span>${pct.toFixed(1)}%</span></div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div></div>`;
@@ -2483,8 +2514,12 @@ async function vaultUpload(loanId, catId) {
         added++;
       }
     }
-    if (added) showToast('✅ ' + added + ' file(s) uploaded', 'success');
-    else showToast('Upload failed — check database settings', 'error');
+    if (added) {
+      showToast('✅ ' + added + ' file(s) uploaded', 'success');
+      if (catId === 'photos') syncPhotosToWebsite(loanId);
+    } else {
+      showToast('Upload failed — check database settings', 'error');
+    }
     renderFileVault(loanId);
     renderDpDocs(loans.find(l => l.id === loanId));
     renderVault();
