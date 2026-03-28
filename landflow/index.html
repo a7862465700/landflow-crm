@@ -1043,7 +1043,7 @@ async function loadAllData() {
     sb.from('payments').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('investors').select('*').eq('user_id', uid),
     sb.from('invoices').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-    sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,storage_path,created_at,uploaded_at').eq('user_id', uid),
+    sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,created_at,uploaded_at').eq('user_id', uid),
     sb.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
     sb.from('late_fees').select('*').eq('user_id', uid),
   ]);
