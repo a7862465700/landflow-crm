@@ -63,7 +63,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .topnav-right{display:flex;align-items:center;gap:8px}
 .burger{background:none;border:none;color:var(--text2);cursor:pointer;padding:8px;font-size:20px;line-height:1}
 .logout-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:11px;padding:6px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;border:1px solid var(--text3)}
-.settings-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:6px 8px;border-radius:6px}
+.settings-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:22px;padding:6px 8px;border-radius:6px}
 .settings-btn:hover{color:var(--gold)}
 .topnav-title{font-size:13px;color:var(--text2);font-weight:600;position:absolute;left:50%;transform:translateX(-50%)}
 
@@ -333,7 +333,8 @@ textarea.form-input{resize:vertical;min-height:80px}
     <input class="auth-input" id="authPass" type="password" placeholder="••••••••" autocomplete="current-password">
     <button class="auth-btn" onclick="signIn()">Sign In</button>
     <div class="auth-err" id="authErr"></div>
-    <div style="margin-top:20px;font-size:11px;color:var(--text3)">First time? <span style="color:var(--gold);cursor:pointer" onclick="signUp()">Create account</span></div>
+    <div style="margin-top:12px;font-size:11px"><span style="color:var(--gold);cursor:pointer" onclick="resetPassword()">Forgot password?</span></div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text3)">First time? <span style="color:var(--gold);cursor:pointer" onclick="signUp()">Create account</span></div>
   </div>
 </div>
 
@@ -792,6 +793,14 @@ textarea.form-input{resize:vertical;min-height:80px}
         </div>
         <div class="form-group"><label class="form-label">Late Fee Amount ($)</label><input class="form-input" id="set-latefee" type="number" value="25" step="1"></div>
         <div class="form-group"><label class="form-label">Grace Period (days)</label><input class="form-input" id="set-grace" type="number" value="15" step="1"></div>
+        <div class="form-full" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
+          <label class="form-label">Change Password</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="form-input" id="set-new-password" type="password" placeholder="Enter new password" style="flex:1">
+            <button class="btn btn-ghost btn-sm" onclick="changePassword()">Update Password</button>
+          </div>
+          <div id="password-msg" style="font-size:11px;margin-top:4px"></div>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -1032,6 +1041,25 @@ async function signOut() {
   await sb.auth.signOut();
 }
 
+async function changePassword() {
+  const pw = document.getElementById('set-new-password').value;
+  const msg = document.getElementById('password-msg');
+  if (!pw || pw.length < 6) { msg.style.color = 'var(--red)'; msg.textContent = 'Password must be at least 6 characters'; return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if (error) { msg.style.color = 'var(--red)'; msg.textContent = error.message; return; }
+  msg.style.color = 'var(--green)'; msg.textContent = 'Password updated!';
+  document.getElementById('set-new-password').value = '';
+}
+
+async function resetPassword() {
+  const email = document.getElementById('authEmail').value.trim();
+  if (!email) { document.getElementById('authErr').textContent = 'Enter your email first'; return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email);
+  if (error) { document.getElementById('authErr').textContent = error.message; return; }
+  document.getElementById('authErr').style.color = 'var(--green)';
+  document.getElementById('authErr').textContent = 'Password reset link sent — check your email!';
+}
+
 // ============================================================
 // DATA — Supabase CRUD
 // ============================================================
@@ -1043,7 +1071,7 @@ async function loadAllData() {
     sb.from('payments').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('investors').select('*').eq('user_id', uid),
     sb.from('invoices').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-    sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,created_at,uploaded_at').eq('user_id', uid),
+    sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,created_at').eq('user_id', uid),
     sb.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
     sb.from('late_fees').select('*').eq('user_id', uid),
   ]);
@@ -1054,6 +1082,16 @@ async function loadAllData() {
   vaultFiles = vf.data || [];
   APP.settings = us.data || null;
   lateFees = lf.data || [];
+
+  // One-time migration: rename old category IDs → new ones
+  const catMigration = { recorded: 'purchase', notarized: 'sale' };
+  for (const f of vaultFiles) {
+    if (catMigration[f.cat_id]) {
+      const newCat = catMigration[f.cat_id];
+      await sb.from('vault_files').update({ cat_id: newCat }).eq('id', f.id).eq('user_id', uid);
+      f.cat_id = newCat;
+    }
+  }
 }
 
 async function dbSaveLoan(data, id) {
