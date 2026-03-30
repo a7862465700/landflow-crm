@@ -3374,6 +3374,12 @@ async function executeTemplateGenerate() {
 
   showToast('Generating document…');
   try {
+    // Fetch the data column (not loaded at startup to keep things fast)
+    if (!t.data) {
+      const { data: full, error: fetchErr } = await sb.from('vault_files').select('data').eq('id', t.id).single();
+      if (fetchErr || !full || !full.data) { showToast('Could not load template file data', 'error'); return; }
+      t.data = full.data;
+    }
     const bytes = await getTemplateBytes(t);
     const zip = new PizZip(bytes.buffer);
     const doc = new window.docxtemplater(zip, {
@@ -3452,6 +3458,12 @@ async function quickGeneratePurchaseAgreement() {
   if (!template) return showToast('No Purchase Agreement template found. Upload one under Templates first.', 'error');
   showToast('Generating Purchase Agreement…');
   try {
+    // Fetch the data column (not loaded at startup to keep things fast)
+    if (!template.data) {
+      const { data: full, error: fetchErr } = await sb.from('vault_files').select('data').eq('id', template.id).single();
+      if (fetchErr || !full || !full.data) { showToast('Could not load template file data', 'error'); return; }
+      template.data = full.data;
+    }
     const bytes = await getTemplateBytes(template);
     const zip = new PizZip(bytes.buffer);
     const doc = new window.docxtemplater(zip, {
