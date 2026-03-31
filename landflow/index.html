@@ -2558,20 +2558,9 @@ function renderChecklist() {
 }
 
 function openChecklistEdit(loanId) {
-  // Widen the modal for checklist editing
-  const modal = document.querySelector('#loanModal .modal');
-  modal.style.maxWidth = '720px';
-  openLoanModal(loanId);
-  // Restore default width when modal closes
-  const orig = document.getElementById('loanModal');
-  const observer = new MutationObserver(() => {
-    if (!orig.classList.contains('active')) {
-      modal.style.maxWidth = '';
-      observer.disconnect();
-      renderChecklist();
-    }
-  });
-  observer.observe(orig, { attributes: true, attributeFilter: ['class'] });
+  // Navigate to the loans view and open the loan detail panel
+  nav('loans', document.querySelector('[data-title="Portfolio"]'));
+  openDetail(loanId);
 }
 
 // ============================================================
