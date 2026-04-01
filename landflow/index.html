@@ -2436,10 +2436,14 @@ async function uploadGlobalStockPhoto() {
         r.onload = () => res(r.result); r.onerror = rej;
         r.readAsDataURL(f);
       });
+      const maxOrder = vaultFiles
+        .filter(v => v.cat_id === 'stock_photos' && !v.loan_id)
+        .reduce((max, v) => Math.max(max, v.sort_order || 0), -1);
       const data = {
         loan_id: null, cat_id: 'stock_photos',
         name: f.name, size: f.size, type: f.type,
         data: b64, book_page: '', notes: '',
+        sort_order: maxOrder + 1 + added,
       };
       showToast('Uploading…');
       const saved = await dbSaveVaultFile(data);
@@ -2460,6 +2464,60 @@ async function deleteStockPhoto(fileId) {
   renderVault();
 }
 
+let stockDragId = null;
+
+function stockDragStart(e, fileId) {
+  stockDragId = fileId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.target.closest('[data-file-id]').style.opacity = '0.4';
+}
+
+function stockDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+async function stockDrop(e, targetId) {
+  e.preventDefault();
+  if (!stockDragId || stockDragId === targetId) {
+    // Reset opacity if dropped on self
+    document.querySelectorAll('[data-file-id]').forEach(el => el.style.opacity = '1');
+    return;
+  }
+
+  // Get current stock photos in sort order
+  const stockPhotos = vaultFiles
+    .filter(f => f.cat_id === 'stock_photos' && !f.loan_id)
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+  const dragIdx = stockPhotos.findIndex(f => f.id === stockDragId);
+  const dropIdx = stockPhotos.findIndex(f => f.id === targetId);
+
+  if (dragIdx === -1 || dropIdx === -1) return;
+
+  // Reorder: remove dragged item and insert at drop position
+  const [moved] = stockPhotos.splice(dragIdx, 1);
+  stockPhotos.splice(dropIdx, 0, moved);
+
+  // Update sort_order for all stock photos (0-indexed)
+  const updates = stockPhotos.map((f, i) => ({ id: f.id, sort_order: i }));
+
+  // Update in-memory vaultFiles
+  for (const u of updates) {
+    const vf = vaultFiles.find(f => f.id === u.id);
+    if (vf) vf.sort_order = u.sort_order;
+  }
+
+  // Persist all sort_order values to database
+  for (const u of updates) {
+    await dbUpdateVaultFile(u.id, { sort_order: u.sort_order });
+  }
+
+  stockDragId = null;
+  renderVault();
+  showToast('Photo order saved', 'success');
+}
+
 function renderVault() {
   const el = document.getElementById('vaultContent');
 
@@ -2474,7 +2532,7 @@ function renderVault() {
       <button class="btn btn-gold btn-sm" onclick="uploadGlobalStockPhoto()">＋ Add Photos</button>
     </div>
     ${stockPhotos.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px">${stockPhotos.map(f => `
-      <div style="position:relative;width:80px;height:60px;border-radius:4px;overflow:hidden;border:1px solid var(--border)">
+      <div draggable="true" data-file-id="${f.id}" ondragstart="stockDragStart(event,'${f.id}')" ondragover="stockDragOver(event)" ondrop="stockDrop(event,'${f.id}')" ondragend="this.style.opacity='1'" style="position:relative;width:80px;height:60px;border-radius:4px;overflow:hidden;border:1px solid var(--border);cursor:grab">
         <img src="${f.data}" style="width:100%;height:100%;object-fit:cover" alt="${f.name}">
         <button onclick="deleteStockPhoto('${f.id}')" style="position:absolute;top:2px;right:2px;background:rgba(200,50,50,0.85);color:white;border:none;width:18px;height:18px;font-size:10px;cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center">✕</button>
       </div>`).join('')}</div>` : `<div style="color:var(--text3);font-size:12px">No stock photos yet — upload area photos that will be included with every property listing</div>`}
