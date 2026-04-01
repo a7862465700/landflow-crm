@@ -10,7 +10,7 @@ This milestone fixes the broken photo-to-video pipeline end-to-end. Starting fro
 - Integer phases (1, 2, 3, 4): Planned milestone work
 - Decimal phases (e.g., 2.1): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: CRM Photo Management** - Fix stock and parcel photo previews and enable drag-reorder in the vault
+- [x] **Phase 1: CRM Photo Management** - Fix stock and parcel photo previews and enable drag-reorder in the vault (completed 2026-04-01)
 - [ ] **Phase 2: Photo Sync Engine** - Assemble 7-photo formula and reliably sync to website storage
 - [ ] **Phase 3: Property Gallery** - Display synced photos in a carousel on property detail pages
 - [ ] **Phase 4: Video Pipeline** - Generate videos from the synced photo set and route to admin approval
@@ -29,7 +29,7 @@ This milestone fixes the broken photo-to-video pipeline end-to-end. Starting fro
 
 Plans:
 - [x] 01-01-PLAN.md -- Fix stock photo previews and add sort_order column
-- [ ] 01-02-PLAN.md -- Implement drag-reorder for stock photos and verify parcel previews
+- [x] 01-02-PLAN.md -- Implement drag-reorder for stock photos and verify parcel previews
 
 ### Phase 2: Photo Sync Engine
 **Goal**: The sync pipeline reliably assembles and delivers the correct 7-photo set to the website
@@ -81,7 +81,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. CRM Photo Management | 1/2 | In Progress|  |
+| 1. CRM Photo Management | 2/2 | Complete   | 2026-04-01 |
 | 2. Photo Sync Engine | 0/0 | Not started | - |
 | 3. Property Gallery | 0/0 | Not started | - |
 | 4. Video Pipeline | 0/0 | Not started | - |

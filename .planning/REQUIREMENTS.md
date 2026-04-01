@@ -10,8 +10,8 @@ Requirements for milestone v1.0: Photo-to-Video Pipeline Fix. Each maps to roadm
 ### CRM Photos
 
 - [x] **PHOTO-01**: User can see image previews of global stock photos in the CRM vault
-- [ ] **PHOTO-02**: User can drag-reorder global stock photos to control which appear first
-- [ ] **PHOTO-03**: User can see image previews of parcel-specific photos in the CRM vault
+- [x] **PHOTO-02**: User can drag-reorder global stock photos to control which appear first
+- [x] **PHOTO-03**: User can see image previews of parcel-specific photos in the CRM vault
 
 ### Sync
 
@@ -68,8 +68,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | PHOTO-01 | Phase 1 | Complete |
-| PHOTO-02 | Phase 1 | Pending |
-| PHOTO-03 | Phase 1 | Pending |
+| PHOTO-02 | Phase 1 | Complete |
+| PHOTO-03 | Phase 1 | Complete |
 | SYNC-01 | Phase 2 | Pending |
 | SYNC-02 | Phase 2 | Pending |
 | SYNC-03 | Phase 2 | Pending |
