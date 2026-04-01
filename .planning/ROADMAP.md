@@ -41,10 +41,12 @@ Plans:
   3. Sync completes without RLS permission errors when reading vault_files via service role key
   4. CRM displays a clear success or failure message after triggering photo sync
   5. Synced photos are auto-enhanced (brightness, contrast, saturation, sharpening) before uploading to Supabase Storage
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: TBD
+- [ ] 02-01-PLAN.md -- Rewrite sync-photos route with 7-photo formula, RLS fix, and auto-enhancement
+- [ ] 02-02-PLAN.md -- Add loading state and error toasts to CRM sync button
+- [ ] 02-03-PLAN.md -- Verify Netlify env var and end-to-end sync pipeline
 
 ### Phase 3: Property Gallery
 **Goal**: Website visitors see property photos in an interactive carousel with correct ordering
@@ -82,6 +84,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. CRM Photo Management | 2/2 | Complete   | 2026-04-01 |
-| 2. Photo Sync Engine | 0/0 | Not started | - |
+| 2. Photo Sync Engine | 0/3 | Planned | - |
 | 3. Property Gallery | 0/0 | Not started | - |
 | 4. Video Pipeline | 0/0 | Not started | - |
