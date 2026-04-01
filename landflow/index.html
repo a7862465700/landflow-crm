@@ -2575,12 +2575,21 @@ function renderVault() {
 // ============================================================
 // CHECKLIST — Missing Items Dashboard
 // ============================================================
-function renderChecklist() {
+async function renderChecklist() {
+  // Fetch website properties to check sync status
+  let websiteProps = [];
+  try {
+    const { data } = await sb.from('properties').select('parcel_number, photos');
+    websiteProps = data || [];
+  } catch (e) { console.error('Failed to fetch properties for checklist:', e); }
+  const syncedParcels = new Set(websiteProps.filter(p => p.photos && p.photos.length > 0).map(p => p.parcel_number));
+
   const checks = [
     { key:'purchase',  icon:'🏛', label:'Missing Purchase Documents', severity:'red',   type:'file', catId:'purchase' },
     { key:'sale',      icon:'📝', label:'Missing Sale Documents',     severity:'red',   type:'file', catId:'sale' },
     { key:'assignment',icon:'🤝', label:'Missing Assignment Documents',severity:'red',  type:'file', catId:'assignment' },
     { key:'photos',    icon:'📸', label:'Missing Parcel Photos (min 2)',severity:'red', type:'fileMin', catId:'photos', min:2 },
+    { key:'websync',   icon:'🌐', label:'Photos Not Synced to Website', severity:'amber', type:'websync' },
     { key:'investor',  icon:'🏦', label:'No Investor Assigned',      severity:'amber', type:'field', field:'investor' },
     { key:'paperstac', icon:'📋', label:'Not Posted on Paperstac',   severity:'amber', type:'field', field:'paperstac_posted' },
     { key:'parcel',    icon:'📍', label:'Missing Parcel Number',     severity:'gray',  type:'field', field:'parcel' },
@@ -2605,6 +2614,13 @@ function renderChecklist() {
       missing = loans.filter(l => !vaultFiles.some(f => f.loan_id === l.id && f.cat_id === chk.catId));
     } else if (chk.type === 'fileMin') {
       missing = loans.filter(l => vaultFiles.filter(f => f.loan_id === l.id && f.cat_id === chk.catId).length < chk.min);
+    } else if (chk.type === 'websync') {
+      // Loans that have parcel photos uploaded but aren't synced to the website yet
+      missing = loans.filter(l => {
+        const hasPhotos = vaultFiles.some(f => f.loan_id === l.id && f.cat_id === 'photos');
+        const isSynced = l.parcel && syncedParcels.has(l.parcel);
+        return hasPhotos && !isSynced;
+      });
     } else {
       missing = loans.filter(l => !l[chk.field] || String(l[chk.field]).trim() === '');
     }
