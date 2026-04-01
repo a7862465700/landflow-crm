@@ -93,6 +93,7 @@ create table if not exists vault_files (
   data text,
   book_page text,
   notes text,
+  sort_order integer default 0,
   created_at timestamptz default now()
 );
 
@@ -134,3 +135,6 @@ create policy "Users see own vault files" on vault_files for select using (auth.
 create policy "Users insert own vault files" on vault_files for insert with check (auth.uid() = user_id);
 create policy "Users update own vault files" on vault_files for update using (auth.uid() = user_id);
 create policy "Users delete own vault files" on vault_files for delete using (auth.uid() = user_id);
+
+-- Phase 1: Add sort_order for stock photo ordering
+ALTER TABLE vault_files ADD COLUMN IF NOT EXISTS sort_order integer DEFAULT 0;

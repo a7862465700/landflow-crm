@@ -1093,7 +1093,7 @@ async function loadAllData() {
     sb.from('payments').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('investors').select('*').eq('user_id', uid),
     sb.from('invoices').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-    sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,created_at').eq('user_id', uid),
+    sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,sort_order,created_at').eq('user_id', uid),
     sb.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
     sb.from('late_fees').select('*').eq('user_id', uid),
   ]);
@@ -1102,6 +1102,17 @@ async function loadAllData() {
   investors = inv.data || [];
   invoices = ivs.data || [];
   vaultFiles = vf.data || [];
+
+  // Fetch base64 data for stock photos only (small set, ~13 photos) per D-01, D-02
+  const stockPhotoIds = vaultFiles.filter(f => f.cat_id === 'stock_photos' && !f.loan_id).map(f => f.id);
+  if (stockPhotoIds.length) {
+    const { data: stockData } = await sb.from('vault_files').select('id,data,sort_order').in('id', stockPhotoIds);
+    if (stockData) {
+      const stockMap = Object.fromEntries(stockData.map(s => [s.id, s]));
+      vaultFiles = vaultFiles.map(f => stockMap[f.id] ? { ...f, data: stockMap[f.id].data, sort_order: stockMap[f.id].sort_order || 0 } : f);
+    }
+  }
+
   APP.settings = us.data || null;
   lateFees = lf.data || [];
 
@@ -2453,7 +2464,7 @@ function renderVault() {
   const el = document.getElementById('vaultContent');
 
   // Global Stock Photos section
-  const stockPhotos = vaultFiles.filter(f => f.cat_id === 'stock_photos' && !f.loan_id);
+  const stockPhotos = vaultFiles.filter(f => f.cat_id === 'stock_photos' && !f.loan_id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   const stockHtml = `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
