@@ -954,6 +954,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const VILLAGE_VISTA_API = 'https://hotspringsland.com';
 
 async function syncPhotosToWebsite(loanId) {
+  showToast('Syncing photos to website...');
   try {
     const res = await fetch(VILLAGE_VISTA_API + '/api/sync-photos', {
       method: 'POST',
@@ -964,10 +965,10 @@ async function syncPhotosToWebsite(loanId) {
     if (result.success) {
       showToast('📸 Photos synced to website (' + result.photosProcessed + ')', 'success');
     } else {
-      console.warn('Photo sync:', result);
+      showToast('Sync failed: ' + (result.error || 'Unknown error'), 'error');
     }
   } catch (err) {
-    console.error('Photo sync failed:', err);
+    showToast('Sync failed: ' + (err.message || 'Network error'), 'error');
   }
 }
 
