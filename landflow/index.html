@@ -575,6 +575,7 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="form-group"><label class="form-label">Buyer State</label><input class="form-input" id="f-buyer-state" placeholder="NEVADA" style="text-transform:uppercase"></div>
         <div class="form-group"><label class="form-label">Buyer County</label><input class="form-input" id="f-buyer-county" placeholder="CLARK" style="text-transform:uppercase"></div>
         <div class="form-group"><label class="form-label" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="f-paperstac" style="width:16px;height:16px;accent-color:var(--gold)"> Posted on Paperstac</label></div>
+        <div class="form-group"><label class="form-label" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="f-sold" style="width:16px;height:16px;accent-color:#c94040" onchange="if(this.checked){document.getElementById('f-status').value='default'}"> Sold — Remove from Website</label></div>
       </div>
       <div class="form-section">📍 Property Info</div>
       <div class="form-grid">
@@ -967,6 +968,27 @@ async function syncPhotosToWebsite(loanId) {
     }
   } catch (err) {
     console.error('Photo sync failed:', err);
+  }
+}
+
+// Sync sold status to the website properties table
+async function syncSoldStatus(loan) {
+  if (!loan || !loan.parcel) return;
+  try {
+    const newStatus = loan.sold ? 'sold' : 'available';
+    const { data: prop } = await sb
+      .from('properties')
+      .select('id, status')
+      .eq('parcel_number', loan.parcel)
+      .single();
+    if (prop) {
+      await sb.from('properties').update({ status: newStatus }).eq('id', prop.id);
+      showToast(loan.sold ? '🚫 Parcel removed from website' : '✅ Parcel restored on website', 'success');
+    } else {
+      console.warn('No matching property found for parcel:', loan.parcel);
+    }
+  } catch (err) {
+    console.error('Sold status sync failed:', err);
   }
 }
 
@@ -1433,6 +1455,7 @@ function openLoanModal(editId) {
     document.getElementById('f-nb-email').value = l.nb_email||'';
     document.getElementById('f-nb-address').value = l.nb_address||'';
     document.getElementById('f-paperstac').checked = !!l.paperstac_posted;
+    document.getElementById('f-sold').checked = !!l.sold;
     document.getElementById('f-loan-servicer').value = l.loan_servicer||'';
     document.getElementById('f-loan-servicer-web').value = l.loan_servicer_web||'';
     document.getElementById('f-notes').value = l.notes||'';
@@ -1597,6 +1620,7 @@ async function saveLoan() {
     nb_email: document.getElementById('f-nb-email').value.trim(),
     nb_address: document.getElementById('f-nb-address').value.trim(),
     paperstac_posted: document.getElementById('f-paperstac').checked,
+    sold: document.getElementById('f-sold').checked,
     loan_servicer: document.getElementById('f-loan-servicer').value.trim(),
     loan_servicer_web: document.getElementById('f-loan-servicer-web').value.trim(),
     notes: document.getElementById('f-notes').value,
@@ -1607,6 +1631,9 @@ async function saveLoan() {
     pendingImportPDF = null;
     return;
   }
+  // Sync sold status to website whenever a loan is saved
+  syncSoldStatus(saved);
+
   if (editingLoanId) {
     const idx = loans.findIndex(l => l.id === editingLoanId);
     if (idx >= 0) loans[idx] = saved;
@@ -2571,7 +2598,6 @@ const FILE_CATEGORIES = [
   { id:'sale', icon:'📝', label:'Sale Documents' },
   { id:'assignment', icon:'🤝', label:'Assignment Documents' },
   { id:'photos', icon:'📸', label:'Parcel Photos' },
-  { id:'stock_photos', icon:'🏞', label:'Stock Photos' },
   { id:'generated', icon:'📄', label:'Generated Documents' },
   { id:'other', icon:'📎', label:'Other Documents' },
 ];
@@ -2601,7 +2627,7 @@ async function vaultUpload(loanId, catId) {
     }
     if (added) {
       showToast('✅ ' + added + ' file(s) uploaded', 'success');
-      if (catId === 'photos' || catId === 'stock_photos') syncPhotosToWebsite(loanId);
+      if (catId === 'photos') syncPhotosToWebsite(loanId);
     } else {
       showToast('Upload failed — check database settings', 'error');
     }

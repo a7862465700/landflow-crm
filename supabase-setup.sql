@@ -36,6 +36,7 @@ create table if not exists loans (
   nb_email text,
   nb_address text,
   notes text,
+  sold boolean default false,
   created_at timestamptz default now()
 );
 
