@@ -18,7 +18,7 @@ Requirements for milestone v1.0: Photo-to-Video Pipeline Fix. Each maps to roadm
 - [ ] **SYNC-01**: Photo sync extracts exactly 2 parcel photos + 3 first stock + 2 random stock = 7 photos
 - [ ] **SYNC-02**: Parcel photos are positioned first in the synced set, stock photos follow
 - [ ] **SYNC-03**: Vault_files RLS bypass works reliably via service role key (no silent failures)
-- [ ] **SYNC-04**: Sync reports clear success/failure status back to the CRM
+- [x] **SYNC-04**: Sync reports clear success/failure status back to the CRM
 - [ ] **SYNC-05**: Photos are auto-enhanced (brightness, contrast, saturation, sharpening) during sync using existing image-enhancer module
 
 ### Gallery
@@ -73,7 +73,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYNC-01 | Phase 2 | Pending |
 | SYNC-02 | Phase 2 | Pending |
 | SYNC-03 | Phase 2 | Pending |
-| SYNC-04 | Phase 2 | Pending |
+| SYNC-04 | Phase 2 | Complete |
 | SYNC-05 | Phase 2 | Pending |
 | GAL-01 | Phase 3 | Pending |
 | GAL-02 | Phase 3 | Pending |
