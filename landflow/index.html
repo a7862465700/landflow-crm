@@ -2905,7 +2905,10 @@ function renderFileVault(loanId) {
     html += `<div class="vault-cat">
       <div class="vault-cat-head">
         <div class="vault-cat-title">${cat.icon} ${cat.label} <span style="color:var(--text3);font-weight:400">(${catFiles.length})</span></div>
-        <button class="btn btn-ghost btn-sm" onclick="vaultUpload('${loanId}','${cat.id}')">＋ Upload</button>
+        <div style="display:flex;gap:6px">
+          ${cat.id === 'photos' ? `<button class="btn btn-sm" style="background:var(--gold);color:#000;font-weight:600" onclick="syncPhotosToWebsite('${loanId}')">🌐 Sync to Website</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="vaultUpload('${loanId}','${cat.id}')">＋ Upload</button>
+        </div>
       </div>`;
     if (!catFiles.length) {
       html += `<div style="padding:10px 14px;color:var(--text3);font-size:12px">No files yet</div>`;
