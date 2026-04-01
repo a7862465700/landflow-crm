@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-04-01T17:49:13.193Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-04-01T17:50:39.953Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 ## Current Position
 
 Phase: 02 (photo-sync-engine) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-01
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-crm-photo-management P01 | 10 | 1 tasks | 2 files |
 | Phase 01-crm-photo-management P02 | 15 | 2 tasks | 1 files |
 | Phase 02-photo-sync-engine P02 | 5 | 1 tasks | 1 files |
+| Phase 02-photo-sync-engine P01 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,9 @@ Recent decisions affecting current work:
 - [Phase 01-crm-photo-management]: No external drag-and-drop library — vanilla HTML5 drag events sufficient for a 13-item grid
 - [Phase 01-crm-photo-management]: All sort_order values reindexed gaplessly on every drop so Phase 2 sync engine reads first 3 stock photos in correct user-defined order
 - [Phase 02-photo-sync-engine]: Preserve emoji prefix in syncPhotosToWebsite() success toast to avoid visual regression
+- [Phase 02-photo-sync-engine]: enhanceBuffer() omits .resize() to preserve portrait photo aspect ratios
+- [Phase 02-photo-sync-engine]: Always upsert on upload; existence-check download removed as wasteful round-trip
+- [Phase 02-photo-sync-engine]: Storage path always .jpg since enhanceBuffer outputs JPEG
 
 ### Pending Todos
 
@@ -83,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T17:49:13.188Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-04-01T17:50:39.949Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None

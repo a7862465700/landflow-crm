@@ -44,7 +44,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md -- Rewrite sync-photos route with 7-photo formula, RLS fix, and auto-enhancement
+- [x] 02-01-PLAN.md -- Rewrite sync-photos route with 7-photo formula, RLS fix, and auto-enhancement
 - [x] 02-02-PLAN.md -- Add loading state and error toasts to CRM sync button
 - [ ] 02-03-PLAN.md -- Verify Netlify env var and end-to-end sync pipeline
 
