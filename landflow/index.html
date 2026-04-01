@@ -1106,10 +1106,13 @@ async function loadAllData() {
   // Fetch base64 data for stock photos only (small set, ~13 photos) per D-01, D-02
   const stockPhotoIds = vaultFiles.filter(f => f.cat_id === 'stock_photos' && !f.loan_id).map(f => f.id);
   if (stockPhotoIds.length) {
-    const { data: stockData } = await sb.from('vault_files').select('id,data,sort_order').in('id', stockPhotoIds);
-    if (stockData) {
+    const { data: stockData, error: stockErr } = await sb.from('vault_files').select('id,data,sort_order').in('id', stockPhotoIds);
+    console.log('Stock photo fetch:', { ids: stockPhotoIds.length, data: stockData?.length, error: stockErr });
+    if (stockErr) console.error('Stock photo fetch error:', stockErr);
+    if (stockData && stockData.length) {
       const stockMap = Object.fromEntries(stockData.map(s => [s.id, s]));
       vaultFiles = vaultFiles.map(f => stockMap[f.id] ? { ...f, data: stockMap[f.id].data, sort_order: stockMap[f.id].sort_order || 0 } : f);
+      console.log('Stock photos merged, first has data:', !!vaultFiles.find(f => f.cat_id === 'stock_photos')?.data);
     }
   }
 
