@@ -76,6 +76,26 @@ Plans:
 Plans:
 - [ ] 04-01: TBD
 
+---
+
+## HSF Platform: Role Foundation
+
+### Phase 01: Role Foundation (borrower-portal)
+**Goal**: RBAC infrastructure established — user_roles table, JWT hook, middleware, route groups — so admin, note_buyer, and borrower each access only their own area
+**Depends on**: Nothing (first HSF phase)
+**Requirements**: RBAC-01, RBAC-02, RBAC-03, RBAC-04, RBAC-05
+**Success Criteria** (what must be TRUE):
+  1. user_roles table exists with app_role enum (admin, note_buyer, borrower)
+  2. JWT Custom Access Token Hook injects user_role claim at login
+  3. Next.js middleware reads role from JWT claim (no DB call per request)
+  4. Route groups /admin/*, /buyer/*, /(portal)/* are each protected by role check
+  5. Admin user seeded via SQL migration and can log in
+**Plans**: 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md -- SQL migration: role enum, user_roles table, JWT hook, admin seed
+- [ ] 01-02-PLAN.md -- SSR upgrade, middleware RBAC, route group scaffolding
+
 ## Progress
 
 **Execution Order:**
@@ -87,3 +107,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 2. Photo Sync Engine | 0/3 | Planned | - |
 | 3. Property Gallery | 0/0 | Not started | - |
 | 4. Video Pipeline | 0/0 | Not started | - |
+| HSF 01. Role Foundation | 0/2 | Planned | - |
