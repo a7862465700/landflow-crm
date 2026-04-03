@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-04-01T17:50:39.953Z"
-last_activity: 2026-04-01
+status: verifying
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-04-03T15:36:28.455Z"
+last_activity: 2026-04-03
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 1
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 
 Phase: 02 (photo-sync-engine) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-04-01
+Status: Phase complete — ready for verification
+Last activity: 2026-04-03
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -55,6 +55,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-crm-photo-management P02 | 15 | 2 tasks | 1 files |
 | Phase 02-photo-sync-engine P02 | 5 | 1 tasks | 1 files |
 | Phase 02-photo-sync-engine P01 | 2 | 2 tasks | 2 files |
+| Phase 01 P02 | 25 | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,8 @@ Recent decisions affecting current work:
 - [Phase 02-photo-sync-engine]: enhanceBuffer() omits .resize() to preserve portrait photo aspect ratios
 - [Phase 02-photo-sync-engine]: Always upsert on upload; existence-check download removed as wasteful round-trip
 - [Phase 02-photo-sync-engine]: Storage path always .jpg since enhanceBuffer outputs JPEG
+- [Phase 01]: Use getClaims() as primary JWT role reader in middleware (with decodeJwt fallback) — cleaner and signature-validating vs raw cookie decode
+- [Phase 01]: Root page.tsx redirects to /login — middleware handles role-based portal routing for authenticated users
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T17:50:39.949Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-04-03T15:36:28.451Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None

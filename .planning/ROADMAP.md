@@ -93,8 +93,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- SQL migration: role enum, user_roles table, JWT hook, admin seed
-- [ ] 01-02-PLAN.md -- SSR upgrade, middleware RBAC, route group scaffolding
+- [x] 01-01-PLAN.md -- SQL migration: role enum, user_roles table, JWT hook, admin seed
+- [x] 01-02-PLAN.md -- SSR upgrade, middleware RBAC, route group scaffolding
 
 ## Progress
 
@@ -103,7 +103,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. CRM Photo Management | 2/2 | Complete   | 2026-04-01 |
+| 1. CRM Photo Management | 2/2 | Complete   | 2026-04-03 |
 | 2. Photo Sync Engine | 0/3 | Planned | - |
 | 3. Property Gallery | 0/0 | Not started | - |
 | 4. Video Pipeline | 0/0 | Not started | - |
