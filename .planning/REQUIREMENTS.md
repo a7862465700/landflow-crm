@@ -34,6 +34,14 @@ Requirements for milestone v1.0: Photo-to-Video Pipeline Fix. Each maps to roadm
 - [ ] **VID-03**: Generated video lands in pending_videos for admin approval
 - [ ] **VID-04**: Video generation failures are logged and reported (not silent)
 
+### CRM Integration (HSF)
+
+- [ ] **CRM-01**: Setting nb_email and inv_date on a LandFlow parcel causes a loan record to appear in HSF within one trigger cycle (no manual action needed)
+- [ ] **CRM-02**: Clicking "Push to HSF" in LandFlow CRM creates or updates the correct loan record in HSF
+- [ ] **CRM-03**: A sync with missing required fields fails validation and writes a record to hsf_sync_errors without corrupting existing data
+- [ ] **CRM-04**: Admin can see sync status (last synced, error state) for each loan in the admin loan list
+- [ ] **CRM-05**: Running the same sync twice for the same parcel does not create duplicate loans
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -60,6 +68,8 @@ Explicitly excluded. Documented to prevent scope creep.
 | Migrating vault base64 to Supabase Storage | Works currently, just inefficient; defer to future milestone |
 | LandID integration with CRM | Admin-only workflow is fine for now |
 | Mobile app | Web-first |
+| Two-way sync (HSF back to CRM) | One-way push is sufficient for now |
+| Cron-based sync | Trigger is faster and more reliable |
 
 ## Traceability
 
@@ -82,12 +92,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VID-02 | Phase 4 | Pending |
 | VID-03 | Phase 4 | Pending |
 | VID-04 | Phase 4 | Pending |
+| CRM-01 | HSF Phase 05 | Pending |
+| CRM-02 | HSF Phase 05 | Pending |
+| CRM-03 | HSF Phase 05 | Pending |
+| CRM-04 | HSF Phase 05 | Pending |
+| CRM-05 | HSF Phase 05 | Pending |
 
 **Coverage:**
-- v1.0 requirements: 15 total
-- Mapped to phases: 15
+- v1.0 requirements: 20 total
+- Mapped to phases: 20
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-01*
-*Last updated: 2026-04-01 after roadmap creation*
+*Last updated: 2026-04-04 after Phase 05 planning*

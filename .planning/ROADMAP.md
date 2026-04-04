@@ -96,6 +96,22 @@ Plans:
 - [x] 01-01-PLAN.md -- SQL migration: role enum, user_roles table, JWT hook, admin seed
 - [x] 01-02-PLAN.md -- SSR upgrade, middleware RBAC, route group scaffolding
 
+### Phase 05: CRM Integration
+**Goal**: LandFlow CRM loan data syncs to HSF borrower-portal automatically via Postgres trigger, with manual fallback button and admin sync status visibility
+**Depends on**: HSF Phase 01 (Role Foundation — admin role required for sync status view)
+**Requirements**: CRM-01, CRM-02, CRM-03, CRM-04, CRM-05
+**Success Criteria** (what must be TRUE):
+  1. Setting nb_email and inv_date on a LandFlow loan causes a loan record to appear in HSF (auto-trigger)
+  2. Clicking "Push to HSF" in LandFlow CRM creates or updates the correct loan record in HSF
+  3. A sync with missing required fields fails validation and writes to hsf_sync_errors without corrupting data
+  4. Admin can see sync status (last synced, error state) for each loan in the admin loan list
+  5. Running the same sync twice for the same parcel does not create duplicate loans
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md -- SQL migration (hsf_loans, hsf_sync_errors, pg_net trigger) + /api/crm-sync route
+- [ ] 05-02-PLAN.md -- CRM "Push to HSF" button + admin sync status column
+
 ## Progress
 
 **Execution Order:**
@@ -108,3 +124,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 3. Property Gallery | 0/0 | Not started | - |
 | 4. Video Pipeline | 0/0 | Not started | - |
 | HSF 01. Role Foundation | 0/2 | Planned | - |
+| HSF 05. CRM Integration | 0/2 | Planned | - |
