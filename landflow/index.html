@@ -953,6 +953,9 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const VILLAGE_VISTA_API = 'https://hotspringsland.com';
 
+const HSF_API = 'https://hickorystreetfinance.com';
+const HSF_SYNC_SECRET = 'c64d3010586aaff59b5d700f61c59d63ba530665bae02a45b02aa1bbfc304c92';  // Shared secret — matches HSF_CRM_SYNC_SECRET env var
+
 async function syncPhotosToWebsite(loanId) {
   showToast('Syncing photos to website...');
   try {
@@ -969,6 +972,28 @@ async function syncPhotosToWebsite(loanId) {
     }
   } catch (err) {
     showToast('Sync failed: ' + (err.message || 'Network error'), 'error');
+  }
+}
+
+async function pushToHSF(loanId) {
+  showToast('Syncing to Hickory Street Finance...', 'info');
+  try {
+    const res = await fetch(HSF_API + '/api/crm-sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + HSF_SYNC_SECRET
+      },
+      body: JSON.stringify({ crm_loan_id: loanId })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('HSF sync failed: ' + (data.error || 'Unknown error'), 'error');
+    } else {
+      showToast('Sent to Hickory Street Finance', 'success');
+    }
+  } catch (e) {
+    showToast('HSF sync error: ' + e.message, 'error');
   }
 }
 
@@ -1893,6 +1918,9 @@ function openDetail(id) {
          <div style="grid-column:1/-1"><div class="dp-field-label">Address</div><div>${l.nb_address||'—'}</div></div>
          <div><div class="dp-field-label">Loan Servicer</div><div>${l.loan_servicer||'—'}</div></div>
          <div><div class="dp-field-label">Website</div><div>${l.loan_servicer_web?`<a href="${l.loan_servicer_web}" target="_blank" style="color:var(--gold);text-decoration:underline">${l.loan_servicer_web}</a>`:'—'}</div></div>
+       </div>
+       <div style="margin-top:10px">
+         <button class="btn btn-sm" style="background:var(--gold);color:#000;font-weight:600" onclick="pushToHSF('${l.id}')">Push to HSF</button>
        </div>`:''}`
     : `<div style="color:var(--text3);font-size:13px">Note retained — not assigned</div>`;
   const sched = genSchedule(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), l.first_pay_date||l.orig_date, 24);
