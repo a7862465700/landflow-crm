@@ -5,3 +5,10 @@ files/
 *.md
 build-guide.md
 tech-spec.md
+
+# Secrets & env files
+.env*
+.claude/settings.local.json
+
+# Large files
+*.mp4
