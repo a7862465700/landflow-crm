@@ -41,9 +41,45 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 .drawer ::-webkit-scrollbar-thumb{background:var(--dark-border2)}
 
-/* ── AUTH SCREEN ── */
-#authScreen{position:fixed;inset:0;background:var(--dark);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
-.auth-card{width:100%;max-width:380px;background:var(--dark2);border:1px solid var(--dark-border);border-radius:16px;padding:36px 32px;text-align:center}
+/* ── AUTH / LANDING SCREEN ── */
+#authScreen{position:fixed;inset:0;background:var(--dark);display:flex;flex-direction:column;z-index:1000;overflow-y:auto}
+/* Landing navbar */
+.landing-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 40px;background:var(--dark2);border-bottom:1px solid var(--dark-border)}
+.landing-nav-brand{font-family:'DM Serif Display',serif;font-size:24px;color:var(--gold);letter-spacing:-0.5px}
+.landing-nav-links{display:flex;align-items:center;gap:20px}
+.landing-nav-link{color:var(--dark-text3);font-size:13px;font-weight:600;cursor:pointer;transition:color .2s;text-decoration:none}
+.landing-nav-link:hover{color:var(--gold)}
+.landing-login-btn{background:var(--gold);color:#fff;border:none;border-radius:var(--r-sm);padding:9px 22px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s}
+.landing-login-btn:hover{background:var(--gold2)}
+/* Landing hero */
+.landing-hero{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:80px 40px 60px;text-align:center}
+.landing-hero-inner{max-width:700px}
+.landing-hero h1{font-family:'DM Serif Display',serif;font-size:48px;color:#fff;margin:0 0 16px;line-height:1.15}
+.landing-hero h1 span{color:var(--gold)}
+.landing-hero p{font-size:18px;color:var(--dark-text3);line-height:1.7;margin:0 0 32px}
+.landing-cta{display:inline-block;background:var(--gold);color:#fff;border:none;border-radius:var(--r-sm);padding:14px 36px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;text-decoration:none}
+.landing-cta:hover{background:var(--gold2)}
+/* Landing features */
+.landing-features{display:flex;gap:32px;justify-content:center;flex-wrap:wrap;padding:0 40px 60px}
+.landing-feature{background:var(--dark2);border:1px solid var(--dark-border);border-radius:16px;padding:32px 28px;max-width:280px;text-align:center}
+.landing-feature-icon{font-size:36px;margin-bottom:12px}
+.landing-feature h3{font-family:'DM Serif Display',serif;font-size:20px;color:#fff;margin:0 0 8px}
+.landing-feature p{font-size:13px;color:var(--dark-text3);line-height:1.6;margin:0}
+/* Landing about / contact */
+.landing-about{padding:60px 40px;display:flex;gap:48px;justify-content:center;flex-wrap:wrap;max-width:1000px;margin:0 auto}
+.landing-about-section{flex:1;min-width:280px}
+.landing-about-section h2{font-family:'DM Serif Display',serif;font-size:28px;color:#fff;margin:0 0 16px}
+.landing-about-section h2 span{color:var(--gold)}
+.landing-about-section p{font-size:14px;color:var(--dark-text3);line-height:1.7;margin:0 0 12px}
+.landing-contact-item{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--dark-text3);margin-bottom:10px}
+.landing-contact-item span:first-child{font-size:18px}
+/* Landing footer */
+.landing-footer{padding:24px 40px;border-top:1px solid var(--dark-border);text-align:center;font-size:11px;color:var(--dark-text3);margin-top:auto}
+/* Login modal overlay */
+#loginModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1100;align-items:center;justify-content:center;padding:20px}
+.auth-card{width:100%;max-width:380px;background:var(--dark2);border:1px solid var(--dark-border);border-radius:16px;padding:36px 32px;text-align:center;position:relative}
+.auth-card-close{position:absolute;top:12px;right:16px;color:var(--dark-text3);font-size:20px;cursor:pointer;background:none;border:none}
+.auth-card-close:hover{color:#fff}
 .auth-logo{font-family:'DM Serif Display',serif;font-size:32px;color:var(--gold);margin-bottom:4px;letter-spacing:-1px}
 .auth-sub{font-size:12px;color:var(--dark-text3);text-transform:uppercase;letter-spacing:2.5px;margin-bottom:32px;font-weight:600}
 .auth-label{display:block;text-align:left;font-size:11px;font-weight:700;color:var(--dark-text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px}
@@ -322,11 +358,79 @@ textarea.form-input{resize:vertical;min-height:80px}
   <div class="spinner"></div>
 </div>
 
-<!-- AUTH -->
+<!-- AUTH / LANDING PAGE -->
 <div id="authScreen" style="display:none">
+
+  <!-- Navbar -->
+  <nav class="landing-nav">
+    <div class="landing-nav-brand">Hickory Street Finance</div>
+    <div class="landing-nav-links">
+      <a class="landing-nav-link" href="#about">About</a>
+      <a class="landing-nav-link" href="#contact">Contact</a>
+      <button class="landing-login-btn" onclick="openLoginModal()">Login</button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="landing-hero">
+    <div class="landing-hero-inner">
+      <h1>Affordable <span>Land Financing</span> Made Simple</h1>
+      <p>Hickory Street Finance offers seller financing for land purchases across Arkansas and beyond. Whether you are looking for a homesite, recreational property, or a long-term investment, we make land ownership accessible with low down payments and flexible monthly terms.</p>
+      <button class="landing-cta" onclick="openLoginModal()">Client Portal Login</button>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <div class="landing-features">
+    <div class="landing-feature">
+      <div class="landing-feature-icon">🏡</div>
+      <h3>Low Down Payments</h3>
+      <p>Get started with as little as 10% down. We work with you to make land ownership within reach for every budget.</p>
+    </div>
+    <div class="landing-feature">
+      <div class="landing-feature-icon">📋</div>
+      <h3>Flexible Terms</h3>
+      <p>Choose from 3 to 10 year terms with competitive interest rates. Fixed monthly payments you can count on.</p>
+    </div>
+    <div class="landing-feature">
+      <div class="landing-feature-icon">🤝</div>
+      <h3>Personal Service</h3>
+      <p>Work directly with our team from application through closing. We are here to answer every question along the way.</p>
+    </div>
+  </div>
+
+  <!-- About & Contact -->
+  <div class="landing-about" id="about">
+    <div class="landing-about-section">
+      <h2>About <span>Hickory Street</span></h2>
+      <p>Hickory Street Finance is a seller finance company specializing in land purchases. We acquire parcels across the Natural State and offer them with owner financing, giving buyers an affordable path to land ownership without the hurdles of traditional bank lending.</p>
+      <p>Our mission is straightforward: connect people with land they can afford, on terms that work for their lives. No credit checks, no bank red tape, just honest financing backed by real property.</p>
+    </div>
+    <div class="landing-about-section" id="contact">
+      <h2>Get in <span>Touch</span></h2>
+      <p>Have questions about a property or your account? We would love to hear from you.</p>
+      <div class="landing-contact-item"><span>🌐</span> www.HickoryStreetFinance.com</div>
+      <div class="landing-contact-item"><span>📧</span> info@hickorystreetfinance.com</div>
+      <div class="landing-contact-item"><span>📍</span> Hot Springs Village, Arkansas</div>
+      <div style="margin-top:24px">
+        <button class="landing-cta" onclick="openLoginModal()">Access Your Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="landing-footer">
+    &copy; 2026 Hickory Street Finance. All rights reserved. &nbsp;|&nbsp; Elk Creek Group USA LLC
+  </div>
+
+</div>
+
+<!-- LOGIN MODAL -->
+<div id="loginModal">
   <div class="auth-card">
+    <button class="auth-card-close" onclick="closeLoginModal()">&times;</button>
     <div class="auth-logo">LandFlow</div>
-    <div class="auth-sub">Seller Finance CRM</div>
+    <div class="auth-sub">Client Portal</div>
     <label class="auth-label">Email</label>
     <input class="auth-input" id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
     <label class="auth-label">Password</label>
@@ -642,7 +746,17 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="form-group"><label class="form-label">Assignment Date</label><input class="form-input" id="f-inv-date" type="date"></div>
         <div class="form-group"><label class="form-label">Note Purchase Price</label><input class="form-input" id="f-inv-price" type="number" placeholder="12000"></div>
       </div>
-      <div class="form-section" style="margin-top:16px">🤝 Note Buyer (Optional)</div>
+      <div class="form-section" style="margin-top:16px;display:flex;align-items:center;justify-content:space-between">
+        <span>🤝 Note Buyer</span>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer;margin:0">
+          <span id="f-website-posted-label" style="color:var(--text3)">Post to Village Vista</span>
+          <div style="position:relative;width:40px;height:22px">
+            <input type="checkbox" id="f-website-posted" style="opacity:0;width:0;height:0;position:absolute" onchange="updateWebsitePostedLabel()">
+            <div id="f-website-posted-track" onclick="document.getElementById('f-website-posted').click()" style="position:absolute;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:11px;transition:background 0.2s;cursor:pointer"></div>
+            <div id="f-website-posted-thumb" onclick="document.getElementById('f-website-posted').click()" style="position:absolute;top:2px;left:2px;width:18px;height:18px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:transform 0.2s,background 0.2s;cursor:pointer"></div>
+          </div>
+        </label>
+      </div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Note Buyer Name</label><input class="form-input" id="f-nb-name" placeholder="Jane Doe"></div>
         <div class="form-group"><label class="form-label">Business Name</label><input class="form-input" id="f-nb-business" placeholder="Horizon Capital LLC"></div>
@@ -876,7 +990,7 @@ textarea.form-input{resize:vertical;min-height:80px}
     <div class="dp-addr" id="dp-addr"></div>
     <div class="dp-actions">
       <span id="dp-badge"></span>
-      <button class="btn btn-ghost btn-sm" onclick="editLoan()">✏️ Edit</button>
+      <button class="btn btn-ghost btn-sm" onclick="editLoan()">👁️ View</button>
       <button class="btn btn-green btn-sm" onclick="quickPayment()">💳 Pay</button>
       <button class="btn btn-gold btn-sm" onclick="quickInvoice()">🧾 Invoice</button>
       <button class="btn btn-ghost btn-sm" onclick="generateMonthlyStatement(currentLoanId)">📄 Statement</button>
@@ -997,11 +1111,19 @@ async function pushToHSF(loanId) {
   }
 }
 
-// Sync sold status to the website properties table
+// Sync sold/posted status to the website properties table
 async function syncSoldStatus(loan) {
   if (!loan || !loan.parcel) return;
   try {
-    const newStatus = loan.sold ? 'sold' : 'available';
+    // Sold takes priority, then website_posted controls available/unlisted
+    let newStatus;
+    if (loan.sold) {
+      newStatus = 'sold';
+    } else if (loan.website_posted) {
+      newStatus = 'available';
+    } else {
+      newStatus = 'unlisted';
+    }
     const { data: prop } = await sb
       .from('properties')
       .select('id, status')
@@ -1009,12 +1131,37 @@ async function syncSoldStatus(loan) {
       .single();
     if (prop) {
       await sb.from('properties').update({ status: newStatus }).eq('id', prop.id);
-      showToast(loan.sold ? '🚫 Parcel removed from website' : '✅ Parcel restored on website', 'success');
+      if (loan.sold) {
+        showToast('🚫 Parcel removed from website', 'success');
+      } else if (loan.website_posted) {
+        showToast('🌐 Parcel posted to Village Vista', 'success');
+      } else {
+        showToast('📋 Parcel unlisted from Village Vista', 'success');
+      }
     } else {
       console.warn('No matching property found for parcel:', loan.parcel);
     }
   } catch (err) {
-    console.error('Sold status sync failed:', err);
+    console.error('Sold/posted status sync failed:', err);
+  }
+}
+
+// Toggle switch visual update for "Post to Village Vista"
+function updateWebsitePostedLabel() {
+  const cb = document.getElementById('f-website-posted');
+  const track = document.getElementById('f-website-posted-track');
+  const thumb = document.getElementById('f-website-posted-thumb');
+  const label = document.getElementById('f-website-posted-label');
+  if (cb.checked) {
+    track.style.background = 'var(--gold)';
+    thumb.style.transform = 'translateX(18px)';
+    label.style.color = 'var(--gold)';
+    label.textContent = 'Posted on Village Vista';
+  } else {
+    track.style.background = '#ccc';
+    thumb.style.transform = 'translateX(0)';
+    label.style.color = 'var(--text3)';
+    label.textContent = 'Post to Village Vista';
   }
 }
 
@@ -1052,11 +1199,23 @@ async function initAuth() {
 function showAuth() {
   document.getElementById('loadingScreen').style.display = 'none';
   document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('loginModal').style.display = 'none';
   document.getElementById('app').classList.remove('visible');
+}
+
+function openLoginModal() {
+  document.getElementById('loginModal').style.display = 'flex';
+  document.getElementById('authEmail').focus();
+}
+
+function closeLoginModal() {
+  document.getElementById('loginModal').style.display = 'none';
+  document.getElementById('authErr').textContent = '';
 }
 
 async function showApp() {
   document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('loginModal').style.display = 'none';
   document.getElementById('loadingScreen').style.display = 'flex';
   await loadAllData();
   document.getElementById('loadingScreen').style.display = 'none';
@@ -1432,6 +1591,7 @@ function renderLoans() {
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
           ${getBadge(l)}
           <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${l.paperstac_posted ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'};color:${l.paperstac_posted ? '#22c55e' : '#ef4444'}">${l.paperstac_posted ? 'Paperstac ✓' : 'Paperstac ✗'}</span>
+          ${l.website_posted ? '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(218,165,32,0.15);color:#b8860b">🌐 Village Vista</span>' : ''}
         </div>
       </div>
       <div class="lc-body">
@@ -1496,6 +1656,8 @@ function openLoanModal(editId) {
     document.getElementById('f-nb-address').value = l.nb_address||'';
     document.getElementById('f-paperstac').checked = !!l.paperstac_posted;
     document.getElementById('f-sold').checked = !!l.sold;
+    document.getElementById('f-website-posted').checked = !!l.website_posted;
+    updateWebsitePostedLabel();
     document.getElementById('f-loan-servicer').value = l.loan_servicer||'';
     document.getElementById('f-loan-servicer-web').value = l.loan_servicer_web||'';
     document.getElementById('f-notes').value = l.notes||'';
@@ -1542,6 +1704,8 @@ function clearLoanForm() {
   document.getElementById('f-status').value = 'current';
   document.getElementById('f-dueday').value = (APP.settings?.default_due_day || 1).toString();
   document.getElementById('f-paperstac').checked = false;
+  document.getElementById('f-website-posted').checked = false;
+  updateWebsitePostedLabel();
 }
 
 function autoFillFromSeller() {
@@ -1661,6 +1825,7 @@ async function saveLoan() {
     nb_address: document.getElementById('f-nb-address').value.trim(),
     paperstac_posted: document.getElementById('f-paperstac').checked,
     sold: document.getElementById('f-sold').checked,
+    website_posted: document.getElementById('f-website-posted').checked,
     loan_servicer: document.getElementById('f-loan-servicer').value.trim(),
     loan_servicer_web: document.getElementById('f-loan-servicer-web').value.trim(),
     notes: document.getElementById('f-notes').value,
@@ -1909,7 +2074,10 @@ function openDetail(id) {
          <div><div class="dp-field-label">Purchase Price</div><div>${l.inv_price?fmt(l.inv_price):'—'}</div></div>
          <div><div class="dp-field-label">Yield</div><div>${l.rate}%</div></div>
        </div>
-       ${(l.nb_name||l.nb_business)?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-weight:700;margin-bottom:8px;color:var(--gold)">🤝 Note Buyer</div>
+       ${(l.nb_name||l.nb_business)?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+         <span style="font-weight:700;color:var(--gold)">🤝 Note Buyer</span>
+         <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:${l.website_posted?'rgba(197,167,95,0.2)':'rgba(255,255,255,0.05)'};color:${l.website_posted?'var(--gold)':'var(--text3)'}">${l.website_posted?'🌐 Posted':'Not Posted'}</span>
+       </div>
        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
          <div><div class="dp-field-label">Name</div><div>${l.nb_name||'—'}</div></div>
          <div><div class="dp-field-label">Business</div><div>${l.nb_business||'—'}</div></div>
@@ -1922,7 +2090,8 @@ function openDetail(id) {
        <div style="margin-top:10px">
          <button class="btn btn-sm" style="background:var(--gold);color:#000;font-weight:600" onclick="pushToHSF('${l.id}')">Push to HSF</button>
        </div>`:''}`
-    : `<div style="color:var(--text3);font-size:13px">Note retained — not assigned</div>`;
+    : `<div style="color:var(--text3);font-size:13px">Note retained — not assigned</div>
+       ${l.website_posted?'<div style="margin-top:8px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;display:inline-block;background:rgba(197,167,95,0.2);color:var(--gold)">🌐 Posted on Village Vista</div>':''}`;
   const sched = genSchedule(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), l.first_pay_date||l.orig_date, 24);
   document.getElementById('dp-amort-preview').innerHTML = `<table class="amort-table"><thead><tr><th>#</th><th>Date</th><th>Payment</th><th>Principal</th><th>Interest</th><th>Balance</th></tr></thead><tbody>${sched.map(r=>`<tr><td>${r.num}</td><td>${r.date}</td><td>${fmtD(r.payment)}</td><td class="p">${fmtD(r.principal)}</td><td class="i">${fmtD(r.interest)}</td><td class="b">${fmtD(r.balance)}</td></tr>`).join('')}</tbody></table>`;
   renderDpPayments(l);
@@ -2620,6 +2789,7 @@ async function renderChecklist() {
     { key:'websync',   icon:'🌐', label:'Photos Not Synced to Website', severity:'amber', type:'websync' },
     { key:'investor',  icon:'🏦', label:'No Investor Assigned',      severity:'amber', type:'field', field:'investor' },
     { key:'paperstac', icon:'📋', label:'Not Posted on Paperstac',   severity:'amber', type:'field', field:'paperstac_posted' },
+    { key:'villavista',icon:'🌐', label:'Not Posted on Village Vista',severity:'amber', type:'field', field:'website_posted' },
     { key:'parcel',    icon:'📍', label:'Missing Parcel Number',     severity:'gray',  type:'field', field:'parcel' },
     { key:'address',   icon:'🏠', label:'Missing Property Address',  severity:'gray',  type:'field', field:'address' },
     { key:'county',    icon:'🗺', label:'Missing County',            severity:'gray',  type:'field', field:'county' },
@@ -2661,7 +2831,7 @@ async function renderChecklist() {
   // Summary cards
   const totalLoans = loans.length;
   const completeLoans = loans.filter(l => results.every(r => !r.missing.includes(l))).length;
-  const summaryCards = results.filter(r => r.missing.length > 0).slice(0, 6).map(r =>
+  const summaryCards = results.filter(r => r.missing.length > 0).slice(0, 7).map(r =>
     `<div style="background:${sevBg[r.severity]};border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;min-width:160px">
       <div style="font-size:22px;font-weight:700;color:${sevColor[r.severity]}">${r.missing.length}</div>
       <div style="font-size:11px;color:var(--text3);margin-top:2px">${r.icon} ${r.label}</div>
