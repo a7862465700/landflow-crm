@@ -1162,7 +1162,7 @@ async function loadAllData() {
     sb.from('payments').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('investors').select('*').eq('user_id', uid),
     sb.from('invoices').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-    sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,sort_order,created_at').eq('user_id', uid),
+    sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,sort_order,created_at,enhanced,enhanced_url,photo_category').eq('user_id', uid),
     sb.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
     sb.from('late_fees').select('*').eq('user_id', uid),
   ]);
@@ -1175,12 +1175,12 @@ async function loadAllData() {
   // Fetch base64 data for stock photos only (small set, ~13 photos) per D-01, D-02
   const stockPhotoIds = vaultFiles.filter(f => f.cat_id === 'stock_photos' && !f.loan_id).map(f => f.id);
   if (stockPhotoIds.length) {
-    const { data: stockData, error: stockErr } = await sb.from('vault_files').select('id,data,sort_order').in('id', stockPhotoIds);
+    const { data: stockData, error: stockErr } = await sb.from('vault_files').select('id,data,sort_order,enhanced,enhanced_url,photo_category').in('id', stockPhotoIds);
     console.log('Stock photo fetch:', { ids: stockPhotoIds.length, data: stockData?.length, error: stockErr });
     if (stockErr) console.error('Stock photo fetch error:', stockErr);
     if (stockData && stockData.length) {
       const stockMap = Object.fromEntries(stockData.map(s => [s.id, s]));
-      vaultFiles = vaultFiles.map(f => stockMap[f.id] ? { ...f, data: stockMap[f.id].data, sort_order: stockMap[f.id].sort_order || 0 } : f);
+      vaultFiles = vaultFiles.map(f => stockMap[f.id] ? { ...f, data: stockMap[f.id].data, sort_order: stockMap[f.id].sort_order || 0, enhanced: stockMap[f.id].enhanced, enhanced_url: stockMap[f.id].enhanced_url, photo_category: stockMap[f.id].photo_category } : f);
       console.log('Stock photos merged, first has data:', !!vaultFiles.find(f => f.cat_id === 'stock_photos')?.data);
     }
   }
@@ -2608,17 +2608,23 @@ function renderVault() {
 
   // Global Stock Photos section
   const stockPhotos = vaultFiles.filter(f => f.cat_id === 'stock_photos' && !f.loan_id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  const enhancedCount = stockPhotos.filter(f => f.enhanced).length;
   const stockHtml = `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
         <div style="font-weight:700;font-size:15px;color:var(--gold)">🏞 Global Stock Photos</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:2px">Area photos included in all property video packages (${stockPhotos.length} photo${stockPhotos.length!==1?'s':''})</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">Area photos included in all property video packages (${stockPhotos.length} photo${stockPhotos.length!==1?'s':''}) · <span style="color:${enhancedCount===stockPhotos.length?'var(--green)':'var(--gold)'}">${enhancedCount} of ${stockPhotos.length} enhanced</span></div>
       </div>
-      <button class="btn btn-gold btn-sm" onclick="uploadGlobalStockPhoto()">＋ Add Photos</button>
+      <div style="display:flex;gap:6px">
+        ${stockPhotos.length && enhancedCount < stockPhotos.length ? `<button class="btn btn-sm" id="enhanceAllBtn" onclick="enhanceAllStockPhotos()" style="background:var(--s3);border:1px solid var(--gold);color:var(--gold)">🔄 Enhance All</button>` : ''}
+        <button class="btn btn-gold btn-sm" onclick="uploadGlobalStockPhoto()">＋ Add Photos</button>
+      </div>
     </div>
     ${stockPhotos.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px">${stockPhotos.map(f => `
-      <div draggable="true" data-file-id="${f.id}" ondragstart="stockDragStart(event,'${f.id}')" ondragover="stockDragOver(event)" ondrop="stockDrop(event,'${f.id}')" ondragend="this.style.opacity='1'" style="position:relative;width:80px;height:60px;border-radius:4px;overflow:hidden;border:1px solid var(--border);cursor:grab">
+      <div draggable="true" data-file-id="${f.id}" ondragstart="stockDragStart(event,'${f.id}')" ondragover="stockDragOver(event)" ondrop="stockDrop(event,'${f.id}')" ondragend="this.style.opacity='1'" style="position:relative;width:80px;height:60px;border-radius:4px;overflow:hidden;border:${f.enhanced?'2px solid var(--green)':'1px solid var(--border)'};cursor:grab">
         <img src="${f.data}" style="width:100%;height:100%;object-fit:cover" alt="${f.name}">
+        ${f.photo_category?`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.7);color:white;font-size:7px;text-align:center;padding:1px;text-transform:uppercase;letter-spacing:0.3px">${f.photo_category.replace(/_/g,' ')}</div>`:''}
+        <button onclick="event.stopPropagation();previewStockPhoto('${f.id}')" style="position:absolute;top:2px;left:2px;background:rgba(0,0,0,0.7);color:white;border:none;width:18px;height:18px;font-size:10px;cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center" title="Preview">👁</button>
         <button onclick="deleteStockPhoto('${f.id}')" style="position:absolute;top:2px;right:2px;background:rgba(200,50,50,0.85);color:white;border:none;width:18px;height:18px;font-size:10px;cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center">✕</button>
       </div>`).join('')}</div>` : `<div style="color:var(--text3);font-size:12px">No stock photos yet — upload area photos that will be included with every property listing</div>`}
   </div>`;
@@ -2651,6 +2657,123 @@ function renderVault() {
       </div>
     </div>`;
   }).join('');
+}
+
+// ── Stock Photo Preview Modal ──────────────────────────────────
+function previewStockPhoto(fileId) {
+  const file = vaultFiles.find(f => f.id === fileId);
+  if (!file) return;
+  const catLabel = file.photo_category ? file.photo_category.replace(/_/g, ' ') : 'uncategorized';
+  const statusBadge = file.enhanced
+    ? '<span style="background:var(--green);color:white;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">✓ Enhanced</span>'
+    : '<span style="background:var(--gold);color:var(--bg);padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">⏳ Pending</span>';
+
+  let existing = document.getElementById('stockPreviewOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'stockPreviewOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = `
+    <div style="background:var(--s1);border:1px solid var(--border);border-radius:14px;max-width:1100px;width:100%;max-height:90vh;overflow-y:auto">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-family:'DM Serif Display',serif;font-size:17px">Stock Photo Preview</span>
+          <span style="background:var(--s3);border:1px solid var(--border);padding:2px 10px;border-radius:12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gold)">${catLabel}</span>
+          ${statusBadge}
+        </div>
+        <button onclick="this.closest('#stockPreviewOverlay').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:20px;padding:4px">✕</button>
+      </div>
+      <div style="padding:20px;display:grid;grid-template-columns:${file.enhanced && file.enhanced_url ? '1fr 1fr' : '1fr'};gap:16px">
+        <div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:8px;font-weight:600">Original</div>
+          <img src="${file.data}" style="width:100%;border-radius:8px;border:1px solid var(--border)" alt="Original">
+        </div>
+        ${file.enhanced && file.enhanced_url ? `
+        <div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px;font-weight:600">Enhanced</div>
+          <img src="${file.enhanced_url}" style="width:100%;border-radius:8px;border:2px solid var(--green)" alt="Enhanced">
+        </div>` : `
+        <div style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;padding:40px;color:var(--text3)">
+          ${file.enhanced_url ? '' : '<div style="font-size:32px">⏳</div><div style="font-size:13px">Enhancement pending</div><div style="font-size:11px">Use "Enhance All" to process this photo</div>'}
+        </div>`}
+      </div>
+      <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:11px;color:var(--text3)">${file.name}</div>
+        ${!file.enhanced ? `<button class="btn btn-gold btn-sm" onclick="enhanceSinglePhoto('${file.id}')">🔄 Enhance This Photo</button>` : ''}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function enhanceSinglePhoto(fileId) {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Enhancing...';
+  try {
+    const res = await fetch(VILLAGE_VISTA_API + '/api/auto-enhance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileId }),
+    });
+    const result = await res.json();
+    if (result.success) {
+      const file = vaultFiles.find(f => f.id === fileId);
+      if (file) {
+        file.enhanced = true;
+        file.enhanced_url = result.enhancedUrl;
+        file.photo_category = result.category;
+      }
+      showToast('✅ Photo enhanced: ' + (result.category || '').replace(/_/g, ' '), 'success');
+      document.getElementById('stockPreviewOverlay')?.remove();
+      previewStockPhoto(fileId);
+      renderVault();
+    } else {
+      showToast('❌ Enhancement failed: ' + (result.error || 'Unknown error'), 'error');
+      btn.disabled = false;
+      btn.textContent = '🔄 Enhance This Photo';
+    }
+  } catch (err) {
+    showToast('❌ Enhancement failed: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '🔄 Enhance This Photo';
+  }
+}
+
+async function enhanceAllStockPhotos() {
+  const btn = document.getElementById('enhanceAllBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Enhancing...'; }
+  showToast('🔄 Starting batch enhancement — this may take a few minutes...', 'info');
+  try {
+    const res = await fetch(VILLAGE_VISTA_API + '/api/auto-enhance-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const result = await res.json();
+    if (result.success) {
+      // Update local state from results
+      for (const r of (result.results || [])) {
+        if (r.status === 'enhanced') {
+          const file = vaultFiles.find(f => f.id === r.id);
+          if (file) {
+            file.enhanced = true;
+            file.enhanced_url = r.enhancedUrl;
+            file.photo_category = r.category;
+          }
+        }
+      }
+      showToast(`✅ Batch complete: ${result.enhanced} enhanced, ${result.failed} failed`, 'success');
+      renderVault();
+    } else {
+      showToast('❌ Batch failed: ' + (result.error || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Batch failed: ' + err.message, 'error');
+  }
+  if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Enhance All'; }
 }
 
 // ============================================================
