@@ -7,8 +7,10 @@ This milestone fixes the broken photo-to-video pipeline end-to-end. Starting fro
 ## Phases
 
 **Phase Numbering:**
-- Integer phases (1, 2, 3, 4): Planned milestone work
-- Decimal phases (e.g., 2.1): Urgent insertions (marked with INSERTED)
+- Integer phases (1, 2, 3): Planned milestone work
+- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+
+Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: CRM Photo Management** - Fix stock and parcel photo previews and enable drag-reorder in the vault (completed 2026-04-01)
 - [ ] **Phase 2: Photo Sync Engine** - Assemble 7-photo formula and reliably sync to website storage
@@ -78,7 +80,7 @@ Plans:
 
 ---
 
-## HSF Platform: Role Foundation
+## HSF Platform: Role Foundation & CRM Integration
 
 ### Phase 01: Role Foundation (borrower-portal)
 **Goal**: RBAC infrastructure established — user_roles table, JWT hook, middleware, route groups — so admin, note_buyer, and borrower each access only their own area
@@ -112,16 +114,85 @@ Plans:
 - [ ] 05-01-PLAN.md -- SQL migration (hsf_loans, hsf_sync_errors, pg_net trigger) + /api/crm-sync route
 - [ ] 05-02-PLAN.md -- CRM "Push to HSF" button + admin sync status column
 
+---
+
+## HSF Platform: Tax Reporting & 1098s (v1.1)
+
+**Milestone Goal:** Borrowers can access their annual 1098 tax form, and admin has an accountant-ready report for IRS filing.
+
+### Phase 06: Data Foundation
+**Goal**: The system can calculate annual interest per loan from actual payments, identify 1098-eligible loans, and store borrower TINs
+**Depends on**: HSF Phase 05 (loan records must exist in HSF)
+**Requirements**: DATA-01, DATA-02, DATA-03, DATA-04
+**Success Criteria** (what must be TRUE):
+  1. Admin can enter and save a borrower's TIN (SSN or EIN) on the loan record in the admin portal
+  2. For any loan and tax year, the system produces a total of interest received calculated from actual payment ledger entries (not amortization)
+  3. Loans with $600 or more in interest received for the year are marked as 1098-eligible; loans below that threshold are not
+  4. A paid-off loan that received $600+ interest during the tax year appears in the eligible set alongside active loans
+**Plans**: TBD
+
+Plans:
+- [ ] 06-01: TBD
+
+### Phase 07: 1098 PDF Generation
+**Goal**: The system generates a compliant IRS Form 1098 (Copy B) PDF for each eligible loan, with correct TIN masking, lender info, and pro-rated interest for mid-year originations
+**Depends on**: Phase 06 (requires TIN and interest calculation)
+**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04
+**Success Criteria** (what must be TRUE):
+  1. For each eligible loan, the system produces a downloadable PDF that matches the IRS Form 1098 (Copy B) layout
+  2. The PDF displays the borrower's SSN masked to the last 4 digits, or EIN shown in full
+  3. The PDF shows the lender's name, address, and EIN pulled from the LENDER_EIN environment variable — not hardcoded
+  4. For a loan originated mid-year, Box 1 shows only the interest received after the origination date, and Box 2 shows the original principal balance at origination
+**Plans**: TBD
+**UI hint**: yes
+
+Plans:
+- [ ] 07-01: TBD
+
+### Phase 08: Portal & Admin Reporting
+**Goal**: Borrowers can download their 1098 from the portal, and admin has an accountant-ready summary report with pre-flight warnings before generation
+**Depends on**: Phase 07 (PDFs must be generated before they can be viewed or reported)
+**Requirements**: PORT-01, PORT-02, PORT-03, PORT-04
+**Success Criteria** (what must be TRUE):
+  1. A borrower logs into their portal and can view and download their 1098 PDF for the current tax year
+  2. Admin opens the 1098 report page, selects a tax year, and sees a summary table of all interest received per borrower
+  3. Before generating 1098s, admin sees a warning list of borrowers with missing TINs so no forms are generated with blank tax IDs
+  4. The admin report shows a visible indicator when 10 or more forms are due, alerting the admin to the mandatory e-file threshold
+**Plans**: TBD
+**UI hint**: yes
+
+Plans:
+- [ ] 08-01: TBD
+
+### Phase 09: Notifications
+**Goal**: Qualifying borrowers receive an email in January notifying them their 1098 is available, triggered by admin (no unsupervised auto-send)
+**Depends on**: Phase 08 (portal link must work before email is sent)
+**Requirements**: NOTIF-01, NOTIF-02
+**Success Criteria** (what must be TRUE):
+  1. Admin opens the notifications panel, reviews the list of qualifying borrowers, and clicks "Send 1098 Emails" — each borrower receives an email with a portal link (no PDF attached)
+  2. The email send cannot run without admin action — there is no automatic unsupervised batch send
+  3. Borrowers who receive the email can click the portal link and land directly on their 1098 download page
+**Plans**: TBD
+
+Plans:
+- [ ] 09-01: TBD
+
+---
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 (v1.0), then HSF 01 -> HSF 05 -> HSF 06 -> HSF 07 -> HSF 08 -> HSF 09
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. CRM Photo Management | 2/2 | Complete   | 2026-04-03 |
-| 2. Photo Sync Engine | 0/3 | Planned | - |
-| 3. Property Gallery | 0/0 | Not started | - |
-| 4. Video Pipeline | 0/0 | Not started | - |
-| HSF 01. Role Foundation | 0/2 | Planned | - |
-| HSF 05. CRM Integration | 0/2 | Planned | - |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. CRM Photo Management | v1.0 | 2/2 | Complete | 2026-04-03 |
+| 2. Photo Sync Engine | v1.0 | 0/3 | Planned | - |
+| 3. Property Gallery | v1.0 | 0/0 | Not started | - |
+| 4. Video Pipeline | v1.0 | 0/0 | Not started | - |
+| HSF 01. Role Foundation | HSF v1.0 | 0/2 | Planned | - |
+| HSF 05. CRM Integration | HSF v1.0 | 0/2 | Planned | - |
+| HSF 06. Data Foundation | v1.1 | 0/0 | Not started | - |
+| HSF 07. 1098 PDF Generation | v1.1 | 0/0 | Not started | - |
+| HSF 08. Portal & Admin Reporting | v1.1 | 0/0 | Not started | - |
+| HSF 09. Notifications | v1.1 | 0/0 | Not started | - |

@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: verifying
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-04-03T15:36:28.455Z"
-last_activity: 2026-04-03
+milestone: v1.1
+milestone_name: Tax Reporting & 1098s
+status: roadmap_created
+stopped_at: null
+last_updated: "2026-04-08"
+last_activity: 2026-04-08
 progress:
-  total_phases: 5
-  completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
   percent: 0
 ---
 
@@ -18,19 +18,28 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-01)
+See: .planning/PROJECT.md (updated 2026-04-08)
 
-**Core value:** When parcel photos are uploaded in the CRM, they appear on the correct property listing with a video -- without manual intervention beyond admin video approval.
-**Current focus:** Phase 02 — photo-sync-engine
+**Core value:** Borrowers can access their annual 1098 tax form, and admin has an accountant-ready report for IRS filing.
+**Current focus:** Roadmap created for milestone v1.1 — ready to plan Phase 06
 
 ## Current Position
 
-Phase: 02 (photo-sync-engine) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-04-03
+Phase: HSF Phase 06 (next to plan)
+Plan: —
+Status: Roadmap created, awaiting phase planning
+Last activity: 2026-04-08 — Roadmap created for v1.1 Tax Reporting & 1098s
 
 Progress: [░░░░░░░░░░] 0%
+
+## v1.1 Phase Summary
+
+| Phase | Goal | Status |
+|-------|------|--------|
+| HSF 06: Data Foundation | TIN field, interest calc, eligibility rules | Not started |
+| HSF 07: 1098 PDF Generation | Generate compliant Form 1098 PDFs | Not started |
+| HSF 08: Portal & Admin Reporting | Borrower download + admin accountant report | Not started |
+| HSF 09: Notifications | Admin-triggered January batch email | Not started |
 
 ## Performance Metrics
 
@@ -77,6 +86,13 @@ Recent decisions affecting current work:
 - [Phase 02-photo-sync-engine]: Storage path always .jpg since enhanceBuffer outputs JPEG
 - [Phase 01]: Use getClaims() as primary JWT role reader in middleware (with decodeJwt fallback) — cleaner and signature-validating vs raw cookie decode
 - [Phase 01]: Root page.tsx redirects to /login — middleware handles role-based portal routing for authenticated users
+- [v1.1 Roadmap]: Interest calculated from payment ledger (not amortization schedule) — DATA-02
+- [v1.1 Roadmap]: Borrower TIN supports both SSN (masked to last 4) and EIN (full) — DOC-02
+- [v1.1 Roadmap]: Lender EIN stored as LENDER_EIN env var — DOC-03
+- [v1.1 Roadmap]: Portal link only in email, no PDF attachment (PII risk) — NOTIF-01
+- [v1.1 Roadmap]: Admin must trigger batch email; no unsupervised auto-send — NOTIF-02
+- [v1.1 Roadmap]: January cron mirrors existing payment-reminders pattern
+- [v1.1 Roadmap]: PDF generation uses @react-pdf/renderer (server-side)
 
 ### Pending Todos
 
@@ -84,12 +100,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Stock photo previews currently broken in CRM (filenames visible, no images)
-- RLS on vault_files blocks cross-repo access without service role key
-- Two-repo changes required: CRM (vanilla JS) and website (Next.js/TypeScript)
+- Forte ACH sandbox credentials still pending (HSF v1.0 concern, not blocking v1.1)
+- HSF Phase 05 (CRM Integration) must be complete before v1.1 phases can execute
 
 ## Session Continuity
 
-Last session: 2026-04-03T15:36:28.451Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-04-08
+Stopped at: Roadmap created for v1.1
 Resume file: None

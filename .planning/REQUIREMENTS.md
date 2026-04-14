@@ -42,9 +42,46 @@ Requirements for milestone v1.0: Photo-to-Video Pipeline Fix. Each maps to roadm
 - [ ] **CRM-04**: Admin can see sync status (last synced, error state) for each loan in the admin loan list
 - [ ] **CRM-05**: Running the same sync twice for the same parcel does not create duplicate loans
 
-## v2 Requirements
+## v1.1 Requirements
+
+Requirements for milestone v1.1: Tax Reporting & 1098s (HSF). Each maps to roadmap phases.
+
+### Data Foundation
+
+- [ ] **DATA-01**: Admin can enter a borrower's TIN (SSN or EIN) on the loan record
+- [ ] **DATA-02**: System calculates annual interest received per loan from the payment ledger (not amortization schedule)
+- [ ] **DATA-03**: Loans with $600+ interest received in a tax year are flagged as 1098-eligible (per loan, not per borrower)
+- [ ] **DATA-04**: Paid-off loans that received $600+ interest during the tax year are included in 1098 generation
+
+### Documents
+
+- [ ] **DOC-01**: System generates an IRS Form 1098 (Copy B) PDF for each eligible loan
+- [ ] **DOC-02**: 1098 PDF displays borrower TIN (SSN masked to last 4, EIN shown in full)
+- [ ] **DOC-03**: 1098 PDF includes lender info (HSF name, address, EIN from env var)
+- [ ] **DOC-04**: Interest is pro-rated for loans originated mid-year (Box 2 = original principal at origination)
+
+### Portal & Reporting
+
+- [ ] **PORT-01**: Borrower can view and download their 1098 PDF from the portal
+- [ ] **PORT-02**: Admin can view an accountant summary report of all interest received per borrower for a tax year
+- [ ] **PORT-03**: Admin sees pre-flight warnings for borrowers missing TIN before 1098 generation
+- [ ] **PORT-04**: Admin report shows e-file threshold indicator (10+ forms = mandatory e-file)
+
+### Notifications
+
+- [ ] **NOTIF-01**: Automated January email notifies qualifying borrowers their 1098 is available (portal link, no PDF attachment)
+- [ ] **NOTIF-02**: Admin triggers the batch email send (no unsupervised auto-send)
+
+## v1.2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
+
+### Tax Reporting
+
+- **DOC-05**: CORRECTED 1098 checkbox and re-generation workflow
+- **PORT-05**: Note buyer can generate 1098s for their own notes
+- **DOC-06**: Box 8 APN fallback for vacant land parcels
+- **DOC-07**: IRS e-filing via IRIS
 
 ### CRM Photos
 
@@ -64,8 +101,12 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
+| IRS e-filing (FIRE/IRIS) | Accountant handles manual filing; deferred to v1.2 |
+| Note buyer 1098 generation | Deferred to v1.2 |
+| CORRECTED 1098 re-generation | Deferred to v1.2; PDF template will include checkbox stub |
+| Box 8 APN fallback for vacant land | Deferred to v1.2 |
 | Auto-approving videos | Admin approval is intentional for quality control |
-| Migrating vault base64 to Supabase Storage | Works currently, just inefficient; defer to future milestone |
+| Migrating vault base64 to Supabase Storage | Works currently, just inefficient; defer |
 | LandID integration with CRM | Admin-only workflow is fine for now |
 | Mobile app | Web-first |
 | Two-way sync (HSF back to CRM) | One-way push is sufficient for now |
@@ -74,6 +115,8 @@ Explicitly excluded. Documented to prevent scope creep.
 ## Traceability
 
 Which phases cover which requirements. Updated during roadmap creation.
+
+### v1.0 (Complete)
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -98,11 +141,30 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CRM-04 | HSF Phase 05 | Pending |
 | CRM-05 | HSF Phase 05 | Pending |
 
+### v1.1 (Current)
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DATA-01 | HSF Phase 06 | Pending |
+| DATA-02 | HSF Phase 06 | Pending |
+| DATA-03 | HSF Phase 06 | Pending |
+| DATA-04 | HSF Phase 06 | Pending |
+| DOC-01 | HSF Phase 07 | Pending |
+| DOC-02 | HSF Phase 07 | Pending |
+| DOC-03 | HSF Phase 07 | Pending |
+| DOC-04 | HSF Phase 07 | Pending |
+| PORT-01 | HSF Phase 08 | Pending |
+| PORT-02 | HSF Phase 08 | Pending |
+| PORT-03 | HSF Phase 08 | Pending |
+| PORT-04 | HSF Phase 08 | Pending |
+| NOTIF-01 | HSF Phase 09 | Pending |
+| NOTIF-02 | HSF Phase 09 | Pending |
+
 **Coverage:**
-- v1.0 requirements: 20 total
-- Mapped to phases: 20
+- v1.1 requirements: 14 total
+- Mapped to phases: 14
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-01*
-*Last updated: 2026-04-04 after Phase 05 planning*
+*Last updated: 2026-04-08 after milestone v1.1 roadmap creation*

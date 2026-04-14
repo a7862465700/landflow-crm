@@ -12,3 +12,6 @@ tech-spec.md
 
 # Large files
 *.mp4
+
+# Claude worktrees
+.claude/worktrees/
