@@ -1,4 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="4" fill="#2C4A35"/>
-  <text x="16" y="21" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#C9A055">HSL</text>
+  <rect width="32" height="32" rx="6" fill="#1a1510"/>
+  <text x="16" y="22" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-style="italic" font-weight="bold" fill="#c8a04a">LF</text>
 </svg>
