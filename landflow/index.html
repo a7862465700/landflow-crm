@@ -1385,7 +1385,7 @@ function calcRealBalance(loanId) {
 function calcBalance(p,r,t,paid){if(!p||!r||!t)return p||0;const mr=r/100/12,pmt=calcPayment(p,r,t);let bal=p;for(let i=0;i<Math.min(paid,t*12);i++){const int=bal*mr;bal-=(pmt-int);if(bal<0)bal=0;}return bal;}
 
 function genSchedule(p,r,t,startDate,limit){const mr=r/100/12,n=t*12,pmt=calcPayment(p,r,t);let bal=p;const rows=[],start=startDate?new Date(startDate):new Date();const max=limit||n;for(let i=0;i<max&&bal>0.01;i++){const int=bal*mr,prin=pmt-int;bal=Math.max(0,bal-prin);const d=new Date(start);d.setMonth(d.getMonth()+i+1);rows.push({num:i+1,date:d.toLocaleDateString('en-US',{month:'short',year:'numeric'}),payment:pmt,principal:prin,interest:int,balance:bal});}return rows;}
-function parseLocalDate(s){const[y,m,d]=(s||'').split(/[-T]/);return new Date(Number(y),Number(m)-1,Number(d));}
+function parseLocalDate(s){if(s instanceof Date)return s;const[y,m,d]=(s||'').split(/[-T]/);return new Date(Number(y),Number(m)-1,Number(d));}
 function paysMade(origDate){if(!origDate)return 0;const start=parseLocalDate(origDate),now=new Date();return Math.max(0,(now.getFullYear()-start.getFullYear())*12+now.getMonth()-start.getMonth());}
 function matDate(orig,years){if(!orig||!years)return'—';const d=parseLocalDate(orig);d.setFullYear(d.getFullYear()+parseInt(years));return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
 function balloonDate(orig,bYears){if(!orig||!bYears)return null;const d=parseLocalDate(orig);d.setFullYear(d.getFullYear()+parseInt(bYears));return d;}
