@@ -1202,10 +1202,21 @@ async function resetPassword() {
 // ============================================================
 // DATA — Supabase CRUD
 // ============================================================
+// Loads the cross-app website-properties lookup used for the Village Vista drift badge.
+// Isolated from loadAllData so a slow/hung query on this table cannot block app boot.
+async function loadWebsiteProperties() {
+  try {
+    const { data, error } = await sb.from('properties').select('parcel_number, status');
+    if (error) { console.warn('properties query failed:', error.message); return; }
+    websiteProperties = Object.fromEntries((data || []).map(r => [r.parcel_number, r.status]));
+    if (typeof renderLoans === 'function') renderLoans();
+  } catch (e) { console.warn('properties query threw:', e); }
+}
+
 async function loadAllData() {
   if (!currentUser) return;
   const uid = currentUser.id;
-  const [l, p, inv, ivs, vf, us, lf, props] = await Promise.all([
+  const [l, p, inv, ivs, vf, us, lf] = await Promise.all([
     sb.from('loans').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     sb.from('payments').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('investors').select('*').eq('user_id', uid),
@@ -1213,15 +1224,14 @@ async function loadAllData() {
     sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,sort_order,created_at,enhanced,enhanced_url,photo_category').eq('user_id', uid),
     sb.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
     sb.from('late_fees').select('*').eq('user_id', uid),
-    sb.from('properties').select('parcel_number, status'),
   ]);
   loans = l.data || [];
   payments = p.data || [];
   investors = inv.data || [];
   invoices = ivs.data || [];
   vaultFiles = vf.data || [];
-  // Lookup: parcel_number -> status on the Village Vista website (available / unlisted / sold)
-  websiteProperties = Object.fromEntries((props.data || []).map(r => [r.parcel_number, r.status]));
+  // websiteProperties (cross-app drift badge) loads in the background — must NOT block app boot
+  loadWebsiteProperties();
 
   // Fetch base64 data for stock photos only (small set, ~13 photos) per D-01, D-02
   const stockPhotoIds = vaultFiles.filter(f => f.cat_id === 'stock_photos' && !f.loan_id).map(f => f.id);
