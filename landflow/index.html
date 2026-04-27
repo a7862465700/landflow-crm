@@ -662,6 +662,12 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="form-group"><label class="form-label">Loan Servicer</label><input class="form-input" id="f-loan-servicer" placeholder="ABC Servicing Co."></div>
         <div class="form-group"><label class="form-label">Website</label><input class="form-input" id="f-loan-servicer-web" type="url" placeholder="https://servicer.com"></div>
       </div>
+      <div style="margin-top:12px;padding:12px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="font-size:12px;color:var(--text3);flex:1;min-width:200px">
+          Send this note buyer a Hickory Street Finance portal invite. They'll sign in with the email above — the one on their PaperStack assignment letter.
+        </div>
+        <button type="button" class="btn btn-sm" style="background:var(--gold);color:#000;font-weight:600;white-space:nowrap" onclick="inviteNoteBuyerToHSF()">✉️ Invite to HSF</button>
+      </div>
       <div class="form-section" style="margin-top:16px">📝 Notes</div>
       <div class="form-group form-full"><textarea class="form-input" id="f-notes" rows="2" placeholder="Internal notes..."></textarea></div>
     </div>
@@ -891,6 +897,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <button class="btn btn-gold btn-sm" onclick="quickInvoice()">🧾 Invoice</button>
       <button class="btn btn-ghost btn-sm" onclick="generateMonthlyStatement(currentLoanId)">📄 Statement</button>
       <button class="btn btn-ghost btn-sm" onclick="generateAccountStatement(currentLoanId)">📋 Full History</button>
+      <button class="btn btn-ghost btn-sm" onclick="quickGenerateAssignmentOfDOT()" title="Assignment of DOT — Paperstac">✍️ Assign DOT</button>
       <button class="btn btn-danger btn-sm" onclick="deleteLoan()">🗑</button>
     </div>
     <div class="dp-stats">
@@ -1007,6 +1014,47 @@ async function pushToHSF(loanId) {
   }
 }
 
+// Invite a note buyer / lender to the Hickory Street Finance portal.
+// Pulls email + name from the currently-open loan modal fields.
+async function inviteNoteBuyerToHSF() {
+  const emailEl = document.getElementById('f-nb-email');
+  const nameEl = document.getElementById('f-nb-name');
+  const businessEl = document.getElementById('f-nb-business');
+  const email = (emailEl && emailEl.value || '').trim();
+  const name = (nameEl && nameEl.value || '').trim();
+  const businessName = (businessEl && businessEl.value || '').trim();
+
+  if (!email || !email.includes('@')) {
+    showToast('Enter a valid Note Buyer email first', 'error');
+    if (emailEl) emailEl.focus();
+    return;
+  }
+
+  if (!confirm(`Send Hickory Street Finance portal invite to ${email}?\n\nThey'll be asked to sign in with this exact email — the one on their PaperStack assignment letter.`)) {
+    return;
+  }
+
+  showToast('Sending invite…', 'info');
+  try {
+    const res = await fetch(HSF_API + '/api/admin/invite-lender', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + HSF_SYNC_SECRET
+      },
+      body: JSON.stringify({ email, name, businessName })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('Invite failed: ' + (data.error || 'Unknown error'), 'error');
+    } else {
+      showToast(data.message || 'Invite sent', 'success');
+    }
+  } catch (e) {
+    showToast('Invite error: ' + e.message, 'error');
+  }
+}
+
 // Sync sold/posted status to the website properties table
 async function syncSoldStatus(loan) {
   if (!loan || !loan.parcel) return;
@@ -1064,7 +1112,7 @@ function updateWebsitePostedLabel() {
 // ============================================================
 // STATE
 // ============================================================
-let loans = [], payments = [], investors = [], invoices = [], vaultFiles = [], lateFees = [];
+let loans = [], payments = [], investors = [], invoices = [], vaultFiles = [], lateFees = [], websiteProperties = {};
 let currentLoanId = null, editingLoanId = null, toastTimer, currentUser = null;
 let APP = { settings: null };
 
@@ -1157,7 +1205,7 @@ async function resetPassword() {
 async function loadAllData() {
   if (!currentUser) return;
   const uid = currentUser.id;
-  const [l, p, inv, ivs, vf, us, lf] = await Promise.all([
+  const [l, p, inv, ivs, vf, us, lf, props] = await Promise.all([
     sb.from('loans').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     sb.from('payments').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('investors').select('*').eq('user_id', uid),
@@ -1165,12 +1213,15 @@ async function loadAllData() {
     sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,sort_order,created_at,enhanced,enhanced_url,photo_category').eq('user_id', uid),
     sb.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
     sb.from('late_fees').select('*').eq('user_id', uid),
+    sb.from('properties').select('parcel_number, status'),
   ]);
   loans = l.data || [];
   payments = p.data || [];
   investors = inv.data || [];
   invoices = ivs.data || [];
   vaultFiles = vf.data || [];
+  // Lookup: parcel_number -> status on the Village Vista website (available / unlisted / sold)
+  websiteProperties = Object.fromEntries((props.data || []).map(r => [r.parcel_number, r.status]));
 
   // Fetch base64 data for stock photos only (small set, ~13 photos) per D-01, D-02
   const stockPhotoIds = vaultFiles.filter(f => f.cat_id === 'stock_photos' && !f.loan_id).map(f => f.id);
@@ -1475,7 +1526,23 @@ function renderLoans() {
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
           ${getBadge(l)}
           <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${l.paperstac_posted ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'};color:${l.paperstac_posted ? '#22c55e' : '#ef4444'}">${l.paperstac_posted ? 'Paperstac ✓' : 'Paperstac ✗'}</span>
-          ${l.website_posted ? '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(218,165,32,0.15);color:#b8860b">🌐 Village Vista</span>' : ''}
+          ${(() => {
+            const siteStatus = l.parcel ? websiteProperties[l.parcel] : undefined;
+            const liveOnSite = siteStatus === 'available';
+            const known = siteStatus !== undefined;
+            const drift = known && liveOnSite !== !!l.website_posted;
+            const tip = !known
+              ? 'Parcel not found in hotspringsland.com properties table'
+              : liveOnSite
+                ? 'Listed on hotspringsland.com' + (drift ? ' — but local toggle is OFF (drift)' : '')
+                : 'Not listed on hotspringsland.com' + (drift ? ' — but local toggle is ON (drift)' : '');
+            const bg = drift ? 'rgba(234,88,12,0.18)' : (liveOnSite ? 'rgba(218,165,32,0.18)' : 'rgba(148,163,184,0.15)');
+            const fg = drift ? '#ea580c' : (liveOnSite ? '#b8860b' : '#94a3b8');
+            const label = drift
+              ? '🌐 Village Vista ⚠'
+              : (liveOnSite ? '🌐 Village Vista ✓' : '🌐 Village Vista ✗');
+            return `<span title="${tip}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${bg};color:${fg}">${label}</span>`;
+          })()}
         </div>
       </div>
       <div class="lc-body">
@@ -3754,6 +3821,75 @@ async function executeTemplateGenerate() {
   } catch (e) {
     console.error('Template generation error:', e);
     showToast('Error: ' + (e.message || 'Template generation failed'), 'error');
+  }
+}
+
+async function quickGenerateAssignmentOfDOT() {
+  const loanId = currentLoanId || editingLoanId;
+  if (!loanId) return showToast('No loan selected', 'error');
+  const loan = loans.find(l => l.id === loanId);
+  if (!loan) return showToast('Loan not found', 'error');
+  // Find the Assignment of DOT template by name (matches "assignment-of-dot-PAPERSTAC...")
+  const template = vaultFiles.find(f =>
+    f.cat_id === 'template' && /assignment.*dot/i.test(f.name)
+  );
+  if (!template) return showToast('No Assignment of DOT template found. Upload one under Templates first.', 'error');
+  showToast('Generating Assignment of DOT…');
+  try {
+    if (!template.data) {
+      const { data: full, error: fetchErr } = await sb.from('vault_files').select('data').eq('id', template.id).single();
+      if (fetchErr || !full || !full.data) { showToast('Could not load template file data', 'error'); return; }
+      template.data = full.data;
+    }
+    const bytes = await getTemplateBytes(template);
+    const zip = new PizZip(bytes.buffer);
+    const doc = new window.docxtemplater(zip, {
+      paragraphLoop: true, linebreaks: true,
+      nullGetter: () => '',
+      errorLogging: false,
+    });
+    const data = buildMergeData(loan);
+    try { doc.render(data); } catch (renderErr) {
+      if (renderErr.properties && renderErr.properties.errors) {
+        const details = renderErr.properties.errors.map(e =>
+          `• ${e.properties?.explanation || e.message || 'Unknown field error'}`
+        ).join('\n');
+        showToast('Template error — check field names:\n' + details, 'error');
+        return;
+      }
+      throw renderErr;
+    }
+    const output = doc.getZip().generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const borrowerPart = (loan.borrower || 'document').replace(/\s+/g, '_');
+    const parcelPart = (loan.parcel || '').replace(/\s+/g, '_');
+    const name = 'Assignment_of_DOT_' + borrowerPart + (parcelPart ? '_' + parcelPart : '') + '.docx';
+    const blobUrl = URL.createObjectURL(output);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = name;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 500);
+    showToast('Assignment of DOT downloaded!', 'success');
+    // Save to CRM in background (non-blocking)
+    const saveCopy = async () => {
+      try {
+        const storagePath = `${currentUser.id}/generated/${Date.now()}_${name}`;
+        await sb.storage.from('vault-files').upload(storagePath, output, { upsert: true, contentType: output.type });
+        const saved = await dbSaveVaultFile({
+          loan_id: loan.id, cat_id: 'generated',
+          name: name, size: output.size, type: output.type,
+          data: 'storage:' + storagePath, book_page: '', notes: 'Generated from template: ' + template.name,
+        });
+        if (saved) { vaultFiles.push(saved); renderFileVault(loan.id); renderDpDocs(loan); renderVault(); }
+        showToast('Saved to loan files!', 'success');
+      } catch (uploadErr) { console.error('Auto-save to CRM failed:', uploadErr); }
+    };
+    saveCopy();
+  } catch (e) {
+    console.error('Quick generate error:', e);
+    showToast('Error: ' + (e.message || 'Generation failed'), 'error');
   }
 }
 
