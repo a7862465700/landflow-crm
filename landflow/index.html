@@ -368,6 +368,9 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="nav-item" onclick="nav('investors',this)" data-title="Investors">
         <span class="nav-icon">💼</span>Investors
       </div>
+      <div class="nav-item" onclick="nav('assigned',this)" data-title="Assigned Notes">
+        <span class="nav-icon">🤝</span>Assigned Notes
+      </div>
     </div>
     <div class="nav-section">
       <div class="nav-label">Finance</div>
@@ -474,6 +477,15 @@ textarea.form-input{resize:vertical;min-height:80px}
           <button class="btn btn-ghost btn-sm" onclick="openInvestorModal()">＋ Add Investor</button>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px" id="investorsGrid"></div>
+      </div>
+
+      <!-- ASSIGNED NOTES -->
+      <div class="view" id="view-assigned">
+        <div class="section-header"><div class="section-title">Assigned Notes</div></div>
+        <div class="search-bar">
+          <input class="search-input" id="assignedSearch" placeholder="🔍  Search by note buyer, parcel, borrower..." oninput="renderAssignedNotes()">
+        </div>
+        <div id="assignedGrid"></div>
       </div>
 
       <!-- VAULT -->
@@ -1426,6 +1438,7 @@ function nav(view, el) {
   if (view === 'payments') renderPaymentLedger();
   if (view === 'buyers') renderBuyers();
   if (view === 'investors') renderInvestors();
+  if (view === 'assigned') renderAssignedNotes();
   if (view === 'vault') renderVault();
   if (view === 'templates') renderTemplates();
   if (view === 'alerts') renderAlerts();
@@ -2498,6 +2511,54 @@ function renderInvestors() {
         <div><div class="lc-label">Notes Held</div><div class="lc-val">${assigned.length}</div></div>
         <div><div class="lc-label">Portfolio</div><div class="lc-val gold">${fmt(total)}</div></div>
       </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// ASSIGNED NOTES — quick reference of which loans are assigned and to whom
+// ============================================================
+function renderAssignedNotes() {
+  const grid = document.getElementById('assignedGrid');
+  if (!grid) return;
+  const q = (document.getElementById('assignedSearch')?.value || '').toLowerCase();
+  const noteBuyerName = l => l.nb_business || l.nb_name || l.investor || '';
+  const assigned = loans.filter(l => noteBuyerName(l).trim() !== '');
+  const filtered = q ? assigned.filter(l =>
+    noteBuyerName(l).toLowerCase().includes(q) ||
+    (l.parcel||'').toLowerCase().includes(q) ||
+    (l.borrower||'').toLowerCase().includes(q) ||
+    (l.buyer_company||'').toLowerCase().includes(q)
+  ) : assigned;
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">🤝</div><div class="empty-title">${q?'No matches':'No assigned notes yet'}</div><div class="empty-sub">${q?'Try a different search':'Notes appear here once an investor or note buyer is assigned to a loan'}</div></div>`;
+    return;
+  }
+  // Group by note buyer name so the user can see who holds what
+  const groups = {};
+  for (const l of filtered) {
+    const key = noteBuyerName(l);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(l);
+  }
+  const groupNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b));
+  grid.innerHTML = groupNames.map(name => {
+    const list = groups[name];
+    const total = list.reduce((s,l)=>s+parseFloat(l.loan_amount||0),0);
+    const rows = list.map(l => `
+      <div onclick="openDetail('${l.id}')" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border);cursor:pointer">
+        <div style="min-width:0;flex:1">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--gold);font-weight:600">${l.parcel || l.id?.slice(0,8).toUpperCase() || '—'}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">${l.buyer_company||l.borrower||'Unnamed'}${l.address?` · ${l.address}`:''}</div>
+        </div>
+        <div style="font-size:12px;color:var(--text3);white-space:nowrap">${l.loan_amount?fmt(l.loan_amount):''}</div>
+      </div>`).join('');
+    return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--s2)">
+        <div style="font-weight:700;font-size:14px">🤝 ${name}</div>
+        <div style="font-size:11px;color:var(--text3)">${list.length} note${list.length!==1?'s':''} · ${fmt(total)}</div>
+      </div>
+      ${rows}
     </div>`;
   }).join('');
 }
