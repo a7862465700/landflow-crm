@@ -1233,16 +1233,28 @@ async function loadWebsiteProperties() {
 async function loadAllData() {
   if (!currentUser) return;
   const uid = currentUser.id;
-  const [l, p, inv, ivs, vf, us, lf] = await Promise.all([
+  // Phase 08 (CRM-001/005): payments + late_fees are scoped by loan_id, not
+  // by user_id. The old eq('user_id', uid) filter missed rows the admin
+  // didn't personally insert — e.g. payments posted from HSF by another
+  // admin, future Stripe ACH webhook rows, autopay rows. We fetch loans
+  // first, then pull payments/late_fees by loan_id (admin RLS allows it).
+  const [l, inv, ivs, vf, us] = await Promise.all([
     sb.from('loans').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-    sb.from('payments').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('investors').select('*').eq('user_id', uid),
     sb.from('invoices').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,sort_order,created_at,enhanced,enhanced_url,photo_category').eq('user_id', uid),
     sb.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
-    sb.from('late_fees').select('*').eq('user_id', uid),
   ]);
   loans = l.data || [];
+
+  const loanIds = loans.map(x => x.id);
+  const [p, lf] = loanIds.length === 0
+    ? [{ data: [] }, { data: [] }]
+    : await Promise.all([
+        sb.from('payments').select('*').in('loan_id', loanIds).order('date', { ascending: false }),
+        sb.from('late_fees').select('*').in('loan_id', loanIds),
+      ]);
+
   payments = p.data || [];
   investors = inv.data || [];
   invoices = ivs.data || [];
@@ -1282,16 +1294,33 @@ async function dbSaveLoan(data, id) {
 
 async function dbDeleteLoan(id) {
   await sb.from('loans').delete().eq('id', id).eq('user_id', currentUser.id);
-  await sb.from('payments').delete().eq('loan_id', id).eq('user_id', currentUser.id);
+  // Phase 08 (CRM-004): drop the eq('user_id', currentUser.id) filter so
+  // HSF-posted (or future Stripe ACH / autopay) payment rows attached to
+  // this loan also cascade-delete. Without this they would be orphaned
+  // to a deleted loan_id. Admin RLS on payments still gates the call.
+  await sb.from('payments').delete().eq('loan_id', id);
 }
 
 async function dbSavePayment(data) {
-  const { data: d } = await sb.from('payments').insert({ ...data, user_id: currentUser.id }).select().single();
+  // Phase 08 (CRM-003): every insert self-identifies as 'landflow' and
+  // records the admin who entered it in posted_by. user_id stays as the
+  // admin (preserves the "who owns the loan" convention that loan.user_id
+  // also uses) so existing RLS + queries don't shift under us.
+  const row = {
+    ...data,
+    user_id: currentUser.id,
+    posted_by: currentUser.id,
+    source: 'landflow',
+  };
+  const { data: d } = await sb.from('payments').insert(row).select().single();
   return d;
 }
 
 async function dbDeletePayment(id) {
-  await sb.from('payments').delete().eq('id', id).eq('user_id', currentUser.id);
+  // Phase 08 (CRM-001): scope by id only so admin can delete a row that
+  // was posted by another writer (HSF admin, Stripe ACH, autopay). Admin
+  // RLS still gates DELETE.
+  await sb.from('payments').delete().eq('id', id);
 }
 
 async function dbSaveInvestor(data) {
