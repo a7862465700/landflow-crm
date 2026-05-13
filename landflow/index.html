@@ -3524,6 +3524,7 @@ function generateAccountStatement(loanId) {
         <tr style="background:#2d2d2d;color:#fff">
           <th style="padding:8px;text-align:left">Date</th>
           <th style="padding:8px;text-align:left">Description</th>
+          <th style="padding:8px;text-align:right">Amount Paid</th>
           <th style="padding:8px;text-align:right">Interest</th>
           <th style="padding:8px;text-align:right">Principal</th>
           <th style="padding:8px;text-align:right">Balance</th>
@@ -3533,9 +3534,11 @@ function generateAccountStatement(loanId) {
         ${history.map((h, i) => {
           const isFirst = i === 0;
           const bg = i % 2 === 0 ? '#fff' : '#f9f9f9';
+          const paid = (h.interest || 0) + (h.principal || 0);
           return `<tr style="background:${bg}">
             <td style="padding:6px 8px;border-bottom:1px solid #eee;font-family:monospace;font-size:11px">${fmtDate(h.date)}</td>
             <td style="padding:6px 8px;border-bottom:1px solid #eee">${isFirst ? 'Funds Advanced' : h.description || 'Payment'}</td>
+            <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-family:monospace;font-weight:bold">${isFirst ? '—' : fmtD(paid)}</td>
             <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-family:monospace">${isFirst ? '—' : fmtD(h.interest)}</td>
             <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-family:monospace">${isFirst ? fmtD(h.balance) : fmtD(h.principal)}</td>
             <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;font-family:monospace;font-weight:bold">${fmtD(h.balance)}</td>
