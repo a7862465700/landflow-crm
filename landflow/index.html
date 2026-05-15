@@ -2400,7 +2400,8 @@ function renderInvoices() {
       <div class="inv-head">
         <div>
           <div class="inv-id">${l?.parcel || inv.loan_id?.slice(0,8).toUpperCase()||''} · ${inv.period||''}</div>
-          <div class="inv-borrower">${inv.borrower||l?.borrower||'—'}</div>
+          <div class="inv-borrower">${l?.buyer_company || inv.borrower || l?.borrower || '—'}</div>
+          ${l?.buyer_company && (inv.borrower || l?.borrower) ? `<div style="font-size:12px;color:var(--text3);margin-top:1px">c/o ${inv.borrower || l?.borrower}</div>` : ''}
           <div style="font-size:12px;color:var(--text3);margin-top:2px">Due: ${fmtDate(inv.due_date)} · ${inv.email}</div>
         </div>
         <div>
@@ -2447,7 +2448,7 @@ function viewInvoice(id) {
   </style></head><body>
   <div class="header">
     <div><div class="logo">LandFlow CRM</div><div class="inv-num">Invoice · ${new Date().toLocaleDateString()}</div></div>
-    <div style="text-align:right"><div style="font-size:12px;color:#888">Bill To:</div><div style="font-weight:bold">${inv.borrower||l?.borrower||''}</div><div style="font-size:12px;color:#888">${inv.email}</div></div>
+    <div style="text-align:right"><div style="font-size:12px;color:#888">Bill To:</div><div style="font-weight:bold">${l?.buyer_company || inv.borrower || l?.borrower || ''}</div>${l?.buyer_company && (inv.borrower || l?.borrower) ? `<div style="font-size:12px;color:#555">c/o ${inv.borrower || l?.borrower}</div>` : ''}<div style="font-size:12px;color:#888">${inv.email}</div></div>
   </div>
   <div class="amount-box">
     <div class="amount-label">Amount Due</div>
@@ -4290,8 +4291,8 @@ async function emailStatement() {
     ? `Payment Statement — Account ${displayAcct} — ${now.toLocaleDateString('en-US',{month:'long',year:'numeric'})}`
     : `Statement of Account — Account ${displayAcct}`;
   const bodyText = isMonthly
-    ? `Dear ${loan.borrower},\n\nPlease find your monthly payment statement attached.\n\nAccount #: ${displayAcct}\nPayment Due: ${dueDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}\nAmount Due: ${fmtD(pmt)}\nCurrent Balance: ${fmtD(realBal.balance)}\n\nPayment Methods: Zelle, Wire, Check, or Credit Card\n${s.company_phone ? 'Questions? Call ' + fmtPhone(s.company_phone) : ''}\n\nThank you,\n${s.company_name || 'LandFlow CRM'}`
-    : `Dear ${loan.borrower},\n\nAttached is your complete Statement of Account for Account #${displayAcct}.\n\nOriginal Loan: ${fmt(loan.loan_amount)}\nCurrent Balance: ${fmtD(realBal.balance)}\nTotal Payments: ${realBal.totalPayments}\n\nThank you,\n${s.company_name || 'LandFlow CRM'}`;
+    ? `Dear ${loan.borrower || loan.buyer_company || ''},\n\nPlease find the monthly payment statement attached${loan.buyer_company ? ' for ' + loan.buyer_company : ''}.\n\nAccount #: ${displayAcct}\nPayment Due: ${dueDate.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}\nAmount Due: ${fmtD(pmt)}\nCurrent Balance: ${fmtD(realBal.balance)}\n\nPayment Methods: Zelle, Wire, Check, or Credit Card\n${s.company_phone ? 'Questions? Call ' + fmtPhone(s.company_phone) : ''}\n\nThank you,\n${s.company_name || 'LandFlow CRM'}`
+    : `Dear ${loan.borrower || loan.buyer_company || ''},\n\nAttached is the complete Statement of Account for Account #${displayAcct}${loan.buyer_company ? ' (' + loan.buyer_company + ')' : ''}.\n\nOriginal Loan: ${fmt(loan.loan_amount)}\nCurrent Balance: ${fmtD(realBal.balance)}\nTotal Payments: ${realBal.totalPayments}\n\nThank you,\n${s.company_name || 'LandFlow CRM'}`;
 
   // Try to open email client with attachment using share API, otherwise download PDF + open mailto
   if (pdfBlob && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], fileName, { type: 'application/pdf' })] })) {
