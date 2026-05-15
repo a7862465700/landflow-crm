@@ -3436,7 +3436,8 @@ function generateMonthlyStatement(loanId) {
       </div>
       <div style="flex:1;text-align:right">
         <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px">Borrower</div>
-        <div style="font-weight:bold">${l.borrower || '—'}</div>
+        <div style="font-weight:bold">${l.buyer_company || l.borrower || '—'}</div>
+        ${l.buyer_company && l.borrower ? `<div style="font-size:12px;color:#555">c/o ${l.borrower}</div>` : ''}
         ${l.buyer_address ? `<div style="font-size:12px;color:#555">${l.buyer_address}</div>` : ''}
       </div>
     </div>
@@ -3499,7 +3500,7 @@ function generateMonthlyStatement(loanId) {
       ${s.company_email ? `<div style="font-size:11px;color:#666">Email: ${s.company_email}</div>` : ''}
     </div>`;
 
-  document.getElementById('stmtTitle').textContent = 'Payment Statement — ' + (l.borrower || '') + ' — ' + now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  document.getElementById('stmtTitle').textContent = 'Payment Statement — ' + (l.buyer_company || l.borrower || '') + ' — ' + now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
   document.getElementById('stmtContent').innerHTML = html;
   window._currentStmtLoanId = loanId;
   window._currentStmtType = 'monthly';
@@ -3532,7 +3533,8 @@ function generateAccountStatement(loanId) {
     <div style="display:flex;justify-content:space-between;margin-bottom:16px">
       <div>
         <div style="font-size:11px;color:#888;text-transform:uppercase">Borrower</div>
-        <div style="font-weight:bold">${l.borrower || '—'}</div>
+        <div style="font-weight:bold">${l.buyer_company || l.borrower || '—'}</div>
+        ${l.buyer_company && l.borrower ? `<div style="font-size:12px;color:#555">c/o ${l.borrower}</div>` : ''}
         ${l.buyer_address ? `<div style="font-size:12px;color:#555">${l.buyer_address}</div>` : ''}
       </div>
       <div style="text-align:right">
@@ -3593,7 +3595,7 @@ function generateAccountStatement(loanId) {
       Property: ${l.address || '—'} ${l.parcel ? '| Parcel: ' + l.parcel : ''} ${l.county ? '| ' + l.county + ' County' : ''}
     </div>`;
 
-  document.getElementById('stmtTitle').textContent = 'Statement of Account — ' + (l.borrower || '') ;
+  document.getElementById('stmtTitle').textContent = 'Statement of Account — ' + (l.buyer_company || l.borrower || '') ;
   document.getElementById('stmtContent').innerHTML = html;
   window._currentStmtLoanId = loanId;
   window._currentStmtType = 'account';
