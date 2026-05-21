@@ -48,6 +48,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 
 /* ── AUTH SCREEN ── */
 #authScreen{position:fixed;inset:0;background:var(--dark);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+/* ── SESSION-EXPIRED BANNER ──
+   Shown when the Supabase session is lost mid-use AND a silent refresh fails.
+   Sits at the top of the viewport, doesn't take over the screen, so the user
+   keeps visual context. z-index 999 so it's below modals (which open at 1000+). */
+#sessionExpiredBanner{position:fixed;top:0;left:0;right:0;background:#b45309;color:#fff;padding:10px 16px;display:none;align-items:center;justify-content:space-between;gap:12px;z-index:999;box-shadow:0 2px 8px rgba(0,0,0,0.25);font-size:13px;font-weight:600}
+#sessionExpiredBanner.visible{display:flex}
+#sessionExpiredBanner .seb-msg{display:flex;align-items:center;gap:8px}
+#sessionExpiredBanner .seb-btn{background:#fff;color:#b45309;border:none;border-radius:6px;padding:6px 14px;font-weight:700;font-size:12px;cursor:pointer;transition:background .15s}
+#sessionExpiredBanner .seb-btn:hover{background:#fef3c7}
 .auth-card{width:100%;max-width:380px;background:var(--dark2);border:1px solid var(--dark-border);border-radius:16px;padding:36px 32px;text-align:center}
 .auth-logo{font-family:'DM Serif Display',serif;font-size:32px;color:var(--gold);margin-bottom:4px;letter-spacing:-1px}
 .auth-sub{font-size:12px;color:var(--dark-text3);text-transform:uppercase;letter-spacing:2.5px;margin-bottom:32px;font-weight:600}
@@ -341,6 +350,12 @@ textarea.form-input{resize:vertical;min-height:80px}
     <div style="margin-top:12px;font-size:11px"><span style="color:var(--gold);cursor:pointer" onclick="resetPassword()">Forgot password?</span></div>
     <div style="margin-top:8px;font-size:11px;color:var(--text3)">First time? <span style="color:var(--gold);cursor:pointer" onclick="signUp()">Create account</span></div>
   </div>
+</div>
+
+<!-- SESSION-EXPIRED BANNER (hidden by default; shown when refresh fails mid-use) -->
+<div id="sessionExpiredBanner">
+  <div class="seb-msg"><span>⚠️</span><span>Session expired — sign in again to save changes.</span></div>
+  <button class="seb-btn" onclick="signInFromBanner()">Sign In</button>
 </div>
 
 <!-- APP -->
@@ -1138,25 +1153,71 @@ let APP = { settings: null };
 // ============================================================
 // AUTH
 // ============================================================
+// Tracks whether the app has been shown to the user at least once this
+// page load. When the session is lost mid-use, we keep the app visible
+// (showing a banner) instead of dumping back to the full login screen.
+let appReady = false;
+
 async function initAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
     currentUser = session.user;
+    appReady = true;
     showApp();
   } else {
     showAuth();
   }
-  let appInitialized = false;
-  sb.auth.onAuthStateChange((_evt, session) => {
+  sb.auth.onAuthStateChange(async (_evt, session) => {
     if (session) {
       currentUser = session.user;
-      if (!appInitialized) { appInitialized = true; showApp(); }
+      hideSessionBanner(); // in case we were showing the banner
+      if (!appReady) { appReady = true; showApp(); }
+      // Else: just regained session mid-use — leave the user's view intact
     } else {
       currentUser = null;
-      appInitialized = false;
-      showAuth();
+      if (appReady) {
+        // Session lost AFTER the app was loaded. Try one explicit refresh
+        // before showing anything to the user — autoRefresh may have missed
+        // its window (tab was asleep, network blip, etc.) but the refresh
+        // token might still be valid.
+        await handleSessionLoss();
+      } else {
+        // No session at startup — full sign-in screen is the right UX here.
+        showAuth();
+      }
     }
   });
+}
+
+async function handleSessionLoss() {
+  try {
+    const { data, error } = await sb.auth.refreshSession();
+    if (!error && data?.session) {
+      // Refresh succeeded — onAuthStateChange will fire again with the new
+      // session and our "if (session)" branch above will hide the banner.
+      return;
+    }
+  } catch (_) {
+    // Fall through to banner.
+  }
+  // Refresh failed — show the non-takeover banner so the user keeps their
+  // view and can sign in when they're ready.
+  showSessionBanner();
+}
+
+function showSessionBanner() {
+  const banner = document.getElementById('sessionExpiredBanner');
+  if (banner) banner.classList.add('visible');
+}
+
+function hideSessionBanner() {
+  const banner = document.getElementById('sessionExpiredBanner');
+  if (banner) banner.classList.remove('visible');
+}
+
+function signInFromBanner() {
+  hideSessionBanner();
+  showAuth(); // explicit user action — full screen is fine now
 }
 
 function showAuth() {
