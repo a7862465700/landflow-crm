@@ -1167,7 +1167,7 @@ async function initAuth() {
   } else {
     showAuth();
   }
-  sb.auth.onAuthStateChange(async (_evt, session) => {
+  sb.auth.onAuthStateChange(async (evt, session) => {
     if (session) {
       currentUser = session.user;
       hideSessionBanner(); // in case we were showing the banner
@@ -1175,11 +1175,19 @@ async function initAuth() {
       // Else: just regained session mid-use — leave the user's view intact
     } else {
       currentUser = null;
-      if (appReady) {
-        // Session lost AFTER the app was loaded. Try one explicit refresh
-        // before showing anything to the user — autoRefresh may have missed
-        // its window (tab was asleep, network blip, etc.) but the refresh
-        // token might still be valid.
+      if (evt === 'SIGNED_OUT') {
+        // Explicit user action via the Sign Out button. Don't try to refresh
+        // them back in (would defeat the whole point) and don't show the
+        // "Session expired" banner (would be misleading — nothing expired,
+        // they chose to leave). Reset appReady so re-login goes through the
+        // full initial flow (showApp → loadAllData → render).
+        hideSessionBanner();
+        appReady = false;
+        showAuth();
+      } else if (appReady) {
+        // Session lost mid-use WITHOUT an explicit sign-out — token expired,
+        // refresh window missed, etc. Try one explicit refresh, fall back to
+        // the graceful banner.
         await handleSessionLoss();
       } else {
         // No session at startup — full sign-in screen is the right UX here.
