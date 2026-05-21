@@ -1037,7 +1037,9 @@ async function inviteNoteBuyerToHSF() {
   const emailEl = document.getElementById('f-nb-email');
   const nameEl = document.getElementById('f-nb-name');
   const businessEl = document.getElementById('f-nb-business');
-  const email = (emailEl && emailEl.value || '').trim();
+  // Same normalization as saveInvestor — strip `mailto:` prefix that gets
+  // pasted by accident when copying email addresses from some apps.
+  const email = ((emailEl && emailEl.value) || '').trim().toLowerCase().replace(/^mailto:/, '').trim();
   const name = (nameEl && nameEl.value || '').trim();
   const businessName = (businessEl && businessEl.value || '').trim();
 
@@ -2544,7 +2546,9 @@ async function saveInvestor() {
   const nameInput = document.getElementById('inv2-name').value.trim();
   const contact = document.getElementById('inv2-contact').value.trim();
   const phone = document.getElementById('inv2-phone').value.trim();
-  const email = document.getElementById('inv2-email').value.trim().toLowerCase();
+  // Strip `mailto:` prefix (which some OS/apps inject on copy) before saving.
+  // Belt-and-suspenders with the server-side check in /api/admin/invite-lender.
+  const email = document.getElementById('inv2-email').value.trim().toLowerCase().replace(/^mailto:/, '').trim();
   const notes = document.getElementById('inv2-notes').value.trim();
 
   if (!nameInput) return showToast('⚠️ Company / Name required', 'error');
