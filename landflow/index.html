@@ -788,7 +788,7 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="form-group"><label class="form-label">Company / Name *</label><input class="form-input" id="inv2-name" placeholder="First Capital LLC"></div>
         <div class="form-group"><label class="form-label">Contact Person</label><input class="form-input" id="inv2-contact" placeholder="Robert Kline"></div>
         <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="inv2-phone" type="tel" placeholder="5550000000"></div>
-        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="inv2-email" type="email" placeholder="contact@fund.com"></div>
+        <div class="form-group"><label class="form-label">Email *</label><input class="form-input" id="inv2-email" type="email" placeholder="contact@fund.com" required></div>
         <div class="form-group form-full"><label class="form-label">Notes</label><textarea class="form-input" id="inv2-notes" rows="2" placeholder="Preferred note types, criteria..."></textarea></div>
       </div>
     </div>
@@ -1238,9 +1238,11 @@ async function loadAllData() {
   // didn't personally insert — e.g. payments posted from HSF by another
   // admin, future Stripe ACH webhook rows, autopay rows. We fetch loans
   // first, then pull payments/late_fees by loan_id (admin RLS allows it).
-  const [l, inv, ivs, vf, us] = await Promise.all([
+  // Lenders live in the shared `note_lenders` table (not scoped by user_id —
+  // it's the canonical record HSF reads too). Loaded out-of-band by
+  // reloadInvestors() below, not part of this Promise.all.
+  const [l, ivs, vf, us] = await Promise.all([
     sb.from('loans').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-    sb.from('investors').select('*').eq('user_id', uid),
     sb.from('invoices').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,sort_order,created_at,enhanced,enhanced_url,photo_category').eq('user_id', uid),
     sb.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
@@ -1256,7 +1258,7 @@ async function loadAllData() {
       ]);
 
   payments = p.data || [];
-  investors = inv.data || [];
+  await reloadInvestors(); // loads note_lenders, normalizes into `investors`
   invoices = ivs.data || [];
   vaultFiles = vf.data || [];
   // websiteProperties (cross-app drift badge) loads in the background — must NOT block app boot
@@ -1323,9 +1325,41 @@ async function dbDeletePayment(id) {
   await sb.from('payments').delete().eq('id', id);
 }
 
+// Lenders are the canonical "investor" record shared with HSF (note_lenders
+// table). UPSERT on email so re-saving the same lender updates the row
+// instead of failing on the unique constraint. The legacy `investors` table
+// is no longer written to — it never connected to HSF and had 0 rows in prod.
 async function dbSaveInvestor(data) {
-  const { data: d } = await sb.from('investors').insert({ ...data, user_id: currentUser.id }).select().single();
+  const { data: d, error } = await sb
+    .from('note_lenders')
+    .upsert(data, { onConflict: 'email' })
+    .select()
+    .single();
+  if (error) {
+    console.error('dbSaveInvestor (note_lenders) error:', error);
+    showToast('Save failed: ' + error.message, 'error');
+    return null;
+  }
   return d;
+}
+
+// Fetches lenders from note_lenders and normalizes to the shape renderInvestors
+// expects ({ id, name, contact, phone, email, notes }). "business" becomes the
+// card title; "name" (the individual) becomes the subtitle when both exist.
+async function reloadInvestors() {
+  const { data, error } = await sb.from('note_lenders').select('*');
+  if (error) {
+    console.error('reloadInvestors error:', error);
+    return;
+  }
+  investors = (data || []).map(l => ({
+    id: l.id,
+    email: l.email,
+    phone: l.phone || '',
+    notes: l.notes || '',
+    name: l.business || l.name || '(unnamed lender)',
+    contact: l.business ? (l.name || '') : '',
+  }));
 }
 
 async function dbSaveInvoice(data) {
@@ -2507,18 +2541,36 @@ function sendAllPendingInvoices() {
 function openInvestorModal() { openModal('investorModal'); }
 
 async function saveInvestor() {
-  const name = document.getElementById('inv2-name').value.trim();
-  if (!name) return showToast('⚠️ Name required', 'error');
+  const nameInput = document.getElementById('inv2-name').value.trim();
+  const contact = document.getElementById('inv2-contact').value.trim();
+  const phone = document.getElementById('inv2-phone').value.trim();
+  const email = document.getElementById('inv2-email').value.trim().toLowerCase();
+  const notes = document.getElementById('inv2-notes').value.trim();
+
+  if (!nameInput) return showToast('⚠️ Company / Name required', 'error');
+  if (!email || !email.includes('@')) {
+    return showToast('⚠️ Email required — must match the address on the PaperStack assignment letter', 'error');
+  }
+
+  // Map LandFlow modal → note_lenders shape:
+  // - If Contact Person is filled, treat "Company / Name" as the business and Contact as the individual.
+  // - Otherwise treat "Company / Name" as the individual's name (no business).
   const data = {
-    name, contact: document.getElementById('inv2-contact').value,
-    phone: document.getElementById('inv2-phone').value,
-    email: document.getElementById('inv2-email').value,
-    notes: document.getElementById('inv2-notes').value,
+    email,
+    business: contact ? nameInput : null,
+    name: contact || nameInput,
+    phone: phone || null,
+    notes: notes || null,
   };
+
   const saved = await dbSaveInvestor(data);
-  investors.push(saved);
-  renderInvestors(); closeModal('investorModal');
-  showToast('✅ Investor saved!', 'success');
+  if (!saved) return; // toast already shown
+
+  // Re-fetch so UPSERT semantics (existing-email match) reflect correctly
+  await reloadInvestors();
+  renderInvestors();
+  closeModal('investorModal');
+  showToast('✅ Lender saved — will sync to Hickory Street Finance', 'success');
   ['inv2-name','inv2-contact','inv2-phone','inv2-email','inv2-notes'].forEach(id => document.getElementById(id).value = '');
 }
 
