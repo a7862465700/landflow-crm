@@ -1923,7 +1923,9 @@ async function saveLoan() {
       pendingImportPDF = null;
     }
   }
-  renderLoans(); updateStats();
+  // Loan changes can flip status, balloon date, etc. — keep Alerts view
+  // in sync without waiting for the user to navigate away and back.
+  renderLoans(); updateStats(); renderAlerts();
   closeModal('loanModal');
   if (editingLoanId && currentLoanId === editingLoanId) openDetail(editingLoanId);
   editingLoanId = null;
@@ -2309,7 +2311,7 @@ async function savePayment() {
     if (lf) lateFees.push(lf);
   }
   if (loan && loan.status === 'late') { loan.status = 'current'; await dbSaveLoan({ status: 'current' }, loanId); }
-  renderLoans(); updateStats(); renderPaymentLedger();
+  renderLoans(); updateStats(); renderPaymentLedger(); renderAlerts();
   closeModal('paymentModal');
   showToast('✅ Payment of ' + fmtD(amount) + ' recorded!', 'success');
   document.getElementById('pay-principal-input').value = '';
@@ -2325,7 +2327,7 @@ async function deletePayment(id) {
   if (!confirm('Delete this payment?')) return;
   await dbDeletePayment(id);
   payments = payments.filter(p => p.id !== id);
-  renderPaymentLedger();
+  renderPaymentLedger(); renderAlerts(); updateStats();
   if (currentLoanId) { openDetail(currentLoanId); }
   showToast('Payment deleted');
 }
