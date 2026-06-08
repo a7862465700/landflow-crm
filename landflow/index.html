@@ -3098,7 +3098,8 @@ async function renderChecklist() {
   const checks = [
     { key:'purchase',  icon:'🏛', label:'Missing Purchase Documents', severity:'red',   type:'file', catId:'purchase' },
     { key:'sale',      icon:'📝', label:'Missing Sale Documents',     severity:'red',   type:'file', catId:'sale' },
-    { key:'assignment',icon:'🤝', label:'Missing Assignment Documents',severity:'red',  type:'file', catId:'assignment' },
+    // Assignment docs only matter once a note is actually assigned to an investor — don't flag retained notes
+    { key:'assignment',icon:'🤝', label:'Missing Assignment Documents',severity:'red',  type:'custom', filter:(l) => l.investor && String(l.investor).trim() !== '' && !vaultFiles.some(f => f.loan_id === l.id && f.cat_id === 'assignment') },
     { key:'photos',    icon:'📸', label:'Missing Parcel Photos (min 2)',severity:'red', type:'fileMin', catId:'photos', min:2 },
     { key:'websync',   icon:'🌐', label:'Photos Not Synced to Website', severity:'amber', type:'websync' },
     { key:'investor',  icon:'🏦', label:'No Investor Assigned',      severity:'amber', type:'field', field:'investor' },
