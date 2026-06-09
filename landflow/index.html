@@ -2203,7 +2203,7 @@ function openDetail(id) {
          <div><div class="dp-field-label">Email</div><div>${l.nb_email||'—'}</div></div>
          <div style="grid-column:1/-1"><div class="dp-field-label">Address</div><div>${l.nb_address||'—'}</div></div>
          <div><div class="dp-field-label">Loan Servicer</div><div>${l.loan_servicer||'—'}</div></div>
-         <div><div class="dp-field-label">Website</div><div>${l.loan_servicer_web?`<a href="${l.loan_servicer_web}" target="_blank" style="color:var(--gold);text-decoration:underline">${l.loan_servicer_web}</a>`:'—'}</div></div>
+         <div><div class="dp-field-label">Website</div><div>${l.loan_servicer_web?`<a href="${/^https?:\/\//i.test(l.loan_servicer_web)?l.loan_servicer_web:'https://'+l.loan_servicer_web}" target="_blank" style="color:var(--gold);text-decoration:underline">${l.loan_servicer_web}</a>`:'—'}</div></div>
        </div>
        <div style="margin-top:10px">
          <button class="btn btn-sm" style="background:var(--gold);color:#000;font-weight:600" onclick="pushToHSF('${l.id}')">Push to HSF</button>
