@@ -1385,6 +1385,29 @@ async function dbSavePayment(data) {
     posted_by: currentUser.id,
     source: 'landflow',
   };
+  // CRM-DUP (2026-06): idempotency guard. A re-run of the monthly payment
+  // entry (or an accidental double-save) was inserting a SECOND payment for
+  // the same loan + same month + same amount. No borrower pays twice in one
+  // month, so if a matching row already exists (from any source — LandFlow or
+  // an HSF-posted row), skip the insert and warn instead of duplicating.
+  if (row.loan_id && row.date && row.amount != null) {
+    const ym = String(row.date).slice(0, 7);            // 'YYYY-MM'
+    let [yy, mm] = ym.split('-').map(Number);
+    const monthStart = ym + '-01';
+    mm += 1; if (mm > 12) { mm = 1; yy += 1; }
+    const monthEnd = yy + '-' + String(mm).padStart(2, '0') + '-01';
+    const { data: existing } = await sb.from('payments')
+      .select('id')
+      .eq('loan_id', row.loan_id)
+      .eq('amount', row.amount)
+      .gte('date', monthStart)
+      .lt('date', monthEnd)
+      .limit(1);
+    if (existing && existing.length) {
+      showToast('⚠️ A payment for this month is already recorded — skipped to avoid a duplicate', 'error');
+      return null;
+    }
+  }
   const { data: d } = await sb.from('payments').insert(row).select().single();
   return d;
 }
@@ -2373,6 +2396,7 @@ async function savePayment() {
   };
   showToast('Saving…');
   const saved = await dbSavePayment(data);
+  if (!saved) return; // duplicate skipped (warning toast already shown) — don't record late fee or flip status
   payments.unshift(saved);
   // Record late fee if applicable
   if (lateFeeAmt > 0) {
