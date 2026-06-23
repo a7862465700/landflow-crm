@@ -1091,7 +1091,7 @@ async function inviteNoteBuyerToHSF() {
 
 // Sync sold/posted status to the website properties table
 async function syncSoldStatus(loan) {
-  if (!loan || !loan.parcel) return;
+  if (!loan || !loan.parcel || !currentUser) return;
   try {
     // Sold takes priority, then website_posted controls available/unlisted
     let newStatus;
