@@ -2803,20 +2803,21 @@ function renderBuyers() {
 function computeAlerts() {
   const alerts = [];
   loans.forEach(l => {
-    if (l.status === 'late') alerts.push({ type:'urgent', icon:'🚨', title: l.borrower + ' — Payment Late', sub: l.parcel||l.id?.slice(0,8).toUpperCase()||'', loanId: l.id });
+    const name = (l.buyer_company || l.borrower || 'Unnamed') + (l.parcel ? ' · ' + l.parcel : '');
+    if (l.status === 'late') alerts.push({ type:'urgent', icon:'🚨', title: name + ' — Payment Late', sub: '', loanId: l.id });
     const bd = balloonDate(l.orig_date, l.balloon);
     if (bd) {
       const days = (bd - new Date()) / (1000*60*60*24);
       if (days < 365 && days > 0) {
         const urgency = days < 90 ? 'urgent' : 'warning';
-        alerts.push({ type: urgency, icon:'⏰', title: l.borrower + ' — Balloon Due', sub: 'Due ' + fmtDate(bd) + ' · ' + Math.round(days) + ' days', loanId: l.id });
+        alerts.push({ type: urgency, icon:'⏰', title: name + ' — Balloon Due', sub: 'Due ' + fmtDate(bd) + ' · ' + Math.round(days) + ' days', loanId: l.id });
       }
     }
     const pmts = payments.filter(p => p.loan_id === l.id);
     if (pmts.length > 0) {
       const last = new Date(Math.max(...pmts.map(p => new Date(p.date))));
       const daysSince = (new Date() - last) / (1000*60*60*24);
-      if (daysSince > 45) alerts.push({ type:'warning', icon:'📅', title: l.borrower + ' — No Payment in ' + Math.round(daysSince) + ' Days', sub: 'Last: ' + fmtDate(last), loanId: l.id });
+      if (daysSince > 45) alerts.push({ type:'warning', icon:'📅', title: name + ' — No Payment in ' + Math.round(daysSince) + ' Days', sub: 'Last: ' + fmtDate(last), loanId: l.id });
     }
   });
   return alerts;
