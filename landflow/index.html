@@ -11,7 +11,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- supabase-js MUST stay non-deferred: the inline body script calls
+     supabase.createClient() at top level, which crashes the entire
+     script (ReferenceError: supabase is not defined) if this loads
+     after the parser reaches that inline block. That leaves the
+     loading spinner stuck forever with no auth screen. Lazy-use libs
+     below (jspdf, html2canvas, pizzip, docxtemplater, jszip, mammoth)
+     are only referenced inside function bodies and can keep defer. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script defer src="https://unpkg.com/pizzip@3.2.0/dist/pizzip.js"></script>
