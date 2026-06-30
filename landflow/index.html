@@ -1568,6 +1568,41 @@ function calcBalance(p,r,t,paid){if(!p||!r||!t)return p||0;const mr=r/100/12,pmt
 function genSchedule(p,r,t,startDate,limit){const mr=r/100/12,n=t*12,pmt=calcPayment(p,r,t);let bal=p;const rows=[],start=startDate?new Date(startDate):new Date();const max=limit||n;for(let i=0;i<max&&bal>0.01;i++){const int=bal*mr,prin=pmt-int;bal=Math.max(0,bal-prin);const d=new Date(start);d.setMonth(d.getMonth()+i+1);rows.push({num:i+1,date:d.toLocaleDateString('en-US',{month:'short',year:'numeric'}),payment:pmt,principal:prin,interest:int,balance:bal});}return rows;}
 function parseLocalDate(s){if(s instanceof Date)return s;const[y,m,d]=(s||'').split(/[-T]/);return new Date(Number(y),Number(m)-1,Number(d));}
 function paysMade(origDate){if(!origDate)return 0;const start=parseLocalDate(origDate),now=new Date();return Math.max(0,(now.getFullYear()-start.getFullYear())*12+now.getMonth()-start.getMonth());}
+// Live loan status derived from payment activity. PORTED FROM — and must stay
+// in sync with — Hickory Street Finance's lib/loan-status.ts computeLoanStatus().
+// Both apps share the payments + late_fees tables, so they must agree on whether
+// a loan is current/late/default. Count-based: a loan is only late when the
+// number of payments that *should* have been made by `asOf` exceeds the number
+// of valid (non-failed/returned/cancelled) payment rows on file, and the oldest
+// missed due date is past the grace window. A calendar date past the grace day is
+// NOT late on its own — if the period's payment is already recorded, it's current.
+function computeLoanStatus(loan, loanPayments, currentBalance, asOf){
+  const today = asOf || new Date();
+  const grace = parseInt((APP.settings||{}).grace_period_days) || 15;
+  if (currentBalance <= 0) return 'paid_off';
+  if (!loan.first_pay_date) return loan.status || 'current';
+  const firstPay = new Date(loan.first_pay_date + 'T00:00:00');
+  if (isNaN(firstPay.getTime())) return loan.status || 'current';
+  if (today < firstPay) return 'current';
+  const dueDay = loan.payment_due_day || firstPay.getDate();
+  // expectedPaymentsMade(): months elapsed since first payment, minus one if
+  // this month's due day hasn't arrived yet.
+  const firstMonth = firstPay.getFullYear()*12 + firstPay.getMonth();
+  const todayMonth = today.getFullYear()*12 + today.getMonth();
+  let expected = todayMonth - firstMonth + 1;
+  if (today.getDate() < dueDay) expected -= 1;
+  expected = Math.max(0, expected);
+  const valid = (loanPayments||[]).filter(p => p.status!=='failed' && p.status!=='returned' && p.status!=='cancelled');
+  const missed = Math.max(0, expected - valid.length);
+  if (missed === 0) return 'current';
+  const missedIndex = expected - missed;
+  const oldestMissedDue = new Date(firstPay.getFullYear(), firstPay.getMonth() + missedIndex, dueDay);
+  const daysPastDue = Math.floor((today.getTime() - oldestMissedDue.getTime()) / 86400000);
+  if (missed >= 2) return 'default';
+  if (daysPastDue <= grace) return 'grace_period';
+  if (daysPastDue <= 60) return 'late';
+  return 'default';
+}
 function matDate(orig,years){if(!orig||!years)return'—';const d=parseLocalDate(orig);d.setFullYear(d.getFullYear()+parseInt(years));return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
 function balloonDate(orig,bYears){if(!orig||!bYears)return null;const d=parseLocalDate(orig);d.setFullYear(d.getFullYear()+parseInt(bYears));return d;}
 const fmt=n=>'$'+Math.round(n||0).toLocaleString();
@@ -2344,22 +2379,25 @@ function populatePaymentDefaults() {
   document.getElementById('pay-balance-preview').textContent = fmtD(bal);
   document.getElementById('pay-principal-input').value = prin.toFixed(2);
   document.getElementById('pay-interest-input').value = int.toFixed(2);
-  // Check if payment is late (past grace period)
+  // Late fee: only auto-suggest when the loan is genuinely past due, NOT merely
+  // because the calendar is past the grace day. Gated on computeLoanStatus() —
+  // the same payment-derived authority Hickory Street Finance uses (its
+  // LateFeeButton only assesses when status is 'late'/'default'). If this
+  // period's payment is already recorded the loan is 'current' and no fee is
+  // suggested. Outstanding (persisted, unpaid) late fees always carry forward.
   const s = APP.settings || {};
-  const graceDays = s.grace_period_days || 15;
   const lateFeeAmt = parseFloat(s.late_fee_amount) || 25;
-  const dueDay = l.payment_due_day || 1;
   const payDate = document.getElementById('pay-date').value ? new Date(document.getElementById('pay-date').value + 'T12:00:00') : new Date();
-  const dueDate = new Date(payDate.getFullYear(), payDate.getMonth(), dueDay);
-  if (payDate < dueDate) dueDate.setMonth(dueDate.getMonth() - 1);
-  const graceDate = new Date(dueDate); graceDate.setDate(graceDate.getDate() + graceDays);
+  const loanPmts = (typeof payments !== 'undefined' ? payments : []).filter(p => p.loan_id === id);
+  const liveStatus = computeLoanStatus(l, loanPmts, bal, payDate);
+  const loanIsLate = liveStatus === 'late' || liveStatus === 'default';
   const lfGroup = document.getElementById('pay-latefee-group');
   const amtRow = document.getElementById('payAmountRow');
   const unpaidLateFees = (typeof lateFees !== 'undefined' ? lateFees : []).filter(f => f.loan_id === id && !f.paid);
-  if (payDate > graceDate || unpaidLateFees.length > 0) {
+  if (loanIsLate || unpaidLateFees.length > 0) {
     lfGroup.style.display = '';
     amtRow.style.gridTemplateColumns = '1fr 1fr 1fr';
-    const totalLF = unpaidLateFees.reduce((s, f) => s + parseFloat(f.amount || 0), 0) + (payDate > graceDate ? lateFeeAmt : 0);
+    const totalLF = unpaidLateFees.reduce((s, f) => s + parseFloat(f.amount || 0), 0) + (loanIsLate ? lateFeeAmt : 0);
     document.getElementById('pay-latefee-input').value = totalLF.toFixed(2);
   } else {
     lfGroup.style.display = 'none';
