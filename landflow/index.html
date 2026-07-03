@@ -1115,14 +1115,12 @@ async function syncSoldStatus(loan) {
       .eq('parcel_number', loan.parcel)
       .single();
     if (prop) {
+      // Website status still syncs silently in the background. The toasts that
+      // used to fire here were removed so that hitting Save just confirms the
+      // save (e.g. checking "Posted on Paperstac") instead of reporting a
+      // website listing change. The "Post to Village Vista" toggle and the
+      // status badges already show the live website state.
       await sb.from('properties').update({ status: newStatus }).eq('id', prop.id);
-      if (loan.sold) {
-        showToast('🚫 Parcel removed from website', 'success');
-      } else if (loan.website_posted) {
-        showToast('🌐 Parcel posted to Village Vista', 'success');
-      } else {
-        showToast('📋 Parcel unlisted from Village Vista', 'success');
-      }
     } else {
       console.warn('No matching property found for parcel:', loan.parcel);
     }
@@ -2036,7 +2034,7 @@ async function saveLoan() {
   if (editingLoanId) {
     const idx = loans.findIndex(l => l.id === editingLoanId);
     if (idx >= 0) loans[idx] = saved;
-    showToast('✅ Loan updated!', 'success');
+    showToast('✅ Saved', 'success');
   } else {
     loans.unshift(saved);
     showToast('✅ Loan created!', 'success');
