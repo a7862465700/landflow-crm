@@ -963,6 +963,10 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="dp-section-title">Note Assignment</div>
         <div id="dp-investor-content"></div>
       </div>
+      <div class="dp-section" id="dp-wrap-section" style="display:none">
+        <div class="dp-section-title">Secondary Buyer (Wraparound)</div>
+        <div id="dp-wrap-content"></div>
+      </div>
     </div>
     <div id="dp-tab-schedule" style="display:none;overflow-y:auto">
       <div class="dp-section">
@@ -1724,7 +1728,10 @@ function getBadge(l) {
 function renderLoans() {
   const grid = document.getElementById('loansGrid');
   const q = (document.getElementById('loanSearch')?.value || '').toLowerCase();
-  const filtered = q ? loans.filter(l =>
+  // Wrap (secondary-buyer) notes appear as a section inside their parent card,
+  // not as their own top-level card.
+  const baseLoans = loans.filter(l => (l.note_type || 'underlying') !== 'wrap');
+  const filtered = q ? baseLoans.filter(l =>
     (l.borrower||'').toLowerCase().includes(q) ||
     (l.buyer_company||'').toLowerCase().includes(q) ||
     (l.seller||'').toLowerCase().includes(q) ||
@@ -1734,7 +1741,7 @@ function renderLoans() {
     (l.address||'').toLowerCase().includes(q) ||
     (l.investor||'').toLowerCase().includes(q) ||
     (l.nb_business||'').toLowerCase().includes(q)
-  ) : loans;
+  ) : baseLoans;
   // Sort by state, then county, then parcel number (alphanumeric)
   filtered.sort((a, b) => {
     const sa = (a.property_state||'').toLowerCase(), sb = (b.property_state||'').toLowerCase();
@@ -2296,6 +2303,35 @@ function openDetail(id) {
        </div>`:''}`
     : `<div style="color:var(--text3);font-size:13px">Note retained — not assigned</div>
        ${l.website_posted?'<div style="margin-top:8px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;display:inline-block;background:rgba(197,167,95,0.2);color:var(--gold)">🌐 Posted on Village Vista</div>':''}`;
+  // Secondary buyer (wraparound): a separate wrap note linked to this parcel/loan.
+  const wrap = loans.find(x => (x.note_type||'') === 'wrap' && (x.wrap_of_loan_id === l.id || (x.parcel && x.parcel === l.parcel)));
+  const wrapSection = document.getElementById('dp-wrap-section');
+  if (wrap) {
+    wrapSection.style.display = '';
+    const wStatus = (wrap.sec_buyer_status || 'pending');
+    const wTerms = wrap.rate ? (wrap.rate + '% · ' + (wrap.term||'?') + 'yr') : '<span style="color:#e6a817">Set wrap terms</span>';
+    document.getElementById('dp-wrap-content').innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-weight:700;color:var(--blue)">🧑 ${wrap.borrower||'Secondary Buyer'}</span>
+        <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:rgba(230,168,23,0.16);color:#e6a817">${wStatus==='pending'?'⏳ Pending Secondary Buyer':wStatus}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+        <div><div class="dp-field-label">Phone</div><div>${fmtPhone(wrap.phone)||'—'}</div></div>
+        <div><div class="dp-field-label">Email</div><div>${wrap.email||'—'}</div></div>
+        <div style="grid-column:1/-1"><div class="dp-field-label">Mailing Address</div><div>${wrap.buyer_address||'—'}</div></div>
+        <div><div class="dp-field-label">Seller</div><div>${wrap.seller||'—'}</div></div>
+        <div><div class="dp-field-label">Lender</div><div>${wrap.loan_servicer||'—'}</div></div>
+        <div><div class="dp-field-label">Sale Price</div><div>${wrap.sale_price?fmt(wrap.sale_price):'—'}</div></div>
+        <div><div class="dp-field-label">Wrap Terms</div><div>${wTerms}</div></div>
+      </div>
+      <div style="margin-top:10px">
+        ${wrap.contract_pdf_url
+          ? `<a href="${wrap.contract_pdf_url}" target="_blank" style="color:var(--gold);text-decoration:underline;font-size:12px">📄 View signed Purchase Agreement</a>`
+          : '<span style="font-size:11px;color:var(--text3)">Signed agreement PDF not yet stored</span>'}
+      </div>`;
+  } else if (wrapSection) {
+    wrapSection.style.display = 'none';
+  }
   const sched = genSchedule(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term), l.first_pay_date||l.orig_date, 24);
   document.getElementById('dp-amort-preview').innerHTML = `<table class="amort-table"><thead><tr><th>#</th><th>Date</th><th>Payment</th><th>Principal</th><th>Interest</th><th>Balance</th></tr></thead><tbody>${sched.map(r=>`<tr><td>${r.num}</td><td>${r.date}</td><td>${fmtD(r.payment)}</td><td class="p">${fmtD(r.principal)}</td><td class="i">${fmtD(r.interest)}</td><td class="b">${fmtD(r.balance)}</td></tr>`).join('')}</tbody></table>`;
   renderDpPayments(l);
@@ -3236,15 +3272,41 @@ async function renderChecklist() {
     } else {
       missing = loans.filter(l => !l[chk.field] || String(l[chk.field]).trim() === '');
     }
-    return { ...chk, missing };
+    // Standard checks apply to underlying notes only; wrap notes have their own section.
+    return { ...chk, missing: missing.filter(l => (l.note_type || 'underlying') !== 'wrap') };
   });
 
   const sevColor = { red:'#e74c3c', amber:'#e6a817', gray:'var(--text3)' };
   const sevBg    = { red:'rgba(231,76,60,.08)', amber:'rgba(230,168,23,.08)', gray:'rgba(150,150,150,.05)' };
 
   // Summary cards
-  const totalLoans = loans.length;
-  const completeLoans = loans.filter(l => results.every(r => !r.missing.includes(l))).length;
+  const baseLoans = loans.filter(l => (l.note_type || 'underlying') !== 'wrap');
+  const totalLoans = baseLoans.length;
+  const completeLoans = baseLoans.filter(l => results.every(r => !r.missing.includes(l))).length;
+
+  // Wraparound secondary-buyer checklist (separate section)
+  const wrapNotes = loans.filter(l => (l.note_type || '') === 'wrap');
+  const wrapRows = wrapNotes.map(w => {
+    const needs = [];
+    if ((w.sec_buyer_status || 'pending') === 'pending') needs.push('Review / activate');
+    if (!w.rate) needs.push('Set wrap terms');
+    if (!w.contract_pdf_url) needs.push('Store signed PDF');
+    if (!w.borrower_user_id) needs.push('Invite to HSF');
+    const parentId = w.wrap_of_loan_id || w.id;
+    return `<div onclick="openChecklistEdit('${parentId}')" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:#e6a817">${w.parcel||'—'}</span>
+      <span style="color:var(--text1)">${w.borrower||'Secondary Buyer'}</span>
+      ${needs.length ? needs.map(n=>`<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(230,168,23,.12);color:#e6a817">${n}</span>`).join('') : '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(34,197,94,.12);color:#22c55e">Ready ✓</span>'}
+    </div>`;
+  }).join('');
+  const wrapSectionHtml = wrapNotes.length ? `<div style="margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px">
+      <span style="font-size:14px">🔄</span>
+      <span style="font-weight:600;font-size:13px;color:var(--text1)">Wraparound Secondary Buyers</span>
+      <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#e6a817">${wrapNotes.length}</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding:0 14px">${wrapRows}</div>
+  </div>` : '';
   const summaryCards = results.filter(r => r.missing.length > 0).slice(0, 7).map(r =>
     `<div style="background:${sevBg[r.severity]};border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;min-width:160px">
       <div style="font-size:22px;font-weight:700;color:${sevColor[r.severity]}">${r.missing.length}</div>
@@ -3280,6 +3342,7 @@ async function renderChecklist() {
       <div style="font-size:13px;color:var(--text3);margin-bottom:10px">${completeLoans} of ${totalLoans} loans fully complete</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">${summaryCards}</div>
     </div>
+    ${wrapSectionHtml}
     <div style="display:flex;flex-direction:column">${sections}</div>
     ${results.every(r => r.missing.length === 0) ? '<div style="text-align:center;padding:40px;color:var(--green);font-size:16px;font-weight:600">All loans are complete! 🎉</div>' : ''}
   `;
