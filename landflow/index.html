@@ -411,6 +411,10 @@ textarea.form-input{resize:vertical;min-height:80px}
         <span class="nav-icon">🔔</span>Alerts
         <span class="nav-badge" id="alertBadge" style="display:none">0</span>
       </div>
+      <div class="nav-item" onclick="nav('wraparounds',this)" data-title="Wraparounds">
+        <span class="nav-icon">🔄</span>Wraparound Buyers
+        <span class="nav-badge" id="wrapBadge" style="display:none">0</span>
+      </div>
     </div>
     <div class="nav-section">
       <div class="nav-label">Documents</div>
@@ -537,6 +541,12 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="view" id="view-alerts">
         <div class="section-header"><div class="section-title">Alerts & Action Items</div></div>
         <div id="alertsContent"></div>
+      </div>
+
+      <!-- WRAPAROUND SECONDARY BUYERS -->
+      <div class="view" id="view-wraparounds">
+        <div class="section-header"><div class="section-title">Wraparound Secondary Buyers</div></div>
+        <div id="wraparoundsContent"></div>
       </div>
 
       <!-- INVOICES -->
@@ -1260,7 +1270,7 @@ async function showApp() {
   document.getElementById('loadingScreen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
   renderLoans(); renderPaymentLedger(); renderBuyers();
-  renderInvestors(); updateStats(); renderAlerts(); renderInvoices();
+  renderInvestors(); updateStats(); renderAlerts(); renderInvoices(); updateWrapBadge();
 }
 
 async function signIn() {
@@ -1672,6 +1682,7 @@ function nav(view, el) {
   if (view === 'alerts') renderAlerts();
   if (view === 'invoices') renderInvoices();
   if (view === 'checklist') renderChecklist();
+  if (view === 'wraparounds') renderWraparounds();
 }
 
 function toggleDrawer() {
@@ -3225,6 +3236,48 @@ async function enhanceAllStockPhotos() {
     showToast('❌ Batch failed: ' + err.message, 'error');
   }
   if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Enhance All'; }
+}
+
+// ============================================================
+// WRAPAROUND SECONDARY BUYERS
+// ============================================================
+function updateWrapBadge() {
+  const n = loans.filter(l => (l.note_type || '') === 'wrap').length;
+  const b = document.getElementById('wrapBadge');
+  if (b) { b.textContent = n; b.style.display = n ? '' : 'none'; }
+}
+
+function renderWraparounds() {
+  updateWrapBadge();
+  const wraps = loans.filter(l => (l.note_type || '') === 'wrap');
+  const el = document.getElementById('wraparoundsContent');
+  if (!el) return;
+  if (!wraps.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🔄</div><div class="empty-title">No wraparound buyers yet</div><div class="empty-sub">Signed website purchases appear here by parcel.</div></div>`;
+    return;
+  }
+  wraps.sort((a, b) => (a.parcel || '').localeCompare(b.parcel || '', undefined, { numeric: true }));
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">` + wraps.map(w => {
+    const status = (w.sec_buyer_status || 'pending');
+    const parentId = w.wrap_of_loan_id || w.id;
+    return `<div class="loan-card" onclick="openDetail('${parentId}')">
+      <div class="lc-head">
+        <div>
+          <div class="lc-id">${w.parcel || '—'}</div>
+          <div class="lc-name">${w.borrower || 'Secondary Buyer'}</div>
+          <div class="lc-addr">✉ ${w.email || '—'}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">📞 ${fmtPhone(w.phone) || '—'}</div>
+        </div>
+        <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:rgba(230,168,23,0.16);color:#e6a817;height:fit-content">${status === 'pending' ? '⏳ Pending' : status}</span>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--text2)">Seller: ${w.seller || '—'} · Lender: ${w.loan_servicer || '—'} · ${w.sale_price ? fmt(w.sale_price) : '—'}</div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+        ${w.contract_pdf_url ? `<span onclick="event.stopPropagation();openWrapPdf('${w.contract_pdf_url}')" style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(201,147,58,.16);color:var(--gold);cursor:pointer">📄 Agreement</span>` : ''}
+        ${!w.rate ? '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(230,168,23,.12);color:#e6a817">Set wrap terms</span>' : ''}
+        ${!w.borrower_user_id ? '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(230,168,23,.12);color:#e6a817">Invite to HSF</span>' : ''}
+      </div>
+    </div>`;
+  }).join('') + `</div>`;
 }
 
 // ============================================================
