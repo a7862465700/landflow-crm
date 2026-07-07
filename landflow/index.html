@@ -2282,7 +2282,7 @@ function openWrapDetail(w) {
     ['Mailing Address', w.buyer_address || '—', ''],
     ['Parcel', w.parcel || '—', 'mono'],
     ['Sale Price', w.sale_price ? fmt(w.sale_price) : '—', 'mono'],
-    ['Wrap Rate / Term', hasTerms ? (w.rate + '% · ' + w.term + 'yr') : 'Set wrap terms', ''],
+    ['Wrap Rate / Term', hasTerms ? (w.rate + '% · ' + w.term + 'yr') : `<a href="#" onclick="openLoanModal('${w.id}');return false" style="color:#e6a817;text-decoration:underline">Set wrap terms →</a>`, ''],
     ['Monthly', hasTerms ? fmtD(pmt) : '—', 'mono'],
     ['Seller', w.seller || '—', ''],
     ['Lender', w.loan_servicer || '—', ''],
@@ -3321,7 +3321,7 @@ function renderWraparounds() {
       <div style="margin-top:8px;font-size:12px;color:var(--text2)">Seller: ${w.seller || '—'} · Lender: ${w.loan_servicer || '—'} · ${w.sale_price ? fmt(w.sale_price) : '—'}</div>
       <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
         ${w.contract_pdf_url ? `<span onclick="event.stopPropagation();openWrapPdf('${w.contract_pdf_url}')" style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(201,147,58,.16);color:var(--gold);cursor:pointer">📄 Agreement</span>` : ''}
-        ${!w.rate ? '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(230,168,23,.12);color:#e6a817">Set wrap terms</span>' : ''}
+        ${!w.rate ? `<span onclick="event.stopPropagation();openLoanModal('${w.id}')" style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(230,168,23,.12);color:#e6a817;cursor:pointer">Set wrap terms</span>` : ''}
         ${!w.borrower_user_id ? '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(230,168,23,.12);color:#e6a817">Invite to HSF</span>' : ''}
       </div>
     </div>`;
