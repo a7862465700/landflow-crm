@@ -1015,9 +1015,17 @@ const HSF_SYNC_SECRET = 'd76c15ad20ab5a3edc65f545df3de0f0c865a2ea01daf605b706c22
 async function syncPhotosToWebsite(loanId) {
   showToast('Syncing photos to website...');
   try {
+    // Send the signed-in admin's Supabase access token so the website can
+    // authorize the request (all apps share one Supabase project).
+    const { data: { session } } = await sb.auth.getSession();
+    const token = session?.access_token;
+    if (!token) { showToast('Please sign in again to sync photos.', 'error'); return; }
     const res = await fetch(VILLAGE_VISTA_API + '/api/sync-photos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
       body: JSON.stringify({ loanId }),
     });
     const result = await res.json();
