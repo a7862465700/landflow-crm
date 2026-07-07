@@ -411,6 +411,10 @@ textarea.form-input{resize:vertical;min-height:80px}
         <span class="nav-icon">🔔</span>Alerts
         <span class="nav-badge" id="alertBadge" style="display:none">0</span>
       </div>
+      <div class="nav-item" onclick="nav('wraparounds',this)" data-title="Wraparounds">
+        <span class="nav-icon">🔄</span>Wraparound Buyers
+        <span class="nav-badge" id="wrapBadge" style="display:none">0</span>
+      </div>
     </div>
     <div class="nav-section">
       <div class="nav-label">Documents</div>
@@ -537,6 +541,12 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="view" id="view-alerts">
         <div class="section-header"><div class="section-title">Alerts & Action Items</div></div>
         <div id="alertsContent"></div>
+      </div>
+
+      <!-- WRAPAROUND SECONDARY BUYERS -->
+      <div class="view" id="view-wraparounds">
+        <div class="section-header"><div class="section-title">Wraparound Secondary Buyers</div></div>
+        <div id="wraparoundsContent"></div>
       </div>
 
       <!-- INVOICES -->
@@ -1260,7 +1270,7 @@ async function showApp() {
   document.getElementById('loadingScreen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
   renderLoans(); renderPaymentLedger(); renderBuyers();
-  renderInvestors(); updateStats(); renderAlerts(); renderInvoices();
+  renderInvestors(); updateStats(); renderAlerts(); renderInvoices(); updateWrapBadge();
 }
 
 async function signIn() {
@@ -1672,6 +1682,7 @@ function nav(view, el) {
   if (view === 'alerts') renderAlerts();
   if (view === 'invoices') renderInvoices();
   if (view === 'checklist') renderChecklist();
+  if (view === 'wraparounds') renderWraparounds();
 }
 
 function toggleDrawer() {
@@ -2249,10 +2260,59 @@ async function openWrapPdf(path) {
   }
 }
 
+// Detail view for a wraparound (secondary buyer) note — shows THAT buyer's info,
+// with a link back to the underlying note it wraps.
+function openWrapDetail(w) {
+  currentLoanId = w.id;
+  const u = loans.find(x => x.id === w.wrap_of_loan_id);
+  const hasTerms = !!(parseFloat(w.rate) && parseInt(w.term));
+  const base = parseFloat(w.loan_amount) || parseFloat(w.sale_price) || 0;
+  const pmt = hasTerms ? calcPayment(base, parseFloat(w.rate), parseInt(w.term)) : 0;
+  document.getElementById('dp-id').textContent = (w.parcel || '') + ' · Wraparound';
+  document.getElementById('dp-name').textContent = w.borrower || 'Secondary Buyer';
+  document.getElementById('dp-addr').textContent = '📬 ' + (w.buyer_address || '—');
+  document.getElementById('dp-badge').innerHTML = `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:rgba(230,168,23,0.16);color:#e6a817">${(w.sec_buyer_status||'pending')==='pending'?'⏳ Pending Secondary Buyer':(w.sec_buyer_status||'')}</span>`;
+  document.getElementById('dp-payment').textContent = hasTerms ? fmtD(pmt) : '—';
+  document.getElementById('dp-balance').textContent = w.sale_price ? fmt(w.sale_price) : '—';
+  document.getElementById('dp-rate').textContent = w.rate ? w.rate + '%' : '—';
+  document.getElementById('dp-fields').innerHTML = [
+    ['Secondary Buyer', w.borrower || '—', 'gold'],
+    ['Phone', fmtPhone(w.phone) || '—', ''],
+    ['Email', w.email || '—', ''],
+    ['Mailing Address', w.buyer_address || '—', ''],
+    ['Parcel', w.parcel || '—', 'mono'],
+    ['Sale Price', w.sale_price ? fmt(w.sale_price) : '—', 'mono'],
+    ['Wrap Rate / Term', hasTerms ? (w.rate + '% · ' + w.term + 'yr') : 'Set wrap terms', ''],
+    ['Monthly', hasTerms ? fmtD(pmt) : '—', 'mono'],
+    ['Seller', w.seller || '—', ''],
+    ['Lender', w.loan_servicer || '—', ''],
+    ['Status', w.sec_buyer_status || 'pending', ''],
+    ['Signed Agreement', w.contract_pdf_url ? `<a href="#" onclick="openWrapPdf('${w.contract_pdf_url}');return false" style="color:var(--gold);text-decoration:underline">📄 View PDF</a>` : 'Not stored', ''],
+  ].map(([lb,val,cls]) => `<div class="dp-field"><div class="dp-field-label">${lb}</div><div class="dp-field-val ${cls}">${val}</div></div>`).join('');
+  document.getElementById('dp-progress').innerHTML = '';
+  document.getElementById('dp-investor-content').innerHTML = u
+    ? `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Wraps the underlying note:</div>
+       <div onclick="openDetail('${u.id}')" style="display:inline-flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">
+         <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--blue)">${u.parcel||'—'}</span>
+         <span style="color:var(--text3)">${u.buyer_company||u.borrower||''}</span>
+       </div>`
+    : '<div style="color:var(--text3);font-size:12px">Underlying note not found</div>';
+  const wsec = document.getElementById('dp-wrap-section'); if (wsec) wsec.style.display = 'none';
+  document.getElementById('dp-amort-preview').innerHTML = hasTerms
+    ? (() => { const s = genSchedule(base, parseFloat(w.rate), parseInt(w.term), w.first_pay_date||w.orig_date, 24); return `<table class="amort-table"><thead><tr><th>#</th><th>Date</th><th>Payment</th><th>Principal</th><th>Interest</th><th>Balance</th></tr></thead><tbody>${s.map(r=>`<tr><td>${r.num}</td><td>${r.date}</td><td>${fmtD(r.payment)}</td><td class="p">${fmtD(r.principal)}</td><td class="i">${fmtD(r.interest)}</td><td class="b">${fmtD(r.balance)}</td></tr>`).join('')}</tbody></table>`; })()
+    : '<div style="color:var(--text3);font-size:12px;padding:12px">Set the wrap terms (rate + term) to generate the amortization schedule.</div>';
+  document.getElementById('dp-payments').innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px">No payments yet. Set the wrap terms and invite this buyer into Hickory Street Finance to collect.</div>';
+  renderFileVault(w.id);
+  document.getElementById('detailPanel').classList.add('open');
+  document.getElementById('detailOverlay').classList.add('open');
+  dpTab('details', document.querySelector('#detailPanel .tab-btn'));
+}
+
 function openDetail(id) {
   currentLoanId = id;
   const l = loans.find(x => x.id === id);
   if (!l) return;
+  if ((l.note_type || '') === 'wrap') return openWrapDetail(l);
   const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
   const realBal = calcRealBalance(l.id);
   const bal = realBal.balance;
@@ -3228,6 +3288,47 @@ async function enhanceAllStockPhotos() {
 }
 
 // ============================================================
+// WRAPAROUND SECONDARY BUYERS
+// ============================================================
+function updateWrapBadge() {
+  const n = loans.filter(l => (l.note_type || '') === 'wrap').length;
+  const b = document.getElementById('wrapBadge');
+  if (b) { b.textContent = n; b.style.display = n ? '' : 'none'; }
+}
+
+function renderWraparounds() {
+  updateWrapBadge();
+  const wraps = loans.filter(l => (l.note_type || '') === 'wrap');
+  const el = document.getElementById('wraparoundsContent');
+  if (!el) return;
+  if (!wraps.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🔄</div><div class="empty-title">No wraparound buyers yet</div><div class="empty-sub">Signed website purchases appear here by parcel.</div></div>`;
+    return;
+  }
+  wraps.sort((a, b) => (a.parcel || '').localeCompare(b.parcel || '', undefined, { numeric: true }));
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">` + wraps.map(w => {
+    const status = (w.sec_buyer_status || 'pending');
+    return `<div class="loan-card" onclick="openDetail('${w.id}')">
+      <div class="lc-head">
+        <div>
+          <div class="lc-id">${w.parcel || '—'}</div>
+          <div class="lc-name">${w.borrower || 'Secondary Buyer'}</div>
+          <div class="lc-addr">✉ ${w.email || '—'}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">📞 ${fmtPhone(w.phone) || '—'}</div>
+        </div>
+        <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:rgba(230,168,23,0.16);color:#e6a817;height:fit-content">${status === 'pending' ? '⏳ Pending' : status}</span>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--text2)">Seller: ${w.seller || '—'} · Lender: ${w.loan_servicer || '—'} · ${w.sale_price ? fmt(w.sale_price) : '—'}</div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+        ${w.contract_pdf_url ? `<span onclick="event.stopPropagation();openWrapPdf('${w.contract_pdf_url}')" style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(201,147,58,.16);color:var(--gold);cursor:pointer">📄 Agreement</span>` : ''}
+        ${!w.rate ? '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(230,168,23,.12);color:#e6a817">Set wrap terms</span>' : ''}
+        ${!w.borrower_user_id ? '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(230,168,23,.12);color:#e6a817">Invite to HSF</span>' : ''}
+      </div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+// ============================================================
 // CHECKLIST — Missing Items Dashboard
 // ============================================================
 async function renderChecklist() {
@@ -3304,8 +3405,7 @@ async function renderChecklist() {
     if (!w.rate) needs.push('Set wrap terms');
     if (!w.contract_pdf_url) needs.push('Store signed PDF');
     if (!w.borrower_user_id) needs.push('Invite to HSF');
-    const parentId = w.wrap_of_loan_id || w.id;
-    return `<div onclick="openChecklistEdit('${parentId}')" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px">
+    return `<div onclick="openChecklistEdit('${w.id}')" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px">
       <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:#e6a817">${w.parcel||'—'}</span>
       <span style="color:var(--text1)">${w.borrower||'Secondary Buyer'}</span>
       ${needs.length ? needs.map(n=>`<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(230,168,23,.12);color:#e6a817">${n}</span>`).join('') : '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(34,197,94,.12);color:#22c55e">Ready ✓</span>'}
