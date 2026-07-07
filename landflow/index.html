@@ -2260,10 +2260,59 @@ async function openWrapPdf(path) {
   }
 }
 
+// Detail view for a wraparound (secondary buyer) note — shows THAT buyer's info,
+// with a link back to the underlying note it wraps.
+function openWrapDetail(w) {
+  currentLoanId = w.id;
+  const u = loans.find(x => x.id === w.wrap_of_loan_id);
+  const hasTerms = !!(parseFloat(w.rate) && parseInt(w.term));
+  const base = parseFloat(w.loan_amount) || parseFloat(w.sale_price) || 0;
+  const pmt = hasTerms ? calcPayment(base, parseFloat(w.rate), parseInt(w.term)) : 0;
+  document.getElementById('dp-id').textContent = (w.parcel || '') + ' · Wraparound';
+  document.getElementById('dp-name').textContent = w.borrower || 'Secondary Buyer';
+  document.getElementById('dp-addr').textContent = '📬 ' + (w.buyer_address || '—');
+  document.getElementById('dp-badge').innerHTML = `<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:rgba(230,168,23,0.16);color:#e6a817">${(w.sec_buyer_status||'pending')==='pending'?'⏳ Pending Secondary Buyer':(w.sec_buyer_status||'')}</span>`;
+  document.getElementById('dp-payment').textContent = hasTerms ? fmtD(pmt) : '—';
+  document.getElementById('dp-balance').textContent = w.sale_price ? fmt(w.sale_price) : '—';
+  document.getElementById('dp-rate').textContent = w.rate ? w.rate + '%' : '—';
+  document.getElementById('dp-fields').innerHTML = [
+    ['Secondary Buyer', w.borrower || '—', 'gold'],
+    ['Phone', fmtPhone(w.phone) || '—', ''],
+    ['Email', w.email || '—', ''],
+    ['Mailing Address', w.buyer_address || '—', ''],
+    ['Parcel', w.parcel || '—', 'mono'],
+    ['Sale Price', w.sale_price ? fmt(w.sale_price) : '—', 'mono'],
+    ['Wrap Rate / Term', hasTerms ? (w.rate + '% · ' + w.term + 'yr') : 'Set wrap terms', ''],
+    ['Monthly', hasTerms ? fmtD(pmt) : '—', 'mono'],
+    ['Seller', w.seller || '—', ''],
+    ['Lender', w.loan_servicer || '—', ''],
+    ['Status', w.sec_buyer_status || 'pending', ''],
+    ['Signed Agreement', w.contract_pdf_url ? `<a href="#" onclick="openWrapPdf('${w.contract_pdf_url}');return false" style="color:var(--gold);text-decoration:underline">📄 View PDF</a>` : 'Not stored', ''],
+  ].map(([lb,val,cls]) => `<div class="dp-field"><div class="dp-field-label">${lb}</div><div class="dp-field-val ${cls}">${val}</div></div>`).join('');
+  document.getElementById('dp-progress').innerHTML = '';
+  document.getElementById('dp-investor-content').innerHTML = u
+    ? `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Wraps the underlying note:</div>
+       <div onclick="openDetail('${u.id}')" style="display:inline-flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">
+         <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--blue)">${u.parcel||'—'}</span>
+         <span style="color:var(--text3)">${u.buyer_company||u.borrower||''}</span>
+       </div>`
+    : '<div style="color:var(--text3);font-size:12px">Underlying note not found</div>';
+  const wsec = document.getElementById('dp-wrap-section'); if (wsec) wsec.style.display = 'none';
+  document.getElementById('dp-amort-preview').innerHTML = hasTerms
+    ? (() => { const s = genSchedule(base, parseFloat(w.rate), parseInt(w.term), w.first_pay_date||w.orig_date, 24); return `<table class="amort-table"><thead><tr><th>#</th><th>Date</th><th>Payment</th><th>Principal</th><th>Interest</th><th>Balance</th></tr></thead><tbody>${s.map(r=>`<tr><td>${r.num}</td><td>${r.date}</td><td>${fmtD(r.payment)}</td><td class="p">${fmtD(r.principal)}</td><td class="i">${fmtD(r.interest)}</td><td class="b">${fmtD(r.balance)}</td></tr>`).join('')}</tbody></table>`; })()
+    : '<div style="color:var(--text3);font-size:12px;padding:12px">Set the wrap terms (rate + term) to generate the amortization schedule.</div>';
+  document.getElementById('dp-payments').innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px">No payments yet. Set the wrap terms and invite this buyer into Hickory Street Finance to collect.</div>';
+  renderFileVault(w.id);
+  document.getElementById('detailPanel').classList.add('open');
+  document.getElementById('detailOverlay').classList.add('open');
+  dpTab('details', document.querySelector('#detailPanel .tab-btn'));
+}
+
 function openDetail(id) {
   currentLoanId = id;
   const l = loans.find(x => x.id === id);
   if (!l) return;
+  if ((l.note_type || '') === 'wrap') return openWrapDetail(l);
   const pmt = calcPayment(parseFloat(l.loan_amount), parseFloat(l.rate), parseInt(l.term));
   const realBal = calcRealBalance(l.id);
   const bal = realBal.balance;
@@ -3259,8 +3308,7 @@ function renderWraparounds() {
   wraps.sort((a, b) => (a.parcel || '').localeCompare(b.parcel || '', undefined, { numeric: true }));
   el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">` + wraps.map(w => {
     const status = (w.sec_buyer_status || 'pending');
-    const parentId = w.wrap_of_loan_id || w.id;
-    return `<div class="loan-card" onclick="openDetail('${parentId}')">
+    return `<div class="loan-card" onclick="openDetail('${w.id}')">
       <div class="lc-head">
         <div>
           <div class="lc-id">${w.parcel || '—'}</div>
@@ -3357,8 +3405,7 @@ async function renderChecklist() {
     if (!w.rate) needs.push('Set wrap terms');
     if (!w.contract_pdf_url) needs.push('Store signed PDF');
     if (!w.borrower_user_id) needs.push('Invite to HSF');
-    const parentId = w.wrap_of_loan_id || w.id;
-    return `<div onclick="openChecklistEdit('${parentId}')" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px">
+    return `<div onclick="openChecklistEdit('${w.id}')" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px">
       <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:#e6a817">${w.parcel||'—'}</span>
       <span style="color:var(--text1)">${w.borrower||'Secondary Buyer'}</span>
       ${needs.length ? needs.map(n=>`<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(230,168,23,.12);color:#e6a817">${n}</span>`).join('') : '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(34,197,94,.12);color:#22c55e">Ready ✓</span>'}
