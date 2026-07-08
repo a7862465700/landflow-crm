@@ -4198,7 +4198,7 @@ function buildMergeData(loan) {
     rate: loan.rate || '', rate_fmt: (loan.rate || 0) + '%',
     term: loan.term || '', balloon: loan.balloon || '',
     balloon_date: balloonDate,
-    orig_date: fmtDate(loan.orig_date), contract_date: fmtDate(loan.orig_date), date: fmtDate(loan.orig_date),
+    orig_date: fmtDate(loan.orig_date), contract_date: loan.orig_date ? writtenDate(loan.orig_date) : '', date: fmtDate(loan.orig_date),
     orig_date_written: loan.orig_date ? writtenDate(loan.orig_date) : '',
     contract_date_written: loan.orig_date ? writtenDate(loan.orig_date) : '',
     first_pay_date: fmtDate(firstPayDate),
