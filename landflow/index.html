@@ -478,7 +478,6 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div class="section-header">
           <div class="section-title">Active Loans</div>
           <button class="btn btn-gold btn-sm" onclick="openLoanModal()">＋ New Loan</button>
-          <button id="importWebsiteBtn" class="btn btn-sm" style="background:#2fae7a;color:#fff;display:none" onclick="openWebsiteBuyerPicker()">📥 From Website</button>
           <button class="btn btn-sm" style="background:#3b7be0;color:#fff" onclick="importPDF()">📄 Import PDF</button>
         </div>
         <div class="search-bar">
@@ -726,23 +725,6 @@ textarea.form-input{resize:vertical;min-height:80px}
       <button class="btn" style="background:rgba(66,133,244,0.15);color:#4285F4;font-weight:600" onclick="quickGeneratePurchaseAgreement()">📄 Purchase Agreement</button>
       <button class="btn btn-ghost" onclick="closeModal('loanModal')">Cancel</button>
       <button id="loanSaveBtn" class="btn btn-gold" onclick="saveLoan()" style="display:none">💾 Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- WEBSITE BUYER PICKER MODAL -->
-<div class="modal-overlay" id="websiteBuyerModal">
-  <div class="modal" style="max-width:520px">
-    <div class="modal-head">
-      <div class="modal-title">📥 Import from Website</div>
-      <button class="modal-close" onclick="closeModal('websiteBuyerModal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Buyers who signed a Purchase Agreement on hotspringsland.com. Pick one to prefill a new loan — you can review and edit everything before saving.</div>
-      <div id="websiteBuyerList"></div>
-    </div>
-    <div class="modal-foot" style="display:flex;justify-content:flex-end">
-      <button class="btn btn-ghost" onclick="closeModal('websiteBuyerModal')">Close</button>
     </div>
   </div>
 </div>
@@ -1193,7 +1175,7 @@ function updateWebsitePostedLabel() {
 // ============================================================
 // STATE
 // ============================================================
-let loans = [], payments = [], investors = [], invoices = [], vaultFiles = [], lateFees = [], websiteProperties = {}, websiteBuyers = [];
+let loans = [], payments = [], investors = [], invoices = [], vaultFiles = [], lateFees = [], websiteProperties = {};
 let currentLoanId = null, editingLoanId = null, toastTimer, currentUser = null;
 let APP = { settings: null };
 
@@ -1348,136 +1330,6 @@ async function loadWebsiteProperties() {
   } catch (e) { console.warn('properties query threw:', e); }
 }
 
-// Loads signed website buyers (leads who chose a parcel and completed the
-// Purchase Agreement on hotspringsland.com) so their terms can be pulled into a
-// new loan without re-keying. Admin-only read (leads RLS). Non-blocking: a slow
-// or failed query here must never block app boot, same as loadWebsiteProperties.
-async function loadWebsiteBuyers() {
-  try {
-    const { data, error } = await sb.from('leads')
-      .select('id, first_name, last_name, email, phone, address, city, state_residence, zip, buyer_county, company_name, parcel, contract_payload, created_at')
-      .eq('status', 'agreement_signed')
-      .not('contract_payload', 'is', null)
-      .order('created_at', { ascending: false });
-    if (error) { console.warn('leads query failed:', error.message); return; }
-    websiteBuyers = data || [];
-    updateImportBadge();
-  } catch (e) { console.warn('leads query threw:', e); }
-}
-
-// A website buyer's parcel (falls back to the parcel inside contract_payload).
-function buyerParcel(b) {
-  return (b.parcel || b.contract_payload?.parcel || '').toString().trim();
-}
-
-// Signed buyers not yet turned into a loan — matched by parcel. Once the loan is
-// saved (it carries the same parcel), the buyer drops off this list.
-function pendingWebsiteBuyers() {
-  const loanParcels = new Set(loans.map(l => (l.parcel || '').toString().trim()).filter(Boolean));
-  return websiteBuyers.filter(b => {
-    const p = buyerParcel(b);
-    return !p || !loanParcels.has(p);
-  });
-}
-
-// Show/hide + count on the "From Website" button.
-function updateImportBadge() {
-  const btn = document.getElementById('importWebsiteBtn');
-  if (!btn) return;
-  const n = pendingWebsiteBuyers().length;
-  if (n > 0) { btn.style.display = ''; btn.textContent = `📥 From Website (${n})`; }
-  else { btn.style.display = 'none'; }
-}
-
-// Parse the checkout's contract_date ("M/D/YYYY" en-US) to an <input type=date>
-// value (YYYY-MM-DD). Falls back to any Date-parseable string.
-function contractDateToISO(v) {
-  if (!v) return '';
-  const s = String(v).trim();
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) {
-    const [, mo, da, yr] = m;
-    return `${yr}-${mo.padStart(2, '0')}-${da.padStart(2, '0')}`;
-  }
-  const d = new Date(s);
-  return isNaN(d) ? '' : d.toISOString().split('T')[0];
-}
-
-// Map term months → the closest available <select> option (years).
-function termMonthsToYears(months) {
-  const opts = [3, 5, 6, 7, 10, 15, 20, 25, 30];
-  const yrs = Math.round((Number(months) || 0) / 12);
-  if (opts.includes(yrs)) return String(yrs);
-  return '30';
-}
-
-function openWebsiteBuyerPicker() {
-  const pending = pendingWebsiteBuyers();
-  const body = document.getElementById('websiteBuyerList');
-  if (!pending.length) {
-    body.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">No new website buyers</div><div class="empty-sub">Signed buyers appear here until you create their loan.</div></div>';
-  } else {
-    body.innerHTML = pending.map(b => {
-      const cp = b.contract_payload || {};
-      const name = (cp.buyer_name || `${b.first_name || ''} ${b.last_name || ''}`).trim() || '(no name)';
-      const parcel = buyerParcel(b) || '—';
-      const price = cp.sale_price != null ? '$' + Number(cp.sale_price).toLocaleString() : '—';
-      const title = cp.property_title || '';
-      const when = b.created_at ? fmtDate(b.created_at.split('T')[0]) : '';
-      return `<div class="wb-row" onclick="importWebsiteBuyer('${b.id}')" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r);margin-bottom:8px;cursor:pointer;background:var(--s2)">
-        <div style="min-width:0">
-          <div style="font-weight:600">${esc(name)}</div>
-          <div style="font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Parcel ${esc(parcel)}${title ? ' · ' + esc(title) : ''}${when ? ' · ' + esc(when) : ''}</div>
-        </div>
-        <div style="text-align:right;white-space:nowrap"><div style="font-weight:600;color:var(--gold)">${esc(price)}</div><div style="font-size:11px;color:var(--text3)">Prefill loan →</div></div>
-      </div>`;
-    }).join('');
-  }
-  openModal('websiteBuyerModal');
-}
-
-// Pull a signed website buyer's submission into a fresh, editable New Loan form
-// for review before saving. Values come from contract_payload (the exact terms
-// the buyer agreed to) with fallbacks to the lead's own columns.
-function importWebsiteBuyer(leadId) {
-  const b = websiteBuyers.find(x => x.id === leadId);
-  if (!b) return;
-  const cp = b.contract_payload || {};
-  closeModal('websiteBuyerModal');
-  openLoanModal(); // fresh, editable "New Loan" modal
-  const set = (id, val) => { const el = document.getElementById(id); if (el != null && val != null && val !== '') el.value = val; };
-
-  // Buyer
-  set('f-borrower', (cp.buyer_name || `${b.first_name || ''} ${b.last_name || ''}`).trim());
-  set('f-buyer-company', cp.buyer_company || b.company_name);
-  set('f-phone', cp.buyer_phone || b.phone);
-  set('f-email', cp.buyer_email || b.email);
-  set('f-buyer-address', cp.buyer_address || [b.address, b.city, [b.state_residence, b.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '));
-  set('f-buyer-state', (cp.buyer_state || b.state_residence || '').toUpperCase());
-  set('f-buyer-county', (cp.buyer_county || b.buyer_county || '').toUpperCase());
-
-  // Property (hotspringsland.com is Arkansas)
-  set('f-state', 'ARKANSAS');
-  set('f-county', cp.county);
-  set('f-parcel', buyerParcel(b));
-  set('f-lot', cp.lot);
-  if (cp.legal_desc && cp.legal_desc !== 'See parcel details') set('f-legaldesc', cp.legal_desc);
-
-  // Loan terms
-  set('f-saleprice', cp.sale_price);
-  set('f-down', cp.down_payment);
-  set('f-loanamt', cp.loan_amount);
-  set('f-rate', cp.rate);
-  if (cp.term_months) document.getElementById('f-term').value = termMonthsToYears(cp.term_months);
-  const iso = contractDateToISO(cp.contract_date);
-  if (iso) set('f-origdate', iso);
-
-  updateDateWritten();
-  updateFirstPayWritten();
-  updatePreview();
-  showToast('Prefilled from website buyer — review and Save', 'success');
-}
-
 async function loadAllData() {
   if (!currentUser) return;
   const uid = currentUser.id;
@@ -1511,8 +1363,6 @@ async function loadAllData() {
   vaultFiles = vf.data || [];
   // websiteProperties (cross-app drift badge) loads in the background — must NOT block app boot
   loadWebsiteProperties();
-  // Signed website buyers (New Loan prefill) — also background, non-blocking.
-  loadWebsiteBuyers();
 
   APP.settings = us.data || null;
   lateFees = lf.data || [];
@@ -1792,8 +1642,6 @@ function balloonDate(orig,bYears){if(!orig||!bYears)return null;const d=parseLoc
 const fmt=n=>'$'+Math.round(n||0).toLocaleString();
 const fmtD=n=>'$'+(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 const fmtDate=d=>d?parseLocalDate(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
-// HTML-escape untrusted values (e.g. buyer-submitted lead data) before innerHTML.
-const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtPhone=p=>{if(!p)return'';const d=p.replace(/\D/g,'');if(d.length===10)return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;if(d.length===11&&d[0]==='1')return`(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;return p;};
 
 // Late fee check: returns true if payment is late (past grace period)
@@ -1889,7 +1737,6 @@ function getBadge(l) {
 // LOANS
 // ============================================================
 function renderLoans() {
-  updateImportBadge();
   const grid = document.getElementById('loansGrid');
   const q = (document.getElementById('loanSearch')?.value || '').toLowerCase();
   // Wrap (secondary-buyer) notes appear as a section inside their parent card,
@@ -2435,6 +2282,8 @@ function openWrapDetail(w) {
     ['Mailing Address', w.buyer_address || '—', ''],
     ['Parcel', w.parcel || '—', 'mono'],
     ['Sale Price', w.sale_price ? fmt(w.sale_price) : '—', 'mono'],
+    ['Down Payment', (w.down_payment != null && w.down_payment !== '') ? fmt(w.down_payment) : '—', 'mono'],
+    ['Amount Financed', w.loan_amount ? fmt(w.loan_amount) : '—', 'mono'],
     ['Wrap Rate / Term', hasTerms ? (w.rate + '% · ' + w.term + 'yr') : `<a href="#" onclick="openLoanModal('${w.id}');return false" style="color:#e6a817;text-decoration:underline">Set wrap terms →</a>`, ''],
     ['Monthly', hasTerms ? fmtD(pmt) : '—', 'mono'],
     ['Seller', w.seller || '—', ''],
