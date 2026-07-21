@@ -2282,6 +2282,8 @@ function openWrapDetail(w) {
     ['Mailing Address', w.buyer_address || '—', ''],
     ['Parcel', w.parcel || '—', 'mono'],
     ['Sale Price', w.sale_price ? fmt(w.sale_price) : '—', 'mono'],
+    ['Down Payment', (w.down_payment != null && w.down_payment !== '') ? fmt(w.down_payment) : '—', 'mono'],
+    ['Amount Financed', w.loan_amount ? fmt(w.loan_amount) : '—', 'mono'],
     ['Wrap Rate / Term', hasTerms ? (w.rate + '% · ' + w.term + 'yr') : `<a href="#" onclick="openLoanModal('${w.id}');return false" style="color:#e6a817;text-decoration:underline">Set wrap terms →</a>`, ''],
     ['Monthly', hasTerms ? fmtD(pmt) : '—', 'mono'],
     ['Seller', w.seller || '—', ''],
