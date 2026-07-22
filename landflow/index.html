@@ -2102,7 +2102,12 @@ async function saveLoan() {
           contentType: pendingImportPDF.type || 'application/pdf'
         });
         const vaultData = {
-          loan_id: saved.id, cat_id: 'recorded',
+          // 'purchase' — the deed is the document evidencing the purchase from the
+          // State, so it belongs under Purchase Documents. It previously saved as
+          // 'recorded', which is not one of FILE_CATEGORIES, so every auto-imported
+          // deed was invisible in the Docs tab and the file vault and had to be
+          // re-uploaded by hand to appear.
+          loan_id: saved.id, cat_id: 'purchase',
           name: pendingImportPDF.name, size: pendingImportPDF.size,
           type: pendingImportPDF.type, data: 'storage:' + storagePath,
           book_page: '', notes: 'Auto-imported deed',
@@ -3794,6 +3799,35 @@ function renderFileVault(loanId) {
     }
     html += `</div>`;
   });
+
+  // A file whose cat_id is not one of the categories above is dropped by every
+  // view that renders FILE_CATEGORIES — which is how 35 auto-imported deeds sat
+  // invisible under cat_id 'recorded'. Surface anything unrecognised so a file
+  // can never silently disappear again.
+  const knownCats = FILE_CATEGORIES.map(c => c.id);
+  const orphans = allFiles.filter(f => !knownCats.includes(f.cat_id));
+  if (orphans.length) {
+    html += `<div class="vault-cat">
+      <div class="vault-cat-head">
+        <div class="vault-cat-title">❓ Uncategorized <span style="color:var(--text3);font-weight:400">(${orphans.length})</span></div>
+      </div>`;
+    orphans.forEach(f => {
+      html += `<div class="vault-file-row">
+        <div class="vault-file-icon">${fileIcon(f.type, f.name)}</div>
+        <div style="flex:1;min-width:0">
+          <div class="vault-file-name" style="cursor:pointer;color:var(--gold)" onclick="vaultOpen('${loanId}','${f.id}')" title="Click to open">${f.name}</div>
+          <div class="vault-file-meta">${fmtFileSize(f.size)} · ${new Date(f.created_at||f.uploaded_at||Date.now()).toLocaleDateString()} · category: ${f.cat_id||'(none)'}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+          <button class="btn btn-ghost btn-sm" onclick="vaultOpen('${loanId}','${f.id}')" title="Open">👁</button>
+          <button class="btn btn-ghost btn-sm" onclick="vaultDownload('${loanId}','${f.id}')" title="Download">⬇</button>
+          <button class="btn btn-danger btn-sm" onclick="vaultDelete('${loanId}','${f.id}')" title="Delete">🗑</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
   el.innerHTML = html;
 }
 
