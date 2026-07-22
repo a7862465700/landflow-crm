@@ -3468,7 +3468,22 @@ async function renderChecklist() {
       missing = loans.filter(l => !l[chk.field] || String(l[chk.field]).trim() === '');
     }
     // Standard checks apply to underlying notes only; wrap notes have their own section.
-    return { ...chk, missing: missing.filter(l => (l.note_type || 'underlying') !== 'wrap') };
+    // Oldest first, then numerically by parcel. Previously the chips inherited the
+    // load order (created_at DESC), which put the newest loans first and scattered
+    // parcels — hard to work through as a punch list. orig_date is an ISO date
+    // string, so a plain string compare is chronological. Undated loans sort last.
+    // localeCompare with numeric:true keeps both parcel formats sane, so 57484
+    // orders against 440-00046-000 by leading number rather than character code.
+    const oldestFirstThenParcel = (a, b) => {
+      const da = a.orig_date || '', db = b.orig_date || '';
+      if (da !== db) {
+        if (!da) return 1;
+        if (!db) return -1;
+        return da < db ? -1 : 1;
+      }
+      return String(a.parcel || '').localeCompare(String(b.parcel || ''), undefined, { numeric: true, sensitivity: 'base' });
+    };
+    return { ...chk, missing: missing.filter(l => (l.note_type || 'underlying') !== 'wrap').sort(oldestFirstThenParcel) };
   });
 
   const sevColor = { red:'#e74c3c', amber:'#e6a817', gray:'var(--text3)' };
