@@ -42,7 +42,7 @@ const DEED_SCHEMA = {
     city: { type: "string", description: "City or municipality, or \"\" if absent" },
     price_paid: { type: "number", description: "Dollar amount paid to the Commissioner of State Lands. 0 if not found." },
     previous_owner: { type: "string", description: "Tax-assessed previous owner who lost the property to the state" },
-    filing_date: { type: "string", description: "Date the Commissioner EXECUTED the deed, from the 'WITNESS MY HAND AND OFFICIAL SEAL ... on this date ____' clause above the signature. YYYY-MM-DD. NOT the county clerk's recording date. \"\" if not legible — never substitute today's date." },
+    filing_date: { type: "string", description: "Date the county clerk RECORDED the deed, from the clerk's filing/certification stamp (e.g. 'eFiled for Record 07/16/2026' or 'filed on: 03/10/2026'). Date only, ignore the time. YYYY-MM-DD. NOT the Commissioner's execution date in the WITNESS clause. \"\" if not legible — never substitute today's date." },
   },
   required: [
     "seller", "seller_address", "parcel", "legal_desc", "county",
@@ -56,19 +56,25 @@ const PROMPT = `This is an Arkansas Limited Warranty Deed issued by the Commissi
 Important notes:
 - Do not put the grantee/purchasing company (the entity the deed conveys TO) in any field. Only the Commissioner side and the property belong in the output.
 
-- filing_date is the date the Commissioner EXECUTED the deed. It appears in the
-  "WITNESS MY HAND AND OFFICIAL SEAL, as Commissioner of State Lands, on this date ____"
-  clause just above the signature block, usually written out longhand
-  (e.g. "July 13, 2026"). Return it as YYYY-MM-DD.
+- filing_date is the date the COUNTY CLERK RECORDED the deed — the recording date,
+  which the business treats as the funding date. It comes from the clerk's filing or
+  certification stamp, which appears in the TOP RIGHT corner of the first page and/or
+  in a certification block, alongside a Book/Page or instrument number. Wording varies
+  by county, for example:
+    * "eFiled for Record 07/16/2026 3:09PM"            (Garland)
+    * "I certify this instrument was filed on: 03/10/2026 03:32:19 PM"  (Saline)
+    * "I certify this instrument was Electronically filed on 07/16/2026 ... in DEED Book 4894"
+  Take the DATE only and ignore the time of day. Return it as YYYY-MM-DD.
 
   These deeds carry several other dates. Do NOT use any of them:
-    * the county clerk's recording stamp — often in the TOP RIGHT corner, alongside a
-      Book/Page number and a filing time (e.g. "eFiled for Record 07/16/2026 3:09PM").
-      This is typically a few days AFTER execution and is not the date we want.
+    * the Commissioner's EXECUTION date, in the "WITNESS MY HAND AND OFFICIAL SEAL,
+      as Commissioner of State Lands, on this date ____" clause above the signature
+      (e.g. "July 13, 2026"). This is typically a few days BEFORE recording and is
+      not the date we want.
     * "Year Forfeited" or the tax years assessed (e.g. "2020 - 2024")
     * today's date
 
-  If the execution date is not legible, return an empty string. Never guess and never
+  If the recording date is not legible, return an empty string. Never guess and never
   substitute a different date from the document.
 
 - For price_paid, use the dollar amount paid to the Commissioner of State Lands
