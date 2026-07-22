@@ -2175,6 +2175,13 @@ async function handlePDFFile(e) {
 
     const extracted = await resp.json();
 
+    // Fields the extractor could not read with confidence. Collected here and
+    // surfaced at the end so a partial extraction is never reported as a clean one.
+    const reviewNotes = Array.isArray(extracted._warnings) ? extracted._warnings.slice() : [];
+    if (extracted._degraded) {
+      console.warn('Deed extraction ran on a fallback model:', extracted._model);
+    }
+
     // Store PDF for vault upload after save
     pendingImportPDF = { name: file.name, size: file.size, type: file.type, dataUrl };
 
@@ -2210,8 +2217,18 @@ async function handlePDFFile(e) {
     document.getElementById('f-buyer-state').value = ARKANSAS_DEFAULTS.buyer_state;
     document.getElementById('f-buyer-county').value = ARKANSAS_DEFAULTS.buyer_county;
 
-    // Set origination date to the filing date from the document (not today)
-    const filingDate = extracted.filing_date ? new Date(extracted.filing_date + 'T00:00:00') : new Date();
+    // Set origination date to the filing date from the document (not today).
+    // A missing or malformed filing_date used to fall through to today's date
+    // silently — which produces a loan that reads as past-due the moment it is
+    // saved — or throw "Invalid time value" and abort the whole import. Fall back
+    // to today so the form still opens, but say so loudly.
+    const filingDateValid =
+      /^\d{4}-\d{2}-\d{2}$/.test(extracted.filing_date || '') &&
+      !isNaN(new Date(extracted.filing_date + 'T00:00:00').getTime());
+    const filingDate = filingDateValid ? new Date(extracted.filing_date + 'T00:00:00') : new Date();
+    if (!filingDateValid) {
+      reviewNotes.push('filing date was not readable — origination and first-payment dates defaulted to today, correct them from the deed before saving');
+    }
     document.getElementById('f-origdate').value = filingDate.toISOString().split('T')[0];
 
     // First payment date = 1st of the month following the filing date
@@ -2227,7 +2244,16 @@ async function handlePDFFile(e) {
     // Trigger live calculation preview
     updatePreview();
 
-    showToast('PDF data extracted — review and save', 'success');
+    if (reviewNotes.length) {
+      console.warn('PDF extraction needs review:', reviewNotes);
+      showToast(
+        'Extracted, but ' + reviewNotes.length + ' field(s) need review — ' + reviewNotes[0] +
+        (reviewNotes.length > 1 ? ' (+' + (reviewNotes.length - 1) + ' more in console)' : ''),
+        'error'
+      );
+    } else {
+      showToast('PDF data extracted — review and save', 'success');
+    }
   } catch (err) {
     console.error('PDF import error:', err);
     showToast('PDF import failed: ' + err.message, 'error');
