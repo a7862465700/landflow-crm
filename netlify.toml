@@ -3,3 +3,8 @@
 
 [functions]
   directory = "netlify/functions"
+
+# Daily model-availability check for deed extraction.
+# 13:00 UTC = 8am CDT / 7am CST.
+[functions."model-health-canary"]
+  schedule = "0 13 * * *"
