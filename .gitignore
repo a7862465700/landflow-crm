@@ -15,3 +15,6 @@ tech-spec.md
 
 # Claude worktrees
 .claude/worktrees/
+
+# Local Netlify folder
+.netlify
