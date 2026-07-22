@@ -42,7 +42,7 @@ const DEED_SCHEMA = {
     city: { type: "string", description: "City or municipality, or \"\" if absent" },
     price_paid: { type: "number", description: "Dollar amount paid to the Commissioner of State Lands. 0 if not found." },
     previous_owner: { type: "string", description: "Tax-assessed previous owner who lost the property to the state" },
-    filing_date: { type: "string", description: "Deed date from the top right of the document, as YYYY-MM-DD. \"\" if not legible — never substitute today's date." },
+    filing_date: { type: "string", description: "Date the Commissioner EXECUTED the deed, from the 'WITNESS MY HAND AND OFFICIAL SEAL ... on this date ____' clause above the signature. YYYY-MM-DD. NOT the county clerk's recording date. \"\" if not legible — never substitute today's date." },
   },
   required: [
     "seller", "seller_address", "parcel", "legal_desc", "county",
@@ -54,8 +54,23 @@ const DEED_SCHEMA = {
 const PROMPT = `This is an Arkansas Limited Warranty Deed issued by the Commissioner of State Lands (Tommy Land or successor). Extract the deed fields.
 
 Important notes:
-- The grantee/buyer is always Terra Equity Holdings — do not put it in any field
-- filing_date must come from the document itself (top right corner), never the current date. If it is not legible, return an empty string rather than guessing.
+- Do not put the grantee/purchasing company (the entity the deed conveys TO) in any field. Only the Commissioner side and the property belong in the output.
+
+- filing_date is the date the Commissioner EXECUTED the deed. It appears in the
+  "WITNESS MY HAND AND OFFICIAL SEAL, as Commissioner of State Lands, on this date ____"
+  clause just above the signature block, usually written out longhand
+  (e.g. "July 13, 2026"). Return it as YYYY-MM-DD.
+
+  These deeds carry several other dates. Do NOT use any of them:
+    * the county clerk's recording stamp — often in the TOP RIGHT corner, alongside a
+      Book/Page number and a filing time (e.g. "eFiled for Record 07/16/2026 3:09PM").
+      This is typically a few days AFTER execution and is not the date we want.
+    * "Year Forfeited" or the tax years assessed (e.g. "2020 - 2024")
+    * today's date
+
+  If the execution date is not legible, return an empty string. Never guess and never
+  substitute a different date from the document.
+
 - For price_paid, use the dollar amount paid to the Commissioner of State Lands
 - Garland County and Saline County deeds have different layouts. In Garland County the parcel number often appears near the legal description; in Saline County it may be labeled "Parcel ID" or "Tax ID". Extract it exactly as written.
 - If a field genuinely does not appear in the document, return an empty string (or 0 for price_paid). Do not infer or invent values.`;
