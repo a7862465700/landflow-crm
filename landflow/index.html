@@ -3393,6 +3393,27 @@ function renderWraparounds() {
 // CHECKLIST — Missing Items Dashboard
 // ============================================================
 async function renderChecklist() {
+  // The checklist is computed from the in-memory `loans` and `vaultFiles` arrays,
+  // which are populated once by loadAllData() at sign-in. Anything added since —
+  // a loan imported an hour ago, a document just uploaded — was silently absent,
+  // so a parcel genuinely missing its sale documents would simply not be listed.
+  // Refresh those two collections before computing. Deliberately not a full
+  // loadAllData(): that also pulls every payment and late fee, which this view
+  // does not use and which is the expensive part of the load.
+  try {
+    const uid = currentUser?.id;
+    if (uid) {
+      const [lRes, vfRes] = await Promise.all([
+        sb.from('loans').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+        sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,sort_order,created_at,enhanced,enhanced_url,photo_category').eq('user_id', uid),
+      ]);
+      if (lRes.data) loans = lRes.data;
+      if (vfRes.data) vaultFiles = vfRes.data;
+    }
+  } catch (e) {
+    console.error('Checklist data refresh failed — showing last loaded data:', e);
+  }
+
   // Fetch website properties to check sync status
   let websiteProps = [];
   try {
