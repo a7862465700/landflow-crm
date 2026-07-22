@@ -610,7 +610,7 @@ textarea.form-input{resize:vertical;min-height:80px}
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Seller Full Name</label><input class="form-input" id="f-seller" placeholder="John Smith" oninput="autoFillFromSeller()"></div>
         <div class="form-group"><label class="form-label">Seller Phone</label><input class="form-input" id="f-seller-phone" type="tel" placeholder="5550000000"></div>
-        <div class="form-group form-full"><label class="form-label">Seller Address</label><input class="form-input" id="f-seller-address" placeholder="123 Main St, Atlanta GA 30301"></div>
+        <div class="form-group form-full"><label class="form-label">Seller Address</label><input class="form-input" id="f-seller-address" placeholder="7003 Valley Ranch Drive, Little Rock, Arkansas 72223"></div>
         <div class="form-group"><label class="form-label">Price Paid to Seller</label><input class="form-input" id="f-price-paid" type="number" placeholder="8000"></div>
       </div>
       <div class="form-section">👤 Buyer Info</div>
@@ -2191,6 +2191,12 @@ async function handlePDFFile(e) {
     // Fill extracted fields
     if (extracted.seller) document.getElementById('f-seller').value = extracted.seller;
     if (extracted.seller_address) document.getElementById('f-seller-address').value = extracted.seller_address;
+
+    // The seller field above is set programmatically, which does not fire the change
+    // event that normally triggers autoFillFromSeller(). Call it directly so a
+    // Commissioner deed whose seller address failed to extract still lands on the
+    // Little Rock office address. It only fills blanks, so an extracted value wins.
+    autoFillFromSeller();
     if (extracted.parcel) document.getElementById('f-parcel').value = extracted.parcel;
     if (extracted.legal_desc) document.getElementById('f-legaldesc').value = extracted.legal_desc;
     if (extracted.county) document.getElementById('f-county').value = extracted.county;
