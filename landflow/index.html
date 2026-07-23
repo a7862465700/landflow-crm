@@ -3400,37 +3400,31 @@ async function renderChecklist() {
   // Refresh those two collections before computing. Deliberately not a full
   // loadAllData(): that also pulls every payment and late fee, which this view
   // does not use and which is the expensive part of the load.
-  try {
-    const uid = currentUser?.id;
-    if (uid) {
-      const [lRes, vfRes] = await Promise.all([
-        sb.from('loans').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-        sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,sort_order,created_at,enhanced,enhanced_url,photo_category').eq('user_id', uid),
-      ]);
-      if (lRes.data) loans = lRes.data;
-      if (vfRes.data) vaultFiles = vfRes.data;
-    }
-  } catch (e) {
-    console.error('Checklist data refresh failed — showing last loaded data:', e);
-  }
-
-  // Which parcels have photos live on the website. This only needs the parcel
-  // numbers of rows whose photos array is non-empty, so the filter runs in the
-  // database and the photos themselves are never downloaded.
+  // All three queries go out together. They were previously two sequential
+  // awaits — loans and vault files, then properties — which cost an extra
+  // round trip to Supabase for no reason, since none of them depends on
+  // another's result.
   //
-  // This previously selected `parcel_number, photos` and tested photos.length
-  // in JavaScript, which pulled ~6.3 MB every time the Checklist opened — one
-  // property alone carries 6.4 MB of photo data — and was what made the page
-  // take minutes to appear. Filtering server-side returns the identical 47
+  // The properties query only needs the parcel numbers of rows whose photos
+  // array is non-empty, so that filter runs in the database. It used to select
+  // `parcel_number, photos` and test photos.length in JavaScript, pulling
+  // ~6.3 MB on every open — one property carries 6.4 MB by itself — which is
+  // what made this page take minutes. Server-side it returns the identical 47
   // parcels in about 540 bytes.
   let syncedParcels = new Set();
   try {
-    const { data } = await sb.from('properties')
-      .select('parcel_number')
-      .not('photos', 'is', null)
-      .neq('photos', '{}');
-    syncedParcels = new Set((data || []).map(p => p.parcel_number));
-  } catch (e) { console.error('Failed to fetch properties for checklist:', e); }
+    const uid = currentUser?.id;
+    const [lRes, vfRes, pRes] = await Promise.all([
+      uid ? sb.from('loans').select('*').eq('user_id', uid).order('created_at', { ascending: false }) : Promise.resolve({ data: null }),
+      uid ? sb.from('vault_files').select('id,user_id,loan_id,cat_id,name,size,type,book_page,notes,sort_order,created_at,enhanced,enhanced_url,photo_category').eq('user_id', uid) : Promise.resolve({ data: null }),
+      sb.from('properties').select('parcel_number').not('photos', 'is', null).neq('photos', '{}'),
+    ]);
+    if (lRes.data) loans = lRes.data;
+    if (vfRes.data) vaultFiles = vfRes.data;
+    if (pRes.data) syncedParcels = new Set(pRes.data.map(p => p.parcel_number));
+  } catch (e) {
+    console.error('Checklist data refresh failed — showing last loaded data:', e);
+  }
 
   const checks = [
     { key:'purchase',  icon:'🏛', label:'Missing Purchase Documents', severity:'red',   type:'file', catId:'purchase' },
