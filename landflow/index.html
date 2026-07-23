@@ -3447,13 +3447,13 @@ async function renderChecklist() {
     { key:'photos',    icon:'📸', label:'Missing Parcel Photos (min 2)',severity:'red', type:'fileMin', catId:'photos', min:2 },
     { key:'websync',   icon:'🌐', label:'Photos Not Synced to Website', severity:'amber', type:'websync' },
     { key:'investor',  icon:'🏦', label:'No Investor Assigned',      severity:'amber', type:'field', field:'investor' },
-    // Only sellable once the contract is executed. Without the signed gate this
-    // flagged 36 loans of which exactly one had an agreement on file at all —
-    // telling you to post notes whose contract had not even been generated.
-    // The June 3 county-sale batch stays excluded, as does anything already sold.
-    { key:'paperstac', icon:'📋', label:'Not Posted on Paperstac',   severity:'amber', type:'custom',
-      filter:(l) => l.pa_signed_at && !l.paperstac_posted && (!l.nb_email || !l.nb_email.trim())
-                    && String(l.orig_date || '') !== '2026-06-03' },
+    // Driven by the "Posted on Paperstac" switch on the property card, not by
+    // the agreement lifecycle above. The two are independent: plenty of older
+    // parcels carry a signed ("S ") agreement in Dropbox and were sold on
+    // Paperstac long ago, so signing tells you nothing about posting status.
+    // A previous version gated this on pa_signed_at, which hid all 36
+    // outstanding parcels because that column is new and empty.
+    { key:'paperstac', icon:'📋', label:'Not Posted on Paperstac',   severity:'amber', type:'custom', filter:(l) => !l.paperstac_posted && (!l.nb_email || !l.nb_email.trim()) },
     { key:'villavista',icon:'🌐', label:'Not Posted on Village Vista',severity:'amber', type:'field', field:'website_posted' },
     { key:'parcel',    icon:'📍', label:'Missing Parcel Number',     severity:'gray',  type:'field', field:'parcel' },
     { key:'address',   icon:'🏠', label:'Missing Property Address',  severity:'gray',  type:'field', field:'address' },
