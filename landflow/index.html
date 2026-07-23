@@ -3573,7 +3573,11 @@ async function renderChecklist() {
     <div style="margin-bottom:20px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
         <div style="font-size:13px;color:var(--text3)">${completeLoans} of ${totalLoans} loans fully complete</div>
-        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="syncSaleDocsFromDropbox()"
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="generateAllMissingAgreements()"
+                title="Generate a Purchase Agreement for every parcel with no sale documents, writing each into its Dropbox parcel folder">
+          📝 Generate All Missing
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="syncSaleDocsFromDropbox()"
                 title="Scan Dropbox\\Arkansas\\Hot Springs for Purchase Agreement PDFs and file them under Sale Documents">
           🔄 Import Sale PDFs from Dropbox
         </button>
@@ -4743,6 +4747,92 @@ async function syncSaleDocsFromDropbox() {
     (mismatched ? ` · ${mismatched} skipped, parcel number didn't match the folder` : '') +
     (failed ? ` · ${failed} failed (see console)` : ''),
     (failed || mismatched) ? 'error' : 'success'
+  );
+}
+
+// Finds the Purchase Agreement template and loads its bytes once. Returned so a
+// bulk run fetches it a single time rather than per loan.
+async function loadAgreementTemplate() {
+  const template = vaultFiles.find(f =>
+    f.cat_id === 'template' && /purchase.*(agreement|contract)/i.test(f.name)
+  );
+  if (!template) throw new Error('No Purchase Agreement template found. Upload one under Templates first.');
+  if (!template.data) {
+    const { data: full, error } = await sb.from('vault_files').select('data').eq('id', template.id).single();
+    if (error || !full || !full.data) throw new Error('Could not load template file data');
+    template.data = full.data;
+  }
+  return template;
+}
+
+// Merges one loan into the template. Shared by the single-parcel button and the
+// bulk run so both produce byte-identical documents — the address bug earlier
+// today came from the same value living in two places.
+async function buildAgreementDocx(loan, template) {
+  const bytes = await getTemplateBytes(template);
+  const zip = new PizZip(bytes.buffer);
+  const doc = new window.docxtemplater(zip, {
+    paragraphLoop: true, linebreaks: true, nullGetter: () => '', errorLogging: false,
+  });
+  doc.render(buildMergeData(loan));
+  const blob = doc.getZip().generate({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+  const borrowerPart = (loan.borrower || 'document').replace(/\s+/g, '_');
+  const parcelPart = (loan.parcel || '').replace(/\s+/g, '_');
+  const name = 'Purchase_Agreement_' + borrowerPart + (parcelPart ? '_' + parcelPart : '') + '.docx';
+  return { blob, name };
+}
+
+// Generates an agreement for every loan that has no sale documents at all —
+// the same set the Checklist lists under Missing Sale Documents — and writes
+// each straight into its parcel folder in Dropbox.
+//
+// Safe to run now that sending is tracked: a generated agreement lands in
+// Awaiting Send to Buyer rather than dropping off the only list there was.
+async function generateAllMissingAgreements() {
+  const targets = loans.filter(l =>
+    (l.note_type || 'underlying') !== 'wrap' &&
+    !vaultFiles.some(f => f.loan_id === l.id && f.cat_id === 'sale')
+  );
+  if (!targets.length) return showToast('Nothing to generate — every parcel already has sale documents', 'success');
+
+  if (!confirm(`Generate Purchase Agreements for ${targets.length} parcels?\n\nEach one is written into its Dropbox parcel folder. Nothing is emailed.`)) return;
+
+  const root = await getHotSpringsDir();
+  if (!root) return showToast('Dropbox folder not linked — pick Hot Springs when prompted', 'error');
+
+  let template;
+  try { template = await loadAgreementTemplate(); }
+  catch (e) { return showToast(e.message, 'error'); }
+
+  let written = 0, failed = 0;
+  const failures = [];
+  for (let i = 0; i < targets.length; i++) {
+    const loan = targets[i];
+    try {
+      showToast(`Generating ${i + 1} of ${targets.length} — ${loan.parcel || '(no parcel)'}…`);
+      const { blob, name } = await buildAgreementDocx(loan, template);
+      const dir = await findParcelDir(root, loan.parcel, true);
+      const fh = await dir.getFileHandle(name, { create: true });
+      const w = await fh.createWritable();
+      await w.write(blob);
+      await w.close();
+      written++;
+    } catch (e) {
+      console.error(`Generate failed for ${loan.parcel}:`, e);
+      failures.push(`${loan.parcel || loan.id}: ${e.message || 'unknown error'}`);
+      failed++;
+    }
+  }
+
+  if (failures.length) console.error('Generate All failures:\n' + failures.join('\n'));
+  showToast(
+    `Wrote ${written} agreement${written !== 1 ? 's' : ''} to Dropbox` +
+    (failed ? ` · ${failed} failed (see console)` : '') +
+    `. Next: run convert-agreements.ps1, then Import Sale PDFs.`,
+    failed ? 'error' : 'success'
   );
 }
 
