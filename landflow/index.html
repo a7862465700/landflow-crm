@@ -4664,7 +4664,7 @@ async function syncSaleDocsFromDropbox() {
 
   showToast('Scanning Dropbox for Purchase Agreements…');
   const targets = loans.filter(l => (l.note_type || 'underlying') !== 'wrap');
-  let filed = 0, signedFiled = 0, already = 0, noFolder = 0, failed = 0;
+  let filed = 0, signedFiled = 0, already = 0, noFolder = 0, failed = 0, mismatched = 0;
 
   for (const loan of targets) {
     try {
@@ -4674,13 +4674,33 @@ async function syncSaleDocsFromDropbox() {
         if (handle.kind !== 'file') continue;
         if (!/\.pdf$/i.test(name)) continue;
 
-        // "S " in front of the filename means the signed copy came back — the
-        // same convention already used for "R " (recorded). Matching S followed
-        // by a separator keeps names like Sale_… or Statement… out of it.
+        // A returned signed package is named "S PA <parcel>" — S for signed,
+        // PA for purchase agreement, following the same convention as the "R "
+        // already used for recorded. The agreement is a package: the agreement
+        // itself plus deed of trust, promissory note and truth-in-lending.
+        //
+        // Requiring a separator after S keeps Sale_…, Statement… and Signed_…
+        // out of it. "PA" is optional so a plain "S <something>" is still
+        // caught, but the parcel check below is not.
         const isSigned = /^S[\s_-]/i.test(name);
         const isAgreement = /^Purchase_Agreement.*\.pdf$/i.test(name);
         if (!isSigned && !isAgreement) continue;
         const cat = isSigned ? 'signed' : 'sale';
+
+        // Michael scans several parcels' agreements into one PDF, so a copy is
+        // saved into each parcel's folder under that parcel's number. That
+        // number is the only thing distinguishing the copies, so verify it
+        // rather than trusting the folder — we have already seen a deed for
+        // 68291 sitting in the 71449 folder, and filing an executed contract
+        // against the wrong parcel is a far worse version of that mistake.
+        const parcelInName = (name.match(/\d{2,}[-\d]*/g) || [])
+          .find(tok => _parcelNorm(tok) === _parcelNorm(loan.parcel));
+        const anyNumberInName = /\d{2,}/.test(name);
+        if (isSigned && anyNumberInName && !parcelInName) {
+          console.warn(`Skipped "${name}" in ${dir.name}: no parcel number matching ${loan.parcel}`);
+          mismatched++;
+          continue;
+        }
 
         const exists = vaultFiles.some(f => f.loan_id === loan.id && f.cat_id === cat && f.name === name);
         if (exists) {
@@ -4720,8 +4740,9 @@ async function syncSaleDocsFromDropbox() {
     (signedFiled ? ` · ${signedFiled} signed` : '') +
     (already ? ` · ${already} already there` : '') +
     (noFolder ? ` · ${noFolder} with no Dropbox folder` : '') +
+    (mismatched ? ` · ${mismatched} skipped, parcel number didn't match the folder` : '') +
     (failed ? ` · ${failed} failed (see console)` : ''),
-    failed ? 'error' : 'success'
+    (failed || mismatched) ? 'error' : 'success'
   );
 }
 
