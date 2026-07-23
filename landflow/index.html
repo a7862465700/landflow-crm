@@ -3548,7 +3548,13 @@ async function renderChecklist() {
 
   document.getElementById('checklistContent').innerHTML = `
     <div style="margin-bottom:20px">
-      <div style="font-size:13px;color:var(--text3);margin-bottom:10px">${completeLoans} of ${totalLoans} loans fully complete</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="font-size:13px;color:var(--text3)">${completeLoans} of ${totalLoans} loans fully complete</div>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="syncSaleDocsFromDropbox()"
+                title="Scan Dropbox\\Arkansas\\Hot Springs for Purchase Agreement PDFs and file them under Sale Documents">
+          🔄 Import Sale PDFs from Dropbox
+        </button>
+      </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">${summaryCards}</div>
     </div>
     ${wrapSectionHtml}
@@ -4539,6 +4545,136 @@ async function quickGenerateAssignmentOfDOT() {
   }
 }
 
+// ============================================================
+// DROPBOX PARCEL FOLDERS
+// ============================================================
+// The Purchase Agreement workflow spans the app and the desktop:
+//
+//   1. this app writes the merged .docx into Hot Springs\<parcel>\
+//   2. tools\convert-agreements.ps1 turns it into a PDF using Word's own
+//      exporter, so the PDF mirrors the Word document exactly
+//   3. this app reads that PDF back and files it under Sale Documents,
+//      which clears the parcel's "Missing Sale Documents" checklist entry
+//
+// A browser cannot touch the disk unprompted, so the Hot Springs folder is
+// granted once through the File System Access API. Directory handles are not
+// JSON-serialisable, so the grant is kept in IndexedDB rather than
+// localStorage and survives across sessions.
+
+function _fsStore(mode) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('landflow-fs', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('handles');
+    req.onsuccess = () => resolve(req.result.transaction('handles', mode).objectStore('handles'));
+    req.onerror = () => reject(req.error);
+  });
+}
+function _fsGet(key) {
+  return _fsStore('readonly').then(s => new Promise(res => {
+    const r = s.get(key); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null);
+  })).catch(() => null);
+}
+function _fsPut(key, value) {
+  return _fsStore('readwrite').then(s => new Promise(res => {
+    const r = s.put(value, key); r.onsuccess = () => res(true); r.onerror = () => res(false);
+  })).catch(() => false);
+}
+async function _ensureReadWrite(handle) {
+  const opts = { mode: 'readwrite' };
+  if ((await handle.queryPermission(opts)) === 'granted') return true;
+  return (await handle.requestPermission(opts)) === 'granted';
+}
+
+// Returns the Hot Springs directory handle, prompting once if we don't hold it.
+// Returns null when unsupported or declined — callers fall back rather than fail.
+async function getHotSpringsDir(silent) {
+  if (!window.showDirectoryPicker) return null;
+  let handle = await _fsGet('hotSpringsDir');
+  if (handle && await _ensureReadWrite(handle)) return handle;
+  if (silent) return null;
+  try {
+    showToast('Select your Dropbox \\ Arkansas \\ Hot Springs folder (one time only)');
+    handle = await window.showDirectoryPicker({ id: 'hotSprings', mode: 'readwrite' });
+    if (!(await _ensureReadWrite(handle))) return null;
+    await _fsPut('hotSpringsDir', handle);
+    return handle;
+  } catch (e) { return null; }
+}
+
+// Dropbox folders use the short parcel form (452-00145) while the loan carries
+// the full form (452-00145-000). Reuse the existing folder instead of creating
+// a near-duplicate beside it.
+const _parcelNorm = s => String(s || '').trim().replace(/-0+$/, '');
+async function findParcelDir(root, parcel, create) {
+  const target = String(parcel || '').trim();
+  if (!target) throw new Error('Loan has no parcel number');
+  for await (const [name, handle] of root.entries()) {
+    if (handle.kind !== 'directory') continue;
+    if (name.trim() === target || _parcelNorm(name) === _parcelNorm(target)) return handle;
+  }
+  return create ? await root.getDirectoryHandle(target, { create: true }) : null;
+}
+
+// Writes the generated .docx straight into the parcel folder, replacing the
+// Save As dialog and the manual navigation to the right folder.
+async function saveDocxToParcelFolder(parcel, filename, blob) {
+  const root = await getHotSpringsDir();
+  if (!root) return null;
+  const dir = await findParcelDir(root, parcel, true);
+  const fh = await dir.getFileHandle(filename, { create: true });
+  const w = await fh.createWritable();
+  await w.write(blob);
+  await w.close();
+  return dir.name;
+}
+
+// Sweeps every parcel folder for Purchase Agreement PDFs produced by
+// convert-agreements.ps1 and files any that aren't already under Sale
+// Documents. Safe to re-run: anything already filed is skipped by name.
+async function syncSaleDocsFromDropbox() {
+  const root = await getHotSpringsDir();
+  if (!root) return showToast('Dropbox folder not linked — pick Hot Springs when prompted', 'error');
+
+  showToast('Scanning Dropbox for Purchase Agreement PDFs…');
+  const targets = loans.filter(l => (l.note_type || 'underlying') !== 'wrap');
+  let filed = 0, already = 0, noPdf = 0, failed = 0;
+
+  for (const loan of targets) {
+    try {
+      const dir = await findParcelDir(root, loan.parcel, false);
+      if (!dir) { noPdf++; continue; }
+      for await (const [name, handle] of dir.entries()) {
+        if (handle.kind !== 'file') continue;
+        if (!/^Purchase_Agreement.*\.pdf$/i.test(name)) continue;
+        const exists = vaultFiles.some(f => f.loan_id === loan.id && f.cat_id === 'sale' && f.name === name);
+        if (exists) { already++; continue; }
+        const file = await handle.getFile();
+        const path = `${currentUser.id}/sale/${Date.now()}_${name}`;
+        await sb.storage.from('vault-files').upload(path, file, { upsert: true, contentType: 'application/pdf' });
+        const saved = await dbSaveVaultFile({
+          loan_id: loan.id, cat_id: 'sale', name: name, size: file.size,
+          type: 'application/pdf', data: 'storage:' + path, book_page: '',
+          notes: 'Purchase Agreement PDF imported from Dropbox',
+        });
+        if (saved) { vaultFiles.push(saved); filed++; }
+      }
+    } catch (e) {
+      console.error('Sale doc sync failed for parcel ' + loan.parcel + ':', e);
+      failed++;
+    }
+  }
+
+  renderVault();
+  if (typeof renderChecklist === 'function') await renderChecklist();
+  showToast(
+    `Filed ${filed} PDF${filed !== 1 ? 's' : ''} under Sale Documents` +
+    (already ? ` · ${already} already there` : '') +
+    (noPdf ? ` · ${noPdf} with no Dropbox folder` : '') +
+    (failed ? ` · ${failed} failed (see console)` : ''),
+    failed ? 'error' : 'success'
+  );
+}
+
 async function quickGeneratePurchaseAgreement() {
   const loanId = editingLoanId || currentLoanId;
   if (!loanId) return showToast('No loan selected', 'error');
@@ -4580,15 +4716,30 @@ async function quickGeneratePurchaseAgreement() {
     const borrowerPart = (loan.borrower || 'document').replace(/\s+/g, '_');
     const parcelPart = (loan.parcel || '').replace(/\s+/g, '_');
     const name = 'Purchase_Agreement_' + borrowerPart + (parcelPart ? '_' + parcelPart : '') + '.docx';
-    const blobUrl = URL.createObjectURL(output);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = name;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 500);
-    showToast('Purchase Agreement downloaded!', 'success');
+
+    // Write straight into Dropbox\Arkansas\Hot Springs\<parcel>\ so there is no
+    // Save As dialog and no navigating to the right folder. Falls back to a
+    // normal download if the folder was never granted or the grant lapsed —
+    // the document is never lost, it just lands in Downloads instead.
+    let savedTo = null;
+    try {
+      savedTo = await saveDocxToParcelFolder(loan.parcel, name, output);
+    } catch (fsErr) {
+      console.error('Writing .docx to the parcel folder failed:', fsErr);
+    }
+    if (savedTo) {
+      showToast('📄 Saved to Dropbox \\ ' + savedTo, 'success');
+    } else {
+      const blobUrl = URL.createObjectURL(output);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = name;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 500);
+      showToast('Purchase Agreement downloaded (Dropbox folder not linked)', 'success');
+    }
     // Save to CRM in background (non-blocking)
     const saveCopy = async () => {
       try {
