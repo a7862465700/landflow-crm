@@ -20,7 +20,9 @@ param(
   [int]      $BatchSize  = 10,
   [string]   $Root       = "C:\Users\Elk Ceek Group\Dropbox\Arkansas\Hot Springs",
   [string]   $From       = "ra@elkcreekusa.com",
-  [string]   $To         = "terraequityml@gmail.com",
+  # Michael's business address. Note this is NOT terraequityml@gmail.com --
+  # that one is for loan servicing, not for contracts going out for signature.
+  [string]   $To         = "MichaelLazarBiz@gmail.com",
   [string]   $SubjectFmt = "Purchase Agreements for Signature - {0} Parcels ({1} of {2})"
 )
 
