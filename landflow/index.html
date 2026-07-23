@@ -3428,13 +3428,32 @@ async function renderChecklist() {
 
   const checks = [
     { key:'purchase',  icon:'🏛', label:'Missing Purchase Documents', severity:'red',   type:'file', catId:'purchase' },
+    // The Purchase Agreement lifecycle, in the order a parcel moves through it.
+    // Every non-wrap loan sits in exactly one of these until it is sold, so
+    // working top to bottom leaves nothing unaccounted for. Previously only the
+    // first existed: once an agreement was generated the parcel dropped off the
+    // list entirely, and whether it had been sent or signed lived in the
+    // operator's head.
     { key:'sale',      icon:'📝', label:'Missing Sale Documents',     severity:'red',   type:'file', catId:'sale' },
+    // Generated but not yet emailed to the buyer.
+    { key:'pasend',    icon:'📤', label:'Awaiting Send to Buyer',     severity:'red',   type:'custom',
+      filter:(l) => vaultFiles.some(f => f.loan_id === l.id && f.cat_id === 'sale') && !l.pa_sent_at },
+    // Emailed, but no signed copy back. Cleared when an "S "-prefixed PDF turns
+    // up in the parcel's Dropbox folder and the sweep files it.
+    { key:'pasigned',  icon:'✍️', label:'Awaiting Signed Copy',       severity:'amber', type:'custom',
+      filter:(l) => l.pa_sent_at && !l.pa_signed_at },
     // Assignment docs only matter once a note is actually assigned to an investor — don't flag retained notes
     { key:'assignment',icon:'🤝', label:'Missing Assignment Documents',severity:'red',  type:'custom', filter:(l) => l.investor && String(l.investor).trim() !== '' && !vaultFiles.some(f => f.loan_id === l.id && f.cat_id === 'assignment') },
     { key:'photos',    icon:'📸', label:'Missing Parcel Photos (min 2)',severity:'red', type:'fileMin', catId:'photos', min:2 },
     { key:'websync',   icon:'🌐', label:'Photos Not Synced to Website', severity:'amber', type:'websync' },
     { key:'investor',  icon:'🏦', label:'No Investor Assigned',      severity:'amber', type:'field', field:'investor' },
-    { key:'paperstac', icon:'📋', label:'Not Posted on Paperstac',   severity:'amber', type:'custom', filter:(l) => !l.paperstac_posted && (!l.nb_email || !l.nb_email.trim()) },
+    // Only sellable once the contract is executed. Without the signed gate this
+    // flagged 36 loans of which exactly one had an agreement on file at all —
+    // telling you to post notes whose contract had not even been generated.
+    // The June 3 county-sale batch stays excluded, as does anything already sold.
+    { key:'paperstac', icon:'📋', label:'Not Posted on Paperstac',   severity:'amber', type:'custom',
+      filter:(l) => l.pa_signed_at && !l.paperstac_posted && (!l.nb_email || !l.nb_email.trim())
+                    && String(l.orig_date || '') !== '2026-06-03' },
     { key:'villavista',icon:'🌐', label:'Not Posted on Village Vista',severity:'amber', type:'field', field:'website_posted' },
     { key:'parcel',    icon:'📍', label:'Missing Parcel Number',     severity:'gray',  type:'field', field:'parcel' },
     { key:'address',   icon:'🏠', label:'Missing Property Address',  severity:'gray',  type:'field', field:'address' },
@@ -3579,6 +3598,10 @@ function openChecklistEdit(loanId) {
 const FILE_CATEGORIES = [
   { id:'purchase', icon:'🏛', label:'Purchase Documents' },
   { id:'sale', icon:'📝', label:'Sale Documents' },
+  // Executed contracts, kept apart from the unsigned drafts in Sale Documents
+  // so the two can never be confused. Populated from Dropbox: a returned copy
+  // is renamed with an "S " prefix and picked up by the sweep.
+  { id:'signed', icon:'✍️', label:'Signed Documents' },
   { id:'assignment', icon:'🤝', label:'Assignment Documents' },
   { id:'photos', icon:'📸', label:'Parcel Photos' },
   { id:'generated', icon:'📄', label:'Generated Documents' },
@@ -4639,31 +4662,53 @@ async function syncSaleDocsFromDropbox() {
   const root = await getHotSpringsDir();
   if (!root) return showToast('Dropbox folder not linked — pick Hot Springs when prompted', 'error');
 
-  showToast('Scanning Dropbox for Purchase Agreement PDFs…');
+  showToast('Scanning Dropbox for Purchase Agreements…');
   const targets = loans.filter(l => (l.note_type || 'underlying') !== 'wrap');
-  let filed = 0, already = 0, noPdf = 0, failed = 0;
+  let filed = 0, signedFiled = 0, already = 0, noFolder = 0, failed = 0;
 
   for (const loan of targets) {
     try {
       const dir = await findParcelDir(root, loan.parcel, false);
-      if (!dir) { noPdf++; continue; }
+      if (!dir) { noFolder++; continue; }
       for await (const [name, handle] of dir.entries()) {
         if (handle.kind !== 'file') continue;
-        if (!/^Purchase_Agreement.*\.pdf$/i.test(name)) continue;
-        const exists = vaultFiles.some(f => f.loan_id === loan.id && f.cat_id === 'sale' && f.name === name);
-        if (exists) { already++; continue; }
-        const file = await handle.getFile();
-        const path = `${currentUser.id}/sale/${Date.now()}_${name}`;
-        await sb.storage.from('vault-files').upload(path, file, { upsert: true, contentType: 'application/pdf' });
-        const saved = await dbSaveVaultFile({
-          loan_id: loan.id, cat_id: 'sale', name: name, size: file.size,
-          type: 'application/pdf', data: 'storage:' + path, book_page: '',
-          notes: 'Purchase Agreement PDF imported from Dropbox',
-        });
-        if (saved) { vaultFiles.push(saved); filed++; }
+        if (!/\.pdf$/i.test(name)) continue;
+
+        // "S " in front of the filename means the signed copy came back — the
+        // same convention already used for "R " (recorded). Matching S followed
+        // by a separator keeps names like Sale_… or Statement… out of it.
+        const isSigned = /^S[\s_-]/i.test(name);
+        const isAgreement = /^Purchase_Agreement.*\.pdf$/i.test(name);
+        if (!isSigned && !isAgreement) continue;
+        const cat = isSigned ? 'signed' : 'sale';
+
+        const exists = vaultFiles.some(f => f.loan_id === loan.id && f.cat_id === cat && f.name === name);
+        if (exists) {
+          already++;
+        } else {
+          const file = await handle.getFile();
+          const path = `${currentUser.id}/${cat}/${Date.now()}_${name}`;
+          await sb.storage.from('vault-files').upload(path, file, { upsert: true, contentType: 'application/pdf' });
+          const saved = await dbSaveVaultFile({
+            loan_id: loan.id, cat_id: cat, name: name, size: file.size,
+            type: 'application/pdf', data: 'storage:' + path, book_page: '',
+            notes: isSigned ? 'Signed Purchase Agreement imported from Dropbox'
+                            : 'Purchase Agreement PDF imported from Dropbox',
+          });
+          if (saved) { vaultFiles.push(saved); isSigned ? signedFiled++ : filed++; }
+        }
+
+        // Stamp the loan as signed the first time a signed copy appears, even if
+        // the file itself was already filed on an earlier sweep — otherwise a
+        // re-run would never set the date.
+        if (isSigned && !loan.pa_signed_at) {
+          const stamped = new Date().toISOString();
+          const { error } = await sb.from('loans').update({ pa_signed_at: stamped }).eq('id', loan.id);
+          if (!error) loan.pa_signed_at = stamped;
+        }
       }
     } catch (e) {
-      console.error('Sale doc sync failed for parcel ' + loan.parcel + ':', e);
+      console.error('Dropbox sync failed for parcel ' + loan.parcel + ':', e);
       failed++;
     }
   }
@@ -4671,9 +4716,10 @@ async function syncSaleDocsFromDropbox() {
   renderVault();
   if (typeof renderChecklist === 'function') await renderChecklist();
   showToast(
-    `Filed ${filed} PDF${filed !== 1 ? 's' : ''} under Sale Documents` +
+    `Filed ${filed} agreement${filed !== 1 ? 's' : ''}` +
+    (signedFiled ? ` · ${signedFiled} signed` : '') +
     (already ? ` · ${already} already there` : '') +
-    (noPdf ? ` · ${noPdf} with no Dropbox folder` : '') +
+    (noFolder ? ` · ${noFolder} with no Dropbox folder` : '') +
     (failed ? ` · ${failed} failed (see console)` : ''),
     failed ? 'error' : 'success'
   );
