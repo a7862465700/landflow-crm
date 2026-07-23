@@ -3428,20 +3428,13 @@ async function renderChecklist() {
 
   const checks = [
     { key:'purchase',  icon:'🏛', label:'Missing Purchase Documents', severity:'red',   type:'file', catId:'purchase' },
-    // The Purchase Agreement lifecycle, in the order a parcel moves through it.
-    // Every non-wrap loan sits in exactly one of these until it is sold, so
-    // working top to bottom leaves nothing unaccounted for. Previously only the
-    // first existed: once an agreement was generated the parcel dropped off the
-    // list entirely, and whether it had been sent or signed lived in the
-    // operator's head.
     { key:'sale',      icon:'📝', label:'Missing Sale Documents',     severity:'red',   type:'file', catId:'sale' },
-    // Generated but not yet emailed to the buyer.
-    { key:'pasend',    icon:'📤', label:'Awaiting Send to Buyer',     severity:'red',   type:'custom',
-      filter:(l) => vaultFiles.some(f => f.loan_id === l.id && f.cat_id === 'sale') && !l.pa_sent_at },
-    // Emailed, but no signed copy back. Cleared when an "S "-prefixed PDF turns
-    // up in the parcel's Dropbox folder and the sweep files it.
-    { key:'pasigned',  icon:'✍️', label:'Awaiting Signed Copy',       severity:'amber', type:'custom',
-      filter:(l) => l.pa_sent_at && !l.pa_signed_at },
+    // NOTE: "Awaiting Send to Buyer" / "Awaiting Signed Copy" were removed. They
+    // keyed off pa_sent_at, an empty new column, so they flagged 57 historical
+    // parcels that were long since signed, sold, and had their notes moved —
+    // pure noise. They only make sense once sending happens inside the CRM and
+    // stamps pa_sent_at. Re-add them together with the in-app Send to Buyer
+    // button, not before.
     // Assignment docs only matter once a note is actually assigned to an investor — don't flag retained notes
     { key:'assignment',icon:'🤝', label:'Missing Assignment Documents',severity:'red',  type:'custom', filter:(l) => l.investor && String(l.investor).trim() !== '' && !vaultFiles.some(f => f.loan_id === l.id && f.cat_id === 'assignment') },
     { key:'photos',    icon:'📸', label:'Missing Parcel Photos (min 2)',severity:'red', type:'fileMin', catId:'photos', min:2 },
