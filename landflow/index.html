@@ -654,7 +654,7 @@ textarea.form-input{resize:vertical;min-height:80px}
             <option value="">None</option><option value="3">3 yr</option><option value="5">5 yr</option><option value="7">7 yr</option><option value="10">10 yr</option>
           </select>
         </div>
-        <div class="form-group"><label class="form-label">Origination Date *</label><input class="form-input" id="f-origdate" type="date" oninput="updatePreview();updateDateWritten()"><div id="origdate-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
+        <div class="form-group"><label class="form-label">Origination Date *</label><input class="form-input" id="f-origdate" type="date" oninput="updatePreview();updateDateWritten();deriveFirstPayIfEmpty()"><div id="origdate-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
         <div class="form-group"><label class="form-label">First Payment Date</label><input class="form-input" id="f-firstpay" type="date" oninput="updateFirstPayWritten()"><div id="firstpay-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
         <div class="form-group"><label class="form-label">Payment Due Day</label>
           <select class="form-input" id="f-dueday">
@@ -1872,7 +1872,11 @@ function openLoanModal(editId) {
     document.getElementById('f-notes').value = l.notes||'';
   } else {
     clearLoanForm();
-    document.getElementById('f-origdate').value = new Date().toISOString().split('T')[0];
+    // Deliberately left blank. Pre-filling today's date meant a loan saved
+    // without touching the field recorded its data-entry date as the
+    // origination date — the exact signature (orig_date === created_at) behind
+    // the bad dates found on 2026-08-03. saveLoan() requires this field, so a
+    // blank forces a real date off the deed.
   }
   const dl = document.getElementById('investorList');
   dl.innerHTML = investors.map(i => `<option value="${i.name}">`).join('');
@@ -2005,6 +2009,21 @@ function updateDateWritten() {
 function updateFirstPayWritten() {
   const v = document.getElementById('f-firstpay').value;
   document.getElementById('firstpay-written').textContent = writtenDate(v);
+}
+// First payment falls on the 1st of the month after origination. Import fills
+// both when it can read the deed; this covers the hand-entered case (and the
+// import where the filing date was unreadable) so first_pay_date doesn't end up
+// null. Only fills an empty field — never overwrites a date already chosen.
+function deriveFirstPayIfEmpty() {
+  const origEl = document.getElementById('f-origdate');
+  const fpEl = document.getElementById('f-firstpay');
+  if (!origEl.value || fpEl.value) return;
+  const d = parseLocalDate(origEl.value);
+  if (isNaN(d)) return;
+  const y = d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear();
+  const m = String(((d.getMonth() + 1) % 12) + 1).padStart(2, '0');
+  fpEl.value = `${y}-${m}-01`;
+  updateFirstPayWritten();
 }
 
 async function saveLoan() {
@@ -2251,22 +2270,25 @@ async function handlePDFFile(e) {
     document.getElementById('f-buyer-county').value = ARKANSAS_DEFAULTS.buyer_county;
 
     // Set origination date to the filing date from the document (not today).
-    // A missing or malformed filing_date used to fall through to today's date
-    // silently — which produces a loan that reads as past-due the moment it is
-    // saved — or throw "Invalid time value" and abort the whole import. Fall back
-    // to today so the form still opens, but say so loudly.
+    // When filing_date is missing or malformed the dates are left BLANK rather
+    // than defaulted to today: a filled-in wrong date passes saveLoan()'s
+    // required-check and silently records the import date as the origination
+    // date, which is how the bad dates found on 2026-08-03 were created. Blank
+    // makes saveLoan() refuse until a real date is read off the deed.
     const filingDateValid =
       /^\d{4}-\d{2}-\d{2}$/.test(extracted.filing_date || '') &&
       !isNaN(new Date(extracted.filing_date + 'T00:00:00').getTime());
-    const filingDate = filingDateValid ? new Date(extracted.filing_date + 'T00:00:00') : new Date();
-    if (!filingDateValid) {
-      reviewNotes.push('filing date was not readable — origination and first-payment dates defaulted to today, correct them from the deed before saving');
+    if (filingDateValid) {
+      const filingDate = new Date(extracted.filing_date + 'T00:00:00');
+      document.getElementById('f-origdate').value = filingDate.toISOString().split('T')[0];
+      // First payment date = 1st of the month following the filing date
+      const firstPay = new Date(filingDate.getFullYear(), filingDate.getMonth() + 1, 1);
+      document.getElementById('f-firstpay').value = firstPay.toISOString().split('T')[0];
+    } else {
+      document.getElementById('f-origdate').value = '';
+      document.getElementById('f-firstpay').value = '';
+      reviewNotes.push('filing date was not readable — enter the origination date from the deed (the form will not save without it)');
     }
-    document.getElementById('f-origdate').value = filingDate.toISOString().split('T')[0];
-
-    // First payment date = 1st of the month following the filing date
-    const firstPay = new Date(filingDate.getFullYear(), filingDate.getMonth() + 1, 1);
-    document.getElementById('f-firstpay').value = firstPay.toISOString().split('T')[0];
     document.getElementById('f-dueday').value = '1';
 
     // Add EIN to notes
