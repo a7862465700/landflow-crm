@@ -130,3 +130,51 @@ $$;
 
 REVOKE ALL ON FUNCTION public.hsf_lender_portal_status() FROM public;
 GRANT EXECUTE ON FUNCTION public.hsf_lender_portal_status() TO authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 3. Unassigning a note in the CRM clears the lender on HSF
+-- ---------------------------------------------------------------------------
+-- The sync only ever added or updated. Taking a lender off a note in LandFlow
+-- -- routine when a buyer cancels -- left the portal holding the old
+-- assignment: lender name, email and purchase price, on a note the CRM shows
+-- as unassigned. Three notes were in that state since 12 June (Lot 2 and Lot 3
+-- Asturias Dr, Lot 3 Pamplona Cir), each still filed to a lender who had no
+-- portal account. Nothing was visible: the CRM had no lender to show, the
+-- lender list counted zero notes for him, and the one view that would have
+-- displayed them needed an account he did not have.
+--
+-- This writes hsf_loans directly rather than going through /api/crm-sync,
+-- because that endpoint rejects a note with no lender -- the very state we are
+-- trying to record.
+--
+-- The row itself is kept, not deleted: every note belongs on the portal
+-- whether or not it has a lender. inv_date is left alone because hsf_loans
+-- declares it NOT NULL -- the schema assumes every note has an assignment,
+-- which is the same assumption behind the API validation and the reason
+-- lender-less notes cannot sync at all yet.
+
+CREATE OR REPLACE FUNCTION public.clear_hsf_lender_on_unassign()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF coalesce(trim(OLD.nb_email), '') <> '' AND coalesce(trim(NEW.nb_email), '') = '' THEN
+    UPDATE hsf_loans
+       SET nb_email = '', nb_name = '', nb_business = '', inv_price = 0,
+           lender_notes = null, lender_address = null, lender_phone = null,
+           lender_bank_name = null, lender_ach_routing_number = null,
+           lender_account_number = null,
+           last_synced_at = now()
+     WHERE crm_loan_id = NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_loan_unassigned_clear_hsf ON public.loans;
+
+CREATE TRIGGER on_loan_unassigned_clear_hsf
+  AFTER UPDATE OF nb_email ON public.loans
+  FOR EACH ROW EXECUTE FUNCTION public.clear_hsf_lender_on_unassign();
