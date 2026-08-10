@@ -3060,6 +3060,44 @@ async function saveInvestor() {
   ['inv2-name','inv2-contact','inv2-phone','inv2-email','inv2-notes'].forEach(id => document.getElementById(id).value = '');
 }
 
+// Deleting a lender is permanent -- note_lenders is the canonical record HSF
+// reads, and there is no undo. So it asks for the word DELETE typed out rather
+// than an OK button that can be clicked through by reflex.
+//
+// Refuses outright while the lender still holds notes. The portal matches a
+// lender to their notes by email, so removing the record underneath live notes
+// would leave them pointing at a lender that no longer exists. Counted by
+// nb_email, not by the legacy free-text `investor` name the card displays --
+// that one is per-loan typing and does not reliably identify anybody.
+async function deleteInvestor(id, email, label) {
+  const key = (email || '').trim().toLowerCase();
+  const held = key
+    ? loans.filter(l => (l.nb_email || '').trim().toLowerCase() === key).length
+    : 0;
+  if (held > 0) {
+    showToast(`⚠️ ${label} still holds ${held} note${held === 1 ? '' : 's'} — reassign or clear them first`, 'error');
+    return;
+  }
+  const typed = prompt(
+    `Delete ${label}${email ? ' (' + email + ')' : ''} permanently?\n\n` +
+    `This removes the lender from LandFlow and from Hickory Street Finance. It cannot be undone.\n\n` +
+    `Type DELETE to confirm:`
+  );
+  if (typed === null) return; // cancelled
+  if (typed.trim() !== 'DELETE') {
+    showToast('Not deleted — you must type DELETE exactly', 'error');
+    return;
+  }
+  const { error } = await sb.from('note_lenders').delete().eq('id', id);
+  if (error) {
+    showToast('Delete failed: ' + error.message, 'error');
+    return;
+  }
+  await reloadInvestors();
+  renderInvestors();
+  showToast(`✅ ${label} deleted`, 'success');
+}
+
 function renderInvestors() {
   const grid = document.getElementById('investorsGrid');
   const allInv = [...investors];
@@ -3085,6 +3123,9 @@ function renderInvestors() {
         <div><div class="lc-label">Notes Held</div><div class="lc-val">${assigned.length}</div></div>
         <div><div class="lc-label">Portfolio</div><div class="lc-val gold">${fmt(total)}</div></div>
       </div>
+      ${inv.auto ? '' : `<div style="margin-top:10px;text-align:right">
+        <button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="deleteInvestor('${inv.id}','${(inv.email||'').replace(/'/g,"\\'")}','${(inv.name||'').replace(/'/g,"\\'")}')">🗑 Delete lender</button>
+      </div>`}
     </div>`;
   }).join('');
 }
