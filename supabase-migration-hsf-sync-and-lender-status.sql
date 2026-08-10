@@ -153,6 +153,19 @@ GRANT EXECUTE ON FUNCTION public.hsf_lender_portal_status() TO authenticated;
 -- which is the same assumption behind the API validation and the reason
 -- lender-less notes cannot sync at all yet.
 
+-- hsf_loans.inv_date was NOT NULL, so the table could not represent a note
+-- with no assignment -- which is every note the owner services himself. That
+-- constraint is the schema half of the same assumption behind /api/crm-sync
+-- rejecting a note with no nb_email + inv_date. Dropped so a note without an
+-- assignment date can exist on the portal.
+--
+-- Existing dates are deliberately left in place; this only stops new rows
+-- being forced to invent one. nb_email is left NOT NULL because '' satisfies
+-- it -- a date has no equivalent empty value, which is why only this column
+-- needed changing.
+
+ALTER TABLE public.hsf_loans ALTER COLUMN inv_date DROP NOT NULL;
+
 CREATE OR REPLACE FUNCTION public.clear_hsf_lender_on_unassign()
 RETURNS trigger
 LANGUAGE plpgsql
