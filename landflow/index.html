@@ -1056,27 +1056,18 @@ async function syncPhotosToWebsite(loanId) {
   }
 }
 
-async function pushToHSF(loanId) {
-  showToast('Syncing to Hickory Street Finance...', 'info');
-  try {
-    const res = await fetch(HSF_API + '/api/crm-sync', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + HSF_SYNC_SECRET
-      },
-      body: JSON.stringify({ crm_loan_id: loanId })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showToast('HSF sync failed: ' + (data.error || 'Unknown error'), 'error');
-    } else {
-      showToast('Sent to Hickory Street Finance', 'success');
-    }
-  } catch (e) {
-    showToast('HSF sync error: ' + e.message, 'error');
-  }
-}
+// pushToHSF() removed along with its "Push to HSF" button.
+//
+// Syncing to Hickory Street is no longer something anyone has to ask for. A
+// database trigger writes hsf_loans on every insert and on any change to a
+// field the portal mirrors, so a note is current by the time the save toast
+// clears. See supabase-migration-hsf-sync-and-lender-status.sql.
+//
+// Leaving the button in place would have been worse than useless: it POSTed to
+// /api/crm-sync, which rejects a note with no note buyer and no assignment date
+// (422). That is every note serviced in-house — 40 of the 92 — so the button
+// worked on some notes and threw an error on the rest, for an operation that
+// had already happened automatically.
 
 // Invite a note buyer / lender to the Hickory Street Finance portal.
 // Pulls email + name from the currently-open loan modal fields.
@@ -1579,11 +1570,8 @@ function hsfSyncWarningHTML(l) {
   if ((l.note_type || 'underlying') === 'wrap') return '';
   if (!hsfSyncedLoanIds.size) return '';
   if (hsfSyncedLoanIds.has(l.id)) return '';
-  const why = !l.inv_date
-    ? 'Assignment Date is empty, and the sync requires it.'
-    : 'The note is assigned but no record reached HSF.';
   return `<div style="margin-top:10px;padding:9px 11px;border-radius:var(--r);background:rgba(230,168,23,0.12);border:1px solid rgba(230,168,23,0.4);font-size:12px;line-height:1.5;color:#e6a817">
-    ⚠️ <strong>Not synced to Hickory Street Finance.</strong> ${why} This lender cannot see this note on the portal — fill the field and save, or use Push to HSF below.
+    ⚠️ <strong>Not on Hickory Street Finance.</strong> This note has no record on the portal, so the lender cannot see it. Saving the loan again should create one — if this persists, the sync trigger needs looking at.
   </div>`;
 }
 
@@ -2578,10 +2566,7 @@ function openDetail(id) {
          <div><div class="dp-field-label">Loan Servicer</div><div>${l.loan_servicer||'—'}</div></div>
          <div><div class="dp-field-label">Website</div><div>${l.loan_servicer_web?`<a href="${l.loan_servicer_web}" target="_blank" style="color:var(--gold);text-decoration:underline">${l.loan_servicer_web}</a>`:'—'}</div></div>
        </div>
-       ${hsfSyncWarningHTML(l)}
-       <div style="margin-top:10px">
-         <button class="btn btn-sm" style="background:var(--gold);color:#000;font-weight:600" onclick="pushToHSF('${l.id}')">Push to HSF</button>
-       </div>`:''}`
+       ${hsfSyncWarningHTML(l)}`:''}`
     : `<div style="color:var(--text3);font-size:13px">Note retained — not assigned</div>
        ${l.website_posted?'<div style="margin-top:8px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;display:inline-block;background:rgba(197,167,95,0.2);color:var(--gold)">🌐 Posted on Village Vista</div>':''}`;
   // Secondary buyer (wraparound): a separate wrap note linked to this parcel/loan.
