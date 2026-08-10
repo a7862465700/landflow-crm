@@ -715,7 +715,10 @@ textarea.form-input{resize:vertical;min-height:80px}
         <div style="font-size:12px;color:var(--text3);flex:1;min-width:200px">
           Send this note buyer a Hickory Street Finance portal invite. They'll sign in with the email above — the one on their PaperStack assignment letter.
         </div>
-        <button type="button" class="btn btn-sm" style="background:var(--gold);color:#000;font-weight:600;white-space:nowrap" onclick="inviteNoteBuyerToHSF()">✉️ Invite to HSF</button>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span id="nb-invite-status"></span>
+          <button type="button" class="btn btn-sm" style="background:var(--gold);color:#000;font-weight:600;white-space:nowrap" onclick="inviteNoteBuyerToHSF()">✉️ Invite to HSF</button>
+        </div>
       </div>
       <div class="form-section" style="margin-top:16px">📝 Notes</div>
       <div class="form-group form-full"><textarea class="form-input" id="f-notes" rows="2" placeholder="Internal notes..."></textarea></div>
@@ -1112,6 +1115,12 @@ async function inviteNoteBuyerToHSF() {
       showToast('Invite failed: ' + (data.error || 'Unknown error'), 'error');
     } else {
       showToast(data.message || 'Invite sent', 'success');
+      // Re-read the real invite state so the badge survives the toast. The
+      // toast was previously the only feedback, which left no way to tell an
+      // hour later whether an invite had ever been sent.
+      await reloadLenderPortalStatus();
+      updateInviteStatusBadge();
+      renderInvestors();
     }
   } catch (e) {
     showToast('Invite error: ' + e.message, 'error');
@@ -1176,6 +1185,7 @@ function updateWebsitePostedLabel() {
 // STATE
 // ============================================================
 let loans = [], payments = [], investors = [], invoices = [], vaultFiles = [], lateFees = [], websiteProperties = {};
+let lenderPortalStatus = {}, hsfSyncedLoanIds = new Set();
 let currentLoanId = null, editingLoanId = null, toastTimer, currentUser = null;
 let APP = { settings: null };
 
@@ -1359,6 +1369,9 @@ async function loadAllData() {
 
   payments = p.data || [];
   await reloadInvestors(); // loads note_lenders, normalizes into `investors`
+  // Both best-effort and independent of each other — neither should be able to
+  // keep the app from booting, so failures are swallowed inside each loader.
+  await Promise.all([reloadLenderPortalStatus(), reloadHsfSyncedLoans()]);
   invoices = ivs.data || [];
   vaultFiles = vf.data || [];
   // websiteProperties (cross-app drift badge) loads in the background — must NOT block app boot
@@ -1483,6 +1496,95 @@ async function reloadInvestors() {
     name: l.business || l.name || '(unnamed lender)',
     contact: l.business ? (l.name || '') : '',
   }));
+}
+
+// Portal invite/acceptance state per lender, keyed by lowercased email.
+//
+// This lives in auth.users, which PostgREST does not expose, so it comes from
+// the admin-gated hsf_lender_portal_status() function (see
+// supabase-migration-hsf-sync-and-lender-status.sql). Best-effort: a failure
+// leaves the map empty and every lender reads "unknown" rather than breaking
+// the lender list.
+async function reloadLenderPortalStatus() {
+  const { data, error } = await sb.rpc('hsf_lender_portal_status');
+  if (error) {
+    console.warn('reloadLenderPortalStatus error:', error);
+    lenderPortalStatus = {};
+    return;
+  }
+  lenderPortalStatus = Object.fromEntries(
+    (data || []).map(r => [(r.email || '').trim().toLowerCase(), r])
+  );
+}
+
+// Three real states, because "did I invite them?" and "did they actually get
+// in?" are different questions and the old transient toast answered neither
+// once it faded. Signed-in beats invited: an accepted invite is the only proof
+// the lender can see their notes.
+function lenderPortalState(email) {
+  const key = (email || '').trim().toLowerCase();
+  if (!key) return null;
+  const r = lenderPortalStatus[key];
+  // Signed-in is checked first and wins outright. Four existing lenders have an
+  // account and an active session but no invited_at — created before the invite
+  // flow existed, or signed up directly — and ordering these the other way
+  // would label them "Not invited" while they are demonstrably using the portal.
+  if (r && r.last_sign_in_at) {
+    return { label: '✅ Signed in', color: 'var(--green)', bg: 'rgba(52,168,83,0.16)',
+             title: 'Last sign-in ' + fmtDate(r.last_sign_in_at) };
+  }
+  if (r && r.invited_at) {
+    return { label: '✉️ Invited — not accepted', color: '#e6a817', bg: 'rgba(230,168,23,0.16)',
+             title: 'Invited ' + fmtDate(r.invited_at) + ' — has not signed in yet' };
+  }
+  return { label: 'Not invited', color: 'var(--text3)', bg: 'rgba(255,255,255,0.05)' };
+}
+
+// Keeps the badge beside the Invite to HSF button in step with whatever email
+// is currently typed in the note-buyer block.
+function updateInviteStatusBadge() {
+  const span = document.getElementById('nb-invite-status');
+  if (!span) return;
+  const email = (document.getElementById('f-nb-email')?.value || '').trim();
+  span.innerHTML = email ? portalBadgeHTML(email) : '';
+}
+
+function portalBadgeHTML(email, extraStyle) {
+  const st = lenderPortalState(email);
+  if (!st) return '';
+  return `<span title="${st.title || st.label}" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:${st.bg};color:${st.color};white-space:nowrap;${extraStyle || ''}">${st.label}</span>`;
+}
+
+// Which loans actually reached hsf_loans — the table the HSF portal reads.
+// Admin RLS ("Admin sees all hsf_loans") permits this read. Drives the
+// not-synced warning on the loan card, so a note that never made it across
+// says so on screen instead of only being discoverable by SQL.
+async function reloadHsfSyncedLoans() {
+  const { data, error } = await sb.from('hsf_loans').select('crm_loan_id');
+  if (error) {
+    console.warn('reloadHsfSyncedLoans error:', error);
+    hsfSyncedLoanIds = new Set();
+    return;
+  }
+  hsfSyncedLoanIds = new Set((data || []).map(r => r.crm_loan_id).filter(Boolean));
+}
+
+// Warns when a note looks assigned in the CRM but never reached HSF. Silent
+// for wrap notes, which are deliberately never synced (buyer isolation), and
+// silent when the status map failed to load so we don't cry wolf on an empty
+// set. Names the actual cause where we can — a missing Assignment Date is the
+// one that bites, because nothing else in the UI hints that it is required.
+function hsfSyncWarningHTML(l) {
+  if (!l || !(l.nb_email || '').trim()) return '';
+  if ((l.note_type || 'underlying') === 'wrap') return '';
+  if (!hsfSyncedLoanIds.size) return '';
+  if (hsfSyncedLoanIds.has(l.id)) return '';
+  const why = !l.inv_date
+    ? 'Assignment Date is empty, and the sync requires it.'
+    : 'The note is assigned but no record reached HSF.';
+  return `<div style="margin-top:10px;padding:9px 11px;border-radius:var(--r);background:rgba(230,168,23,0.12);border:1px solid rgba(230,168,23,0.4);font-size:12px;line-height:1.5;color:#e6a817">
+    ⚠️ <strong>Not synced to Hickory Street Finance.</strong> ${why} This lender cannot see this note on the portal — fill the field and save, or use Push to HSF below.
+  </div>`;
 }
 
 async function dbSaveInvoice(data) {
@@ -1876,6 +1978,7 @@ function openLoanModal(editId) {
   }
   const dl = document.getElementById('investorList');
   dl.innerHTML = investors.map(i => `<option value="${i.name}">`).join('');
+  updateInviteStatusBadge();
   updatePreview();
   updateDateWritten();
   updateFirstPayWritten();
@@ -2061,6 +2164,50 @@ async function saveLoan() {
     loan_servicer_web: document.getElementById('f-loan-servicer-web').value.trim(),
     notes: document.getElementById('f-notes').value,
   };
+
+  // Note-buyer completeness gate.
+  //
+  // A loan with NO investor data at all still saves fine — most notes start
+  // unassigned and that has to keep working. What this blocks is a *partially*
+  // filled investor block, which is the silent failure mode: the HSF sync
+  // requires both nb_email and inv_date, so a note with the buyer's email but
+  // no Assignment Date looks fully assigned in the CRM and is invisible to the
+  // lender on the portal, with no error anywhere. Lot 17 Claro Way sat like
+  // that; three other notes still do.
+  const NB_REQUIRED = [
+    ['f-nb-name',   'Note Buyer Name',  () => !!data.nb_name],
+    ['f-nb-email',  'Note Buyer Email', () => !!data.nb_email],
+    ['f-inv-date',  'Assignment Date',  () => !!data.inv_date],
+    ['f-inv-price', 'Purchase Price',   () => data.inv_price > 0],
+  ];
+  NB_REQUIRED.forEach(([id]) => {
+    const el = document.getElementById(id);
+    if (el) el.style.borderColor = '';
+  });
+  const nbStarted =
+    [data.investor, data.inv_contact, data.nb_name, data.nb_business,
+     data.nb_phone, data.nb_email, data.nb_address].some(v => (v || '').trim() !== '')
+    || !!data.inv_date
+    || data.inv_price > 0;
+  if (nbStarted) {
+    const missing = NB_REQUIRED.filter(([, , ok]) => !ok());
+    if (missing.length) {
+      missing.forEach(([id]) => {
+        const el = document.getElementById(id);
+        if (el) el.style.borderColor = 'var(--red)';
+      });
+      const first = document.getElementById(missing[0][0]);
+      if (first) {
+        first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        first.focus();
+      }
+      return showToast(
+        '⚠️ Note buyer started — still need: ' + missing.map(m => m[1]).join(', ') +
+        '. Leave the whole investor section blank for an unassigned note.',
+        'error'
+      );
+    }
+  }
 
   // Auto-uncheck "Posted on Paperstac" when a note transitions to having
   // a buyer assigned — once sold, it's no longer listed there. Only fires
@@ -2418,9 +2565,9 @@ function openDetail(id) {
          <div><div class="dp-field-label">Purchase Price</div><div>${l.inv_price?fmt(l.inv_price):'—'}</div></div>
          <div><div class="dp-field-label">Yield</div><div>${l.rate}%</div></div>
        </div>
-       ${(l.nb_name||l.nb_business)?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+       ${(l.nb_name||l.nb_business)?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">
          <span style="font-weight:700;color:var(--gold)">🤝 Note Buyer</span>
-         <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:${l.website_posted?'rgba(197,167,95,0.2)':'rgba(255,255,255,0.05)'};color:${l.website_posted?'var(--gold)':'var(--text3)'}">${l.website_posted?'🌐 Posted':'Not Posted'}</span>
+         <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${portalBadgeHTML(l.nb_email)}<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:${l.website_posted?'rgba(197,167,95,0.2)':'rgba(255,255,255,0.05)'};color:${l.website_posted?'var(--gold)':'var(--text3)'}">${l.website_posted?'🌐 Posted':'Not Posted'}</span></span>
        </div>
        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
          <div><div class="dp-field-label">Name</div><div>${l.nb_name||'—'}</div></div>
@@ -2431,6 +2578,7 @@ function openDetail(id) {
          <div><div class="dp-field-label">Loan Servicer</div><div>${l.loan_servicer||'—'}</div></div>
          <div><div class="dp-field-label">Website</div><div>${l.loan_servicer_web?`<a href="${l.loan_servicer_web}" target="_blank" style="color:var(--gold);text-decoration:underline">${l.loan_servicer_web}</a>`:'—'}</div></div>
        </div>
+       ${hsfSyncWarningHTML(l)}
        <div style="margin-top:10px">
          <button class="btn btn-sm" style="background:var(--gold);color:#000;font-weight:600" onclick="pushToHSF('${l.id}')">Push to HSF</button>
        </div>`:''}`
@@ -2902,9 +3050,15 @@ async function saveInvestor() {
   // Map LandFlow modal → note_lenders shape:
   // - If Contact Person is filled, treat "Company / Name" as the business and Contact as the individual.
   // - Otherwise treat "Company / Name" as the individual's name (no business).
+  //
+  // Empty string, NOT null, for an individual with no business. HSF distinguishes
+  // the two: '' renders the lender's own name, while null falls through to the
+  // loan's buyer_company — which is the *borrower's* company, so the lender shows
+  // up on the portal under a business they have nothing to do with. Two lenders
+  // were displaying as "Terra Equity Holdings LLC" because of this.
   const data = {
     email,
-    business: contact ? nameInput : null,
+    business: contact ? nameInput : '',
     name: contact || nameInput,
     phone: phone || null,
     notes: notes || null,
@@ -2941,6 +3095,7 @@ function renderInvestors() {
       ${inv.contact&&inv.contact!=='—'?`<div style="font-size:12px;color:var(--text2)">👤 ${inv.contact}</div>`:''}
       ${inv.phone?`<div style="font-size:12px;color:var(--text2)">📞 ${fmtPhone(inv.phone)}</div>`:''}
       ${inv.email?`<div style="font-size:12px;color:var(--text2)">✉️ ${inv.email}</div>`:''}
+      ${inv.email?`<div style="margin-top:8px">${portalBadgeHTML(inv.email)}</div>`:''}
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
         <div><div class="lc-label">Notes Held</div><div class="lc-val">${assigned.length}</div></div>
         <div><div class="lc-label">Portfolio</div><div class="lc-val gold">${fmt(total)}</div></div>
@@ -5196,6 +5351,10 @@ document.addEventListener('DOMContentLoaded', () => {
       else el.value = `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
     });
   });
+  // Keep the portal-invite badge in step with the email being typed, so you can
+  // see "already invited" before clicking Invite again.
+  const nbEmail = document.getElementById('f-nb-email');
+  if (nbEmail) nbEmail.addEventListener('input', updateInviteStatusBadge);
   initAuth();
 });
 </script>
