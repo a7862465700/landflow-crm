@@ -18,8 +18,31 @@ portal change is a drop-in.
 4. They read it and **type their name** into a signature field. Accept stays
    disabled until the field is non-empty.
 5. On accept, stamp all four columns (below) in one write, then let them in.
-6. On every later sign-in, if `hold_harmless_accepted_at` is set for the
-   current `hold_harmless_version`, skip the gate.
+6. On every later sign-in, skip the gate **only if** the lender's
+   `hold_harmless_version` equals the current version. Read the current version
+   from `app_settings` where `key = 'hold_harmless_version'` — do not hardcode
+   it. Bumping that one row is what re-prompts everybody.
+
+```
+   accepted_at IS NULL                        -> gate
+   version <> app_settings.hold_harmless_version -> gate (terms changed)
+   otherwise                                  -> let them through
+```
+
+## Re-prompting lenders who already signed
+
+This is the intended mechanism, and it needs no data surgery. Change the
+`hold_harmless_version` row in `app_settings` to the new version string; every
+lender still carrying the old one is gated at their next sign-in and signs the
+new terms with their name.
+
+Do **not** null `hold_harmless_accepted_at` to force the prompt. It erases what
+they signed and when, which is the record the agreement exists to create. The
+version comparison achieves the same thing without destroying evidence.
+
+The nine existing acceptances all carry `2026-06-02` and a null
+`hold_harmless_signed_name` — they predate the signature field. Bumping the
+version re-prompts them and captures a real signature for the first time.
 
 ## Storage — already in place, nothing to add
 
@@ -82,6 +105,22 @@ order by hold_harmless_accepted_at desc;
 select email from note_lenders where hold_harmless_accepted_at is null;
 ```
 
-Historical note: the nine existing acceptances predate the signature field, so
-`hold_harmless_signed_name` is null for all of them. Decide whether they are
-re-prompted (bump the version) or grandfathered (leave them).
+## History
+
+`hold_harmless_acceptances` is an append-only record of every acceptance ever
+made — email, name, version, timestamp, typed signature, IP. A trigger on
+`note_lenders` writes to it automatically; nothing else can, and there is no
+INSERT policy, so it cannot be forged or edited through the API.
+
+This exists because `note_lenders` holds only the *latest* acceptance. Without
+the history table, re-prompting a lender and having them sign again would
+overwrite the signature they gave in June. All nine June acceptances are
+backfilled.
+
+```sql
+-- Everything a given lender has ever accepted
+select version, accepted_at, signed_name, ip
+from hold_harmless_acceptances
+where lower(lender_email) = 'someone@example.com'
+order by accepted_at desc;
+```
