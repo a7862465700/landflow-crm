@@ -3,10 +3,12 @@
 -- Two problems this fixes, both found while tracing why an assigned note
 -- (Lot 17 Claro Way) was invisible to its lender on Hickory Street Finance.
 --
--- 1. `on_loan_assigned_sync_to_hsf` was AFTER UPDATE only. A loan saved with
---    the note buyer already filled in at creation never fired the sync, so it
---    only ever reached hsf_loans if someone happened to edit it again later.
---    Now fires on INSERT too.
+-- 1. `on_loan_assigned_sync_to_hsf` was AFTER UPDATE only, and even then only
+--    reacted to nb_email / inv_date. A loan saved with the note buyer already
+--    filled in at creation never synced at all, and a synced loan whose amount,
+--    dates or address were later corrected in the CRM never re-synced -- the
+--    portal kept serving the old values silently. Now fires on INSERT, and on
+--    UPDATE of any field hsf_loans mirrors.
 --
 -- 2. The CRM had no way to tell whether a lender had actually been invited to
 --    the portal, or had accepted. That lives in auth.users, which PostgREST
@@ -39,11 +41,28 @@ BEGIN
   -- OLD is not assigned during INSERT; referencing it there raises. Treat an
   -- insert as "changed" so a loan created with the buyer already filled in
   -- syncs immediately instead of waiting for an unrelated later edit.
+  --
+  -- On UPDATE, compare every field hsf_loans mirrors -- not just nb_email and
+  -- inv_date as before. hsf_loans is a copy, so any mirrored field edited in
+  -- the CRM and not re-pushed leaves the portal showing stale data with nothing
+  -- to indicate it. That had already happened to 8 notes: five lenders were
+  -- being shown the wrong first payment date, two of them out by four months.
+  --
+  -- Fields not mirrored into hsf_loans (loan_servicer, notes, sold, status,
+  -- paperstac_posted, ...) are deliberately excluded, so ordinary CRM edits
+  -- don't generate pointless HTTP posts.
   IF TG_OP = 'INSERT' THEN
     v_changed := true;
   ELSE
-    v_changed := (OLD.nb_email IS DISTINCT FROM NEW.nb_email)
-              OR (OLD.inv_date IS DISTINCT FROM NEW.inv_date);
+    v_changed := (
+      OLD.borrower, OLD.email, OLD.phone, OLD.loan_amount, OLD.rate, OLD.term,
+      OLD.orig_date, OLD.first_pay_date, OLD.nb_name, OLD.nb_email, OLD.nb_business,
+      OLD.inv_date, OLD.inv_price, OLD.parcel, OLD.address
+    ) IS DISTINCT FROM (
+      NEW.borrower, NEW.email, NEW.phone, NEW.loan_amount, NEW.rate, NEW.term,
+      NEW.orig_date, NEW.first_pay_date, NEW.nb_name, NEW.nb_email, NEW.nb_business,
+      NEW.inv_date, NEW.inv_price, NEW.parcel, NEW.address
+    );
   END IF;
 
   IF (NEW.nb_email IS NOT NULL AND NEW.nb_email <> '')
