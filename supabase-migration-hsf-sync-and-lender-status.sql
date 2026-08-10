@@ -1,56 +1,57 @@
--- HSF sync hardening + lender portal status
+-- HSF sync: every note on the portal, kept current, without the API
 --
--- Two problems this fixes, both found while tracing why an assigned note
--- (Lot 17 Claro Way) was invisible to its lender on Hickory Street Finance.
+-- Traced from "an assigned note is invisible on Hickory Street" (Lot 17 Claro
+-- Way) down to the sync itself. Four changes.
 --
--- 1. `on_loan_assigned_sync_to_hsf` was AFTER UPDATE only, and even then only
---    reacted to nb_email / inv_date. A loan saved with the note buyer already
---    filled in at creation never synced at all, and a synced loan whose amount,
---    dates or address were later corrected in the CRM never re-synced -- the
---    portal kept serving the old values silently. Now fires on INSERT, and on
---    UPDATE of any field hsf_loans mirrors.
+-- The shape of the problem: hsf_loans is a *copy* of loans, written by POSTing
+-- to the portal's /api/crm-sync. Payments never had any of these faults
+-- because payments were never copied -- one shared table, both apps reading it.
 --
--- 2. The CRM had no way to tell whether a lender had actually been invited to
---    the portal, or had accepted. That lives in auth.users, which PostgREST
---    does not expose. `hsf_lender_portal_status()` returns it for admins only.
---
--- Both objects already existed in the database but not in the repo. Per
--- .planning/note-buyer-visibility.md, DB objects are the source of truth only
--- when mirrored here — this file is that mirror.
+-- Per .planning/note-buyer-visibility.md the repo is the record for DB objects,
+-- and it had drifted; this file is the mirror.
 
 -- ---------------------------------------------------------------------------
--- 1. Sync trigger: fire on INSERT as well as UPDATE
+-- 1. Sync writes hsf_loans directly instead of calling /api/crm-sync
 -- ---------------------------------------------------------------------------
+-- Three faults, one cause:
+--
+--   * AFTER UPDATE only -- a loan created with the buyer already filled in
+--     never synced at all.
+--   * Reacted only to nb_email / inv_date -- a note whose amount, dates or
+--     address were later corrected never re-synced, and the portal served the
+--     old values silently. Eight notes had drifted; five lenders were being
+--     shown the wrong first payment date, two of them out by four months.
+--   * /api/crm-sync rejects a note with no nb_email + inv_date (422
+--     VALIDATION_FAILED, confirmed by testing one). Notes serviced in-house
+--     have neither, so 37 of 92 could not reach the portal at all.
+--
+-- The endpoint turned out to be a straight field copy -- verified across all
+-- 52 lender rows, every mirrored column matched its source in loans and
+-- note_lenders exactly, with no transformation. So the database can do the
+-- write itself, which sidesteps the validation entirely and closes the drift
+-- window to zero.
+--
+-- Deliberately NOT written here: lender_address, lender_phone,
+-- lender_bank_name, lender_ach_routing_number, lender_account_number. The
+-- lender enters those themselves in the portal; they flow portal -> note_lenders
+-- and are none of the CRM's business. Overwriting them from here would destroy
+-- data the CRM never had.
 
 CREATE OR REPLACE FUNCTION public.trigger_crm_sync_to_hsf()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = public
 AS $$
 DECLARE
-  sync_url    text;
-  sync_secret text;
-  v_changed   boolean;
+  v_changed  boolean;
+  v_name     text;
+  v_business text;
 BEGIN
-  -- Never sync a wrap note to the note-buyer-facing hsf_loans (isolation).
-  IF COALESCE(NEW.note_type, 'underlying') = 'wrap' THEN
-    RETURN NEW;
-  END IF;
+  -- Wrap notes are never exposed to note buyers (buyer isolation).
+  IF COALESCE(NEW.note_type, 'underlying') = 'wrap' THEN RETURN NEW; END IF;
 
-  -- OLD is not assigned during INSERT; referencing it there raises. Treat an
-  -- insert as "changed" so a loan created with the buyer already filled in
-  -- syncs immediately instead of waiting for an unrelated later edit.
-  --
-  -- On UPDATE, compare every field hsf_loans mirrors -- not just nb_email and
-  -- inv_date as before. hsf_loans is a copy, so any mirrored field edited in
-  -- the CRM and not re-pushed leaves the portal showing stale data with nothing
-  -- to indicate it. That had already happened to 8 notes: five lenders were
-  -- being shown the wrong first payment date, two of them out by four months.
-  --
-  -- Fields not mirrored into hsf_loans (loan_servicer, notes, sold, status,
-  -- paperstac_posted, ...) are deliberately excluded, so ordinary CRM edits
-  -- don't generate pointless HTTP posts.
+  -- OLD is unassigned during INSERT; referencing it there raises.
   IF TG_OP = 'INSERT' THEN
     v_changed := true;
   ELSE
@@ -65,24 +66,47 @@ BEGIN
     );
   END IF;
 
-  IF (NEW.nb_email IS NOT NULL AND NEW.nb_email <> '')
-     AND (NEW.inv_date IS NOT NULL)
-     AND v_changed
-  THEN
-    SELECT value INTO sync_url    FROM app_settings WHERE key = 'hsf_sync_url';
-    SELECT value INTO sync_secret FROM app_settings WHERE key = 'hsf_sync_secret';
+  -- Fields hsf_loans does not mirror (loan_servicer, notes, sold, status,
+  -- paperstac_posted, ...) fall out here, so routine CRM edits are free.
+  IF NOT v_changed THEN RETURN NEW; END IF;
 
-    IF sync_url IS NOT NULL AND sync_secret IS NOT NULL THEN
-      PERFORM net.http_post(
-        url     := sync_url,
-        body    := jsonb_build_object('crm_loan_id', NEW.id::text),
-        headers := jsonb_build_object(
-          'Content-Type', 'application/json',
-          'Authorization', 'Bearer ' || sync_secret
-        )
-      );
-    END IF;
-  END IF;
+  -- note_lenders is the canonical lender identity; loans.nb_name is whatever
+  -- was typed on that particular note and carries per-loan variants.
+  SELECT nl.name, nl.business INTO v_name, v_business
+    FROM note_lenders nl
+   WHERE coalesce(trim(NEW.nb_email), '') <> ''
+     AND lower(trim(nl.email)) = lower(trim(NEW.nb_email))
+   LIMIT 1;
+
+  INSERT INTO hsf_loans (
+    crm_loan_id, borrower, email, phone, loan_amount, rate, term,
+    orig_date, first_pay_date, nb_name, nb_email, nb_business,
+    inv_date, inv_price, parcel, address, last_synced_at
+  ) VALUES (
+    NEW.id, coalesce(NEW.borrower,''), coalesce(NEW.email,''), NEW.phone,
+    coalesce(NEW.loan_amount,0), NEW.rate, NEW.term, NEW.orig_date, NEW.first_pay_date,
+    coalesce(v_name, nullif(trim(coalesce(NEW.nb_name,'')),''), ''),
+    coalesce(trim(NEW.nb_email),''),
+    coalesce(v_business, nullif(trim(coalesce(NEW.nb_business,'')),''), ''),
+    NEW.inv_date, coalesce(NEW.inv_price,0), NEW.parcel, NEW.address, now()
+  )
+  ON CONFLICT (crm_loan_id) DO UPDATE SET
+    borrower       = EXCLUDED.borrower,
+    email          = EXCLUDED.email,
+    phone          = EXCLUDED.phone,
+    loan_amount    = EXCLUDED.loan_amount,
+    rate           = EXCLUDED.rate,
+    term           = EXCLUDED.term,
+    orig_date      = EXCLUDED.orig_date,
+    first_pay_date = EXCLUDED.first_pay_date,
+    nb_name        = EXCLUDED.nb_name,
+    nb_email       = EXCLUDED.nb_email,
+    nb_business    = EXCLUDED.nb_business,
+    inv_date       = EXCLUDED.inv_date,
+    inv_price      = EXCLUDED.inv_price,
+    parcel         = EXCLUDED.parcel,
+    address        = EXCLUDED.address,
+    last_synced_at = now();
 
   RETURN NEW;
 END;
@@ -95,12 +119,70 @@ CREATE TRIGGER on_loan_assigned_sync_to_hsf
   FOR EACH ROW EXECUTE FUNCTION public.trigger_crm_sync_to_hsf();
 
 -- ---------------------------------------------------------------------------
--- 2. Lender portal status, for the CRM's invite indicator
+-- 2. Assignment date is not mandatory
+-- ---------------------------------------------------------------------------
+-- hsf_loans.inv_date was NOT NULL, so the table could not represent a note
+-- with no assignment -- every note serviced in-house. The schema half of the
+-- same assumption behind the API validation. Existing dates are left alone.
+--
+-- nb_email stays NOT NULL: '' satisfies it, and that is what an unassigned
+-- note writes. A date has no equivalent empty value, so this was the only
+-- column that actually blocked anything.
+
+ALTER TABLE public.hsf_loans ALTER COLUMN inv_date DROP NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- 3. Unassigning a note in the CRM clears the lender on HSF
+-- ---------------------------------------------------------------------------
+-- The sync only ever added or updated. Taking a lender off a note in LandFlow
+-- -- routine when a buyer cancels -- left the portal holding the old
+-- assignment. Three notes sat like that from 12 June (Lot 2 and Lot 3 Asturias
+-- Dr, Lot 3 Pamplona Cir), each filed to a lender with no portal account.
+--
+-- Invisible from every screen: the CRM had no lender to show, the lender list
+-- counted zero notes for him, and the view that would have shown them needed
+-- an account he did not have. Nothing was exposed for that same reason -- but
+-- an invite would have handed him three notes he does not own, with prices.
+--
+-- Clears the lender's banking details from the *note* (a copy of a lender who
+-- no longer holds it), not from note_lenders, which is the lender's own record.
+-- The row is kept, not deleted: every note belongs on the portal, assigned or
+-- not.
+
+CREATE OR REPLACE FUNCTION public.clear_hsf_lender_on_unassign()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF coalesce(trim(OLD.nb_email), '') <> '' AND coalesce(trim(NEW.nb_email), '') = '' THEN
+    UPDATE hsf_loans
+       SET nb_email = '', nb_name = '', nb_business = '', inv_price = 0,
+           lender_notes = null, lender_address = null, lender_phone = null,
+           lender_bank_name = null, lender_ach_routing_number = null,
+           lender_account_number = null,
+           last_synced_at = now()
+     WHERE crm_loan_id = NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_loan_unassigned_clear_hsf ON public.loans;
+
+CREATE TRIGGER on_loan_unassigned_clear_hsf
+  AFTER UPDATE OF nb_email ON public.loans
+  FOR EACH ROW EXECUTE FUNCTION public.clear_hsf_lender_on_unassign();
+
+-- ---------------------------------------------------------------------------
+-- 4. Lender portal status, for the CRM's invite indicator
 -- ---------------------------------------------------------------------------
 -- Returns one row per note_buyer account. The CRM joins this to note_lenders
--- by email to show not-invited / invited-pending / signed-in. Admin-gated
--- inside the function body: a non-admin caller gets zero rows, never an error,
--- so the indicator degrades to "unknown" rather than breaking the lender list.
+-- by email to show not-invited / invited-pending / signed-in. Lives in
+-- auth.users, which PostgREST does not expose. Admin-gated inside the body: a
+-- non-admin caller gets zero rows, never an error, so the indicator degrades
+-- to "unknown" rather than breaking the lender list.
 
 CREATE OR REPLACE FUNCTION public.hsf_lender_portal_status()
 RETURNS TABLE (
@@ -132,62 +214,24 @@ REVOKE ALL ON FUNCTION public.hsf_lender_portal_status() FROM public;
 GRANT EXECUTE ON FUNCTION public.hsf_lender_portal_status() TO authenticated;
 
 -- ---------------------------------------------------------------------------
--- 3. Unassigning a note in the CRM clears the lender on HSF
+-- Backfill (one-time; the trigger handles everything from here)
 -- ---------------------------------------------------------------------------
--- The sync only ever added or updated. Taking a lender off a note in LandFlow
--- -- routine when a buyer cancels -- left the portal holding the old
--- assignment: lender name, email and purchase price, on a note the CRM shows
--- as unassigned. Three notes were in that state since 12 June (Lot 2 and Lot 3
--- Asturias Dr, Lot 3 Pamplona Cir), each still filed to a lender who had no
--- portal account. Nothing was visible: the CRM had no lender to show, the
--- lender list counted zero notes for him, and the one view that would have
--- displayed them needed an account he did not have.
---
--- This writes hsf_loans directly rather than going through /api/crm-sync,
--- because that endpoint rejects a note with no lender -- the very state we are
--- trying to record.
---
--- The row itself is kept, not deleted: every note belongs on the portal
--- whether or not it has a lender. inv_date is left alone because hsf_loans
--- declares it NOT NULL -- the schema assumes every note has an assignment,
--- which is the same assumption behind the API validation and the reason
--- lender-less notes cannot sync at all yet.
+-- Mirrors the trigger's mapping exactly. Safe to re-run.
 
--- hsf_loans.inv_date was NOT NULL, so the table could not represent a note
--- with no assignment -- which is every note the owner services himself. That
--- constraint is the schema half of the same assumption behind /api/crm-sync
--- rejecting a note with no nb_email + inv_date. Dropped so a note without an
--- assignment date can exist on the portal.
---
--- Existing dates are deliberately left in place; this only stops new rows
--- being forced to invent one. nb_email is left NOT NULL because '' satisfies
--- it -- a date has no equivalent empty value, which is why only this column
--- needed changing.
-
-ALTER TABLE public.hsf_loans ALTER COLUMN inv_date DROP NOT NULL;
-
-CREATE OR REPLACE FUNCTION public.clear_hsf_lender_on_unassign()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF coalesce(trim(OLD.nb_email), '') <> '' AND coalesce(trim(NEW.nb_email), '') = '' THEN
-    UPDATE hsf_loans
-       SET nb_email = '', nb_name = '', nb_business = '', inv_price = 0,
-           lender_notes = null, lender_address = null, lender_phone = null,
-           lender_bank_name = null, lender_ach_routing_number = null,
-           lender_account_number = null,
-           last_synced_at = now()
-     WHERE crm_loan_id = NEW.id;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS on_loan_unassigned_clear_hsf ON public.loans;
-
-CREATE TRIGGER on_loan_unassigned_clear_hsf
-  AFTER UPDATE OF nb_email ON public.loans
-  FOR EACH ROW EXECUTE FUNCTION public.clear_hsf_lender_on_unassign();
+INSERT INTO hsf_loans (
+  crm_loan_id, borrower, email, phone, loan_amount, rate, term,
+  orig_date, first_pay_date, nb_name, nb_email, nb_business,
+  inv_date, inv_price, parcel, address, last_synced_at
+)
+SELECT l.id, coalesce(l.borrower,''), coalesce(l.email,''), l.phone,
+       coalesce(l.loan_amount,0), l.rate, l.term, l.orig_date, l.first_pay_date,
+       coalesce(nl.name, nullif(trim(coalesce(l.nb_name,'')),''), ''),
+       coalesce(trim(l.nb_email),''),
+       coalesce(nl.business, nullif(trim(coalesce(l.nb_business,'')),''), ''),
+       l.inv_date, coalesce(l.inv_price,0), l.parcel, l.address, now()
+FROM loans l
+LEFT JOIN note_lenders nl
+  ON coalesce(trim(l.nb_email),'') <> '' AND lower(trim(nl.email)) = lower(trim(l.nb_email))
+WHERE coalesce(l.note_type,'underlying') <> 'wrap'
+  AND l.id NOT IN (SELECT crm_loan_id FROM hsf_loans WHERE crm_loan_id IS NOT NULL)
+ON CONFLICT (crm_loan_id) DO NOTHING;
