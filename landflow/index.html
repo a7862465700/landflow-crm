@@ -1394,13 +1394,43 @@ async function dbSaveLoan(data, id) {
   }
 }
 
+// Returns { ok:true } or { ok:false, error }. It used to return nothing and
+// discard every error, so deleteLoan() removed the row from the in-memory
+// array and announced "Loan deleted" while the row sat untouched in the
+// database — reappearing in the Checklist (which re-queries) and on the next
+// sign-in. Every loan is mirrored into hsf_loans for the HSF portal and that
+// FK is ON DELETE RESTRICT, so in practice NO loan could be deleted at all.
+// (2026-08-25)
 async function dbDeleteLoan(id) {
-  await sb.from('loans').delete().eq('id', id).eq('user_id', currentUser.id);
+  const del = () => sb.from('loans').delete().eq('id', id).eq('user_id', currentUser.id).select('id');
+
+  let { data, error } = await del();
+
+  // Postgres blocks the delete while the HSF mirror row exists. Drop the
+  // mirror and retry once — but only when the violated constraint is that one.
+  // Any other RESTRICT reference (servicing_agreements, hsf_note_transfers,
+  // loan_ledger) is a real reason not to delete the loan, and we must not
+  // destroy the mirror chasing it.
+  if (error && String(error.message || '').includes('hsf_loans_crm_loan_id_fkey')) {
+    const { error: hsfErr } = await sb.from('hsf_loans').delete().eq('crm_loan_id', id);
+    if (hsfErr) { console.error('dbDeleteLoan hsf_loans error:', hsfErr); return { ok:false, error:hsfErr }; }
+    ({ data, error } = await del());
+  }
+
+  if (error) { console.error('dbDeleteLoan loans error:', error); return { ok:false, error }; }
+
+  // A delete that RLS filters out matches nothing: no error, empty result.
+  // Without this check that is indistinguishable from success.
+  if (!data || data.length === 0) {
+    return { ok:false, error:{ message:'Nothing was deleted — the loan is not owned by this account.' } };
+  }
+
   // Phase 08 (CRM-004): drop the eq('user_id', currentUser.id) filter so
   // HSF-posted (or future Stripe ACH / autopay) payment rows attached to
   // this loan also cascade-delete. Without this they would be orphaned
   // to a deleted loan_id. Admin RLS on payments still gates the call.
   await sb.from('payments').delete().eq('loan_id', id);
+  return { ok:true };
 }
 
 async function dbSavePayment(data) {
@@ -2297,7 +2327,10 @@ async function handlePDFFile(e) {
 async function deleteLoan() {
   if (!currentLoanId) return;
   if (!confirm('Delete this loan? This also removes payment history.')) return;
-  await dbDeleteLoan(currentLoanId);
+  const res = await dbDeleteLoan(currentLoanId);
+  // Only touch the UI once the database has actually agreed. Reporting success
+  // unconditionally is what let a "deleted" loan keep showing up in the Checklist.
+  if (!res.ok) { showToast('Delete failed: ' + (res.error?.message || 'unknown error'), 'error'); return; }
   loans = loans.filter(l => l.id !== currentLoanId);
   payments = payments.filter(p => p.loan_id !== currentLoanId);
   renderLoans(); updateStats(); closeDetail();
