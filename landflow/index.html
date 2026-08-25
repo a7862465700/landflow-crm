@@ -1411,7 +1411,11 @@ async function dbDeleteLoan(id) {
   // Any other RESTRICT reference (servicing_agreements, hsf_note_transfers,
   // loan_ledger) is a real reason not to delete the loan, and we must not
   // destroy the mirror chasing it.
-  if (error && String(error.message || '').includes('hsf_loans_crm_loan_id_fkey')) {
+  // PostgREST puts the constraint name in message, details or hint depending
+  // on the error, so check all three rather than trusting one.
+  const blockedByMirror = (e) =>
+    !!e && [e.message, e.details, e.hint].some(t => String(t || '').includes('hsf_loans'));
+  if (blockedByMirror(error)) {
     const { error: hsfErr } = await sb.from('hsf_loans').delete().eq('crm_loan_id', id);
     if (hsfErr) { console.error('dbDeleteLoan hsf_loans error:', hsfErr); return { ok:false, error:hsfErr }; }
     ({ data, error } = await del());
