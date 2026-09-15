@@ -654,8 +654,8 @@ textarea.form-input{resize:vertical;min-height:80px}
             <option value="">None</option><option value="3">3 yr</option><option value="5">5 yr</option><option value="7">7 yr</option><option value="10">10 yr</option>
           </select>
         </div>
-        <div class="form-group"><label class="form-label">Origination Date *</label><input class="form-input" id="f-origdate" type="date" oninput="updatePreview();updateDateWritten()"><div id="origdate-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
-        <div class="form-group"><label class="form-label">First Payment Date</label><input class="form-input" id="f-firstpay" type="date" oninput="updateFirstPayWritten()"><div id="firstpay-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
+        <div class="form-group"><label class="form-label">Origination Date *</label><input class="form-input" id="f-origdate" type="date" oninput="updatePreview();updateDateWritten();syncFirstPay()"><div id="origdate-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
+        <div class="form-group"><label class="form-label">First Payment Date</label><input class="form-input" id="f-firstpay" type="date" oninput="markFirstPayTouched();updateFirstPayWritten()"><div id="firstpay-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
         <div class="form-group"><label class="form-label">Payment Due Day</label>
           <select class="form-input" id="f-dueday">
             <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
@@ -1904,14 +1904,22 @@ function openLoanModal(editId) {
     document.getElementById('f-loan-servicer').value = l.loan_servicer||'';
     document.getElementById('f-loan-servicer-web').value = l.loan_servicer_web||'';
     document.getElementById('f-notes').value = l.notes||'';
+    // A saved first-payment date is never overwritten — whatever is on the loan
+    // today stands until someone edits it deliberately.
+    firstPayTouched = true;
   } else {
     clearLoanForm();
-    document.getElementById('f-origdate').value = new Date().toISOString().split('T')[0];
+    // ymd(), not toISOString() — the latter converts to UTC first, so anything
+    // entered after ~6pm Central would be stamped with tomorrow's date, and at a
+    // month end that lands the loan in the wrong first-payment bucket entirely.
+    document.getElementById('f-origdate').value = ymd(new Date());
+    firstPayTouched = false;
   }
   const dl = document.getElementById('investorList');
   dl.innerHTML = investors.map(i => `<option value="${i.name}">`).join('');
   updatePreview();
   updateDateWritten();
+  syncFirstPay();
   updateFirstPayWritten();
   // Existing loans open read-only; new loans open editable
   setLoanFormEditable(!editId);
@@ -2036,6 +2044,43 @@ function updateDateWritten() {
   const v = document.getElementById('f-origdate').value;
   document.getElementById('origdate-written').textContent = writtenDate(v);
 }
+// Funding in the first half of a month makes the payment due the 1st of the
+// next month. Funding on the 15th or later skips that 1st — a loan funded
+// 30 July cannot be due 1 August, it is due 1 September. Richard's rule,
+// recorded 2026-08-25; the 15th itself defers.
+//
+// Takes a Date at LOCAL midnight, returns a Date at local midnight. Parse
+// 'YYYY-MM-DD' with 'T00:00:00' appended before calling — bare `new Date('...')`
+// is read as UTC, which lands on the previous day west of Greenwich, and one
+// day's slip across the 14th/15th boundary moves the payment a whole month.
+function firstPaymentDate(fundedOn) {
+  const monthsAhead = fundedOn.getDate() >= 15 ? 2 : 1;
+  return new Date(fundedOn.getFullYear(), fundedOn.getMonth() + monthsAhead, 1);
+}
+
+// Format a Date from its LOCAL parts. toISOString() converts to UTC first,
+// which shifts the date east of Greenwich.
+function ymd(d) {
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
+}
+
+// First payment tracks the origination date until someone types a date of their
+// own, after which it is left alone. Editing an existing loan counts as already
+// typed — a saved date is never overwritten by this.
+let firstPayTouched = false;
+function markFirstPayTouched() { firstPayTouched = true; }
+function syncFirstPay() {
+  if (firstPayTouched) return;
+  const v = document.getElementById('f-origdate').value;
+  const el = document.getElementById('f-firstpay');
+  el.value = /^\d{4}-\d{2}-\d{2}$/.test(v)
+    ? ymd(firstPaymentDate(new Date(v + 'T00:00:00')))
+    : '';
+  updateFirstPayWritten();
+}
+
 function updateFirstPayWritten() {
   const v = document.getElementById('f-firstpay').value;
   document.getElementById('firstpay-written').textContent = writtenDate(v);
@@ -2298,9 +2343,10 @@ async function handlePDFFile(e) {
     }
     document.getElementById('f-origdate').value = filingDate.toISOString().split('T')[0];
 
-    // First payment date = 1st of the month following the filing date
-    const firstPay = new Date(filingDate.getFullYear(), filingDate.getMonth() + 1, 1);
-    document.getElementById('f-firstpay').value = firstPay.toISOString().split('T')[0];
+    // First payment date per firstPaymentDate() — a filing on the 15th or later
+    // skips the next 1st and falls due the month after.
+    document.getElementById('f-firstpay').value = ymd(firstPaymentDate(filingDate));
+    firstPayTouched = true;   // computed here; don't let syncFirstPay() second-guess it
     document.getElementById('f-dueday').value = '1';
 
     // Add EIN to notes
@@ -4339,12 +4385,16 @@ function buildMergeData(loan) {
   const totalInterest = (pmt * n) - parseFloat(loan.loan_amount);
   const today = new Date();
 
-  // Calculate first payment date: always 1st of the month following the contract date
+  // First payment date per firstPaymentDate() — funded on the 15th or later and
+  // the next 1st is skipped. This is what gets merged into the agreement, so it
+  // must agree with what the CRM stores against the loan.
   let firstPayDate;
   if (loan.orig_date) {
-    const origD = new Date(loan.orig_date);
-    const fpd = new Date(origD.getFullYear(), origD.getMonth() + 1, 1);
-    firstPayDate = fpd.toISOString();
+    // 'T00:00:00' forces local midnight. Bare `new Date('2026-07-30')` is parsed
+    // as UTC and reads as the 29th here — a day's slip either side of the 15th
+    // moves the first payment by a full month.
+    const origD = new Date(String(loan.orig_date).slice(0, 10) + 'T00:00:00');
+    firstPayDate = firstPaymentDate(origD).toISOString();
   } else {
     firstPayDate = loan.first_pay_date || '';
   }
