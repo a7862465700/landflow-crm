@@ -654,8 +654,8 @@ textarea.form-input{resize:vertical;min-height:80px}
             <option value="">None</option><option value="3">3 yr</option><option value="5">5 yr</option><option value="7">7 yr</option><option value="10">10 yr</option>
           </select>
         </div>
-        <div class="form-group"><label class="form-label">Origination Date *</label><input class="form-input" id="f-origdate" type="date" oninput="updatePreview();updateDateWritten();syncFirstPay()"><div id="origdate-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
-        <div class="form-group"><label class="form-label">First Payment Date</label><input class="form-input" id="f-firstpay" type="date" oninput="markFirstPayTouched();updateFirstPayWritten()"><div id="firstpay-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div></div>
+        <div class="form-group"><label class="form-label">Origination Date</label><input class="form-input" id="f-origdate" type="date" oninput="updatePreview();updateDateWritten();syncFirstPay()"><div id="origdate-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div><div style="font-size:11px;color:var(--text3);margin-top:2px">Leave blank. It is filled in, with the first payment date, the day you generate the deed of trust.</div></div>
+        <div class="form-group"><label class="form-label">First Payment Date</label><input class="form-input" id="f-firstpay" type="date" oninput="markFirstPayTouched();updateFirstPayWritten()"><div id="firstpay-written" style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic"></div><div style="font-size:11px;color:var(--text3);margin-top:2px">Leave blank. Set by the 15th rule the day you generate the deed of trust.</div></div>
         <div class="form-group"><label class="form-label">Payment Due Day</label>
           <select class="form-input" id="f-dueday">
             <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
@@ -1909,10 +1909,9 @@ function openLoanModal(editId) {
     firstPayTouched = true;
   } else {
     clearLoanForm();
-    // ymd(), not toISOString() — the latter converts to UTC first, so anything
-    // entered after ~6pm Central would be stamped with tomorrow's date, and at a
-    // month end that lands the loan in the wrong first-payment bucket entirely.
-    document.getElementById('f-origdate').value = ymd(new Date());
+    // A new note has NO origination date. It is set the day the deed of trust
+    // package is generated (setOriginationFromDocuments), or typed by hand.
+    document.getElementById('f-origdate').value = '';
     firstPayTouched = false;
   }
   const dl = document.getElementById('investorList');
@@ -2058,6 +2057,44 @@ function firstPaymentDate(fundedOn) {
   return new Date(fundedOn.getFullYear(), fundedOn.getMonth() + monthsAhead, 1);
 }
 
+// ── A note originates the day its deed of trust is generated ─────────────────
+// Richard's rule, 2026-09-18. Scanning the Commissioner's deed does NOT set an
+// origination date — the Commissioner's date is not the loan's date, and using
+// it printed "July 30" on papers signed 28 August. The Origination Date stays
+// blank until the purchase package (agreement, note, deed of trust) is first
+// generated. That day becomes the origination date, and the first payment date
+// is worked out from it: generated on the 1st–14th → due the 1st of next month;
+// generated on the 15th or later → that 1st is skipped (18 Sep → 1 Nov).
+//
+// Both dates are SAVED on the loan before anything is merged, and the saved
+// dates are what print. One stored pair feeds the agreement, the note, the deed
+// of trust, landFlow and the Hickory Street portal — they cannot disagree.
+//
+// "No origination date" is the whole test. A note that already has one — every
+// note that existed before this rule, and any note once its package has been
+// generated — is never touched, so a reprint reproduces what was signed. Type a
+// date into the Origination Date box by hand and that date stands too.
+async function setOriginationFromDocuments(loan) {
+  if (!loan || loan.orig_date) return loan;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const origDate = ymd(today);
+  const firstPay = ymd(firstPaymentDate(today));
+  const { data, error } = await sb.from('loans')
+    .update({ orig_date: origDate, first_pay_date: firstPay })
+    .eq('id', loan.id)
+    .select('orig_date, first_pay_date')
+    .single();
+  // Never print a date that could not be saved — that is how the paper and the
+  // portal came to disagree in the first place.
+  if (error || !data) throw new Error('Could not save the origination date, so no documents were generated: ' + (error ? error.message : 'no row returned'));
+  loan.orig_date = data.orig_date;
+  loan.first_pay_date = data.first_pay_date;
+  showToast('Originated ' + writtenDate(loan.orig_date) + ' · first payment ' + writtenDate(loan.first_pay_date), 'success');
+  try { if (typeof renderLoans === 'function') renderLoans(); } catch (e) { /* display only */ }
+  return loan;
+}
+
 // Format a Date from its LOCAL parts. toISOString() converts to UTC first,
 // which shifts the date east of Greenwich.
 function ymd(d) {
@@ -2075,6 +2112,11 @@ function syncFirstPay() {
   if (firstPayTouched) return;
   const v = document.getElementById('f-origdate').value;
   const el = document.getElementById('f-firstpay');
+  // No origination date → no first payment date. Richard, 2026-09-18: the
+  // property card carries NO first payment date until the deed of trust is
+  // generated; setOriginationFromDocuments() sets both then. (The Hickory
+  // Street portal treats a note with no first payment date as Funded and never
+  // chases it.) A hand-typed origination date still drives the box as before.
   el.value = /^\d{4}-\d{2}-\d{2}$/.test(v)
     ? ymd(firstPaymentDate(new Date(v + 'T00:00:00')))
     : '';
@@ -2094,9 +2136,10 @@ async function saveLoan() {
   if (!borrower) return showToast('⚠️ Buyer name required', 'error');
   if (!loanAmount || isNaN(loanAmount)) return showToast('⚠️ Loan amount required', 'error');
   if (!rate || isNaN(rate)) return showToast('⚠️ Interest rate required', 'error');
-  if (!origDate) return showToast('⚠️ Origination date required', 'error');
+  // Origination date is no longer required: it is blank until the deed of trust
+  // package is generated, which sets it (see setOriginationFromDocuments).
   const data = {
-    borrower, loan_amount: loanAmount, rate, orig_date: origDate,
+    borrower, loan_amount: loanAmount, rate, orig_date: origDate || null,
     seller: document.getElementById('f-seller').value.trim(),
     seller_phone: document.getElementById('f-seller-phone').value.trim(),
     seller_address: document.getElementById('f-seller-address').value.trim(),
@@ -2329,24 +2372,19 @@ async function handlePDFFile(e) {
     document.getElementById('f-buyer-state').value = ARKANSAS_DEFAULTS.buyer_state;
     document.getElementById('f-buyer-county').value = ARKANSAS_DEFAULTS.buyer_county;
 
-    // Set origination date to the filing date from the document (not today).
-    // A missing or malformed filing_date used to fall through to today's date
-    // silently — which produces a loan that reads as past-due the moment it is
-    // saved — or throw "Invalid time value" and abort the whole import. Fall back
-    // to today so the form still opens, but say so loudly.
-    const filingDateValid =
-      /^\d{4}-\d{2}-\d{2}$/.test(extracted.filing_date || '') &&
-      !isNaN(new Date(extracted.filing_date + 'T00:00:00').getTime());
-    const filingDate = filingDateValid ? new Date(extracted.filing_date + 'T00:00:00') : new Date();
-    if (!filingDateValid) {
-      reviewNotes.push('filing date was not readable — origination and first-payment dates defaulted to today, correct them from the deed before saving');
-    }
-    document.getElementById('f-origdate').value = filingDate.toISOString().split('T')[0];
+    // The Commissioner's deed date is deliberately NOT used (Richard, 2026-09-18).
+    // Origination Date is left blank here and is filled in, with the real first
+    // payment date, by setOriginationFromDocuments() the day the deed of trust
+    // package is generated. extracted.filing_date is still returned by the scan
+    // but nothing reads it any more.
+    document.getElementById('f-origdate').value = '';
+    updateDateWritten();
 
-    // First payment date per firstPaymentDate() — a filing on the 15th or later
-    // skips the next 1st and falls due the month after.
-    document.getElementById('f-firstpay').value = ymd(firstPaymentDate(filingDate));
-    firstPayTouched = true;   // computed here; don't let syncFirstPay() second-guess it
+    // No first payment date either — not even an estimate. It is generated, by
+    // the 15th rule, only when the deed of trust is printed.
+    document.getElementById('f-firstpay').value = '';
+    firstPayTouched = false;
+    updateFirstPayWritten();
     document.getElementById('f-dueday').value = '1';
 
     // Add EIN to notes
@@ -4385,18 +4423,23 @@ function buildMergeData(loan) {
   const totalInterest = (pmt * n) - parseFloat(loan.loan_amount);
   const today = new Date();
 
-  // First payment date per firstPaymentDate() — funded on the 15th or later and
-  // the next 1st is skipped. This is what gets merged into the agreement, so it
-  // must agree with what the CRM stores against the loan.
+  // The documents print the first payment date STORED on the loan — the same
+  // date landFlow and the Hickory Street portal use. It used to be recomputed
+  // here from the Commissioner's deed date and could disagree with the loan
+  // (signed papers said 1 Aug while a reprint said 1 Sep). For a new note,
+  // setOriginationFromDocuments() has just saved it before this runs. Only a loan
+  // with no stored date at all falls back to the old calculation.
   let firstPayDate;
-  if (loan.orig_date) {
+  if (loan.first_pay_date) {
+    firstPayDate = parseLocalDate(String(loan.first_pay_date).slice(0, 10)).toISOString();
+  } else if (loan.orig_date) {
     // 'T00:00:00' forces local midnight. Bare `new Date('2026-07-30')` is parsed
     // as UTC and reads as the 29th here — a day's slip either side of the 15th
     // moves the first payment by a full month.
     const origD = new Date(String(loan.orig_date).slice(0, 10) + 'T00:00:00');
     firstPayDate = firstPaymentDate(origD).toISOString();
   } else {
-    firstPayDate = loan.first_pay_date || '';
+    firstPayDate = '';
   }
 
   // Maturity/last payment date: term (in years) × 12 months from the FIRST PAYMENT date
@@ -4529,6 +4572,9 @@ async function executeTemplateGenerate() {
       nullGetter: () => '',
       errorLogging: false,
     });
+    // Generating the purchase package from the Templates screen fixes the first
+    // payment date just as the quick button does. Other templates do not.
+    if (/purchase.*(agreement|contract)/i.test(t.name || '')) await setOriginationFromDocuments(loan);
     const data = buildMergeData(loan);
     try {
       doc.render(data);
@@ -4854,6 +4900,7 @@ async function buildAgreementDocx(loan, template) {
   const doc = new window.docxtemplater(zip, {
     paragraphLoop: true, linebreaks: true, nullGetter: () => '', errorLogging: false,
   });
+  await setOriginationFromDocuments(loan);
   doc.render(buildMergeData(loan));
   const blob = doc.getZip().generate({
     type: 'blob',
@@ -4942,6 +4989,8 @@ async function quickGeneratePurchaseAgreement() {
       nullGetter: () => '',
       errorLogging: false,
     });
+    // Fix the first payment date from today's date before anything is merged.
+    await setOriginationFromDocuments(loan);
     const data = buildMergeData(loan);
     try { doc.render(data); } catch (renderErr) {
       if (renderErr.properties && renderErr.properties.errors) {
@@ -5059,9 +5108,14 @@ const MERGE_FIELDS = [
     ['{rate}', 'Interest rate (number)'], ['{rate_fmt}', 'Interest rate (%)'],
     ['{term}', 'Loan term (years)'], ['{term_months}', 'Loan term (months)'],
     ['{balloon}', 'Balloon (years)'], ['{balloon_date}', 'Balloon maturity date'],
-    ['{orig_date}', 'Origination date (short)'], ['{orig_date_written}', 'Origination date (written out)'],
-    ['{contract_date}', 'Same as orig_date'], ['{contract_date_written}', 'Contract date (written out)'],
-    ['{date}', 'Contract date'],
+    // Not offered as options since 2026-09-18 (Richard): {orig_date},
+    // {orig_date_written}, {contract_date}, {contract_date_written} and {date}
+    // all print the Commissioner's deed date, which was mistaken for the date
+    // the contract was written — papers signed 28 Aug 2026 read "July 30, 2026".
+    // The contract date on documents is {today} / {today_long}: the day the
+    // package is generated. The old tags are still supplied to the merge so an
+    // older template (ARKANSAS DEED.docx uses {orig_date_written}) never prints
+    // a blank; they are just no longer advertised.
     ['{first_pay_date}', 'First payment date (short)'], ['{first_pay_date_written}', 'First payment date (written out)'],
     ['{payment_due_day}', 'Due day of month'], ['{status}', 'Loan status'], ['{notes}', 'Notes'],
   ]},
