@@ -1023,23 +1023,28 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const VILLAGE_VISTA_API = 'https://hotspringsland.com';
 
-const HSF_API = 'https://hickorystreetfinance.com';
-const HSF_SYNC_SECRET = 'd76c15ad20ab5a3edc65f545df3de0f0c865a2ea01daf605b706c2201d28115e';  // Shared secret — matches HSF_CRM_SYNC_SECRET env var
+// Session token for LandFlow's own server functions. The Hickory Street
+// shared secret stays in the Netlify environment and is never sent to the browser.
+async function signedInHeaders() {
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return null;
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + token,
+  };
+}
 
 async function syncPhotosToWebsite(loanId) {
   showToast('Syncing photos to website...');
   try {
     // Send the signed-in admin's Supabase access token so the website can
     // authorize the request (all apps share one Supabase project).
-    const { data: { session } } = await sb.auth.getSession();
-    const token = session?.access_token;
-    if (!token) { showToast('Please sign in again to sync photos.', 'error'); return; }
+    const headers = await signedInHeaders();
+    if (!headers) { showToast('Please sign in again to sync photos.', 'error'); return; }
     const res = await fetch(VILLAGE_VISTA_API + '/api/sync-photos', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token,
-      },
+      headers,
       body: JSON.stringify({ loanId }),
     });
     const result = await res.json();
@@ -1056,12 +1061,11 @@ async function syncPhotosToWebsite(loanId) {
 async function pushToHSF(loanId) {
   showToast('Syncing to Hickory Street Finance...', 'info');
   try {
-    const res = await fetch(HSF_API + '/api/crm-sync', {
+    const headers = await signedInHeaders();
+    if (!headers) { showToast('Please sign in again to sync.', 'error'); return; }
+    const res = await fetch('/.netlify/functions/crm-sync', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + HSF_SYNC_SECRET
-      },
+      headers,
       body: JSON.stringify({ crm_loan_id: loanId })
     });
     const data = await res.json();
@@ -1099,12 +1103,11 @@ async function inviteNoteBuyerToHSF() {
 
   showToast('Sending invite…', 'info');
   try {
-    const res = await fetch(HSF_API + '/api/admin/invite-lender', {
+    const headers = await signedInHeaders();
+    if (!headers) { showToast('Please sign in again to send an invite.', 'error'); return; }
+    const res = await fetch('/.netlify/functions/invite-lender', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + HSF_SYNC_SECRET
-      },
+      headers,
       body: JSON.stringify({ email, name, businessName })
     });
     const data = await res.json();
@@ -2308,9 +2311,11 @@ async function handlePDFFile(e) {
   showToast('Extracting data from PDF…');
 
   try {
+    const headers = await signedInHeaders();
+    if (!headers) { showToast('Please sign in again to import a deed.', 'error'); return; }
     const resp = await fetch('/.netlify/functions/extract-pdf', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ pdf_base64: base64 }),
     });
 
