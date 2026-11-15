@@ -6,8 +6,9 @@ files/
 build-guide.md
 tech-spec.md
 
-# Secrets & env files
+# Secrets & env files. .env.example is a template of names only.
 .env*
+!.env.example
 .claude/settings.local.json
 
 # Large files

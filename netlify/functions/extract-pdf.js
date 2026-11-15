@@ -1,5 +1,6 @@
 const Anthropic = require("@anthropic-ai/sdk");
 const { extractDeed, validateDeed } = require("./lib/deed-extraction");
+const { requireSignedInUser } = require("./lib/require-user");
 
 /**
  * Translate a failure into a status code and a message that says what to do
@@ -33,9 +34,8 @@ function describeFailure(err) {
 
 exports.handler = async (event) => {
   const headers = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
     "Content-Type": "application/json",
+    "Cache-Control": "no-store",
   };
 
   if (event.httpMethod === "OPTIONS") {
@@ -44,6 +44,16 @@ exports.handler = async (event) => {
 
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, headers, body: JSON.stringify({ error: "Method not allowed" }) };
+  }
+
+  // Same-origin CRM call. Reject strangers before spending an Anthropic request.
+  const authResult = await requireSignedInUser(event);
+  if (!authResult.ok) {
+    return {
+      statusCode: authResult.statusCode,
+      headers,
+      body: JSON.stringify({ error: authResult.error }),
+    };
   }
 
   try {
